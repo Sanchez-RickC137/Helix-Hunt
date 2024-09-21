@@ -17,7 +17,7 @@ const GeneSelection = ({ isDarkMode, selectedGenes, setSelectedGenes }) => {
   };
 
   return (
-    <div className="w-1/3 pr-4">
+    <div className="w-full">
       <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-lg p-6 h-full transition-colors duration-200`}>
         <h2 className="text-xl font-semibold mb-4">Select Genes</h2>
         <input

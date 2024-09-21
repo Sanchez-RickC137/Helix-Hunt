@@ -1,3 +1,4 @@
+// components/QueryParameters.js
 import React from 'react';
 import GeneVariationSearch from './GeneVariationSearch';
 
@@ -29,7 +30,7 @@ const QueryParameters = ({
   };
 
   return (
-    <div className="w-2/3 pl-4">
+    <div className="w-full">
       <div className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} rounded-lg shadow-lg p-6 h-full transition-colors duration-200`}>
         <h2 className="text-xl font-semibold mb-4">Query Parameters</h2>
         <form className="space-y-6">
@@ -62,28 +63,34 @@ const QueryParameters = ({
             <label className={`block mb-1 font-medium ${isDarkMode ? 'text-indigo-300' : 'text-indigo-600'}`}>
               Date Range <span className="text-red-500">*</span>
             </label>
-            <div className="flex space-x-4">
-              <input 
-                type="date" 
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className={`flex-1 p-2 rounded ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-300'} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition-colors duration-200`} 
-                required
-              />
-              <input 
-                type="date" 
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className={`flex-1 p-2 rounded ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-300'} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition-colors duration-200`} 
-                required
-              />
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+              <div className="w-full sm:w-1/2">
+                <label className="block text-sm font-medium mb-1">Start Date</label>
+                <input 
+                  type="date" 
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className={`w-full p-2 rounded ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-300'} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition-colors duration-200`} 
+                  required
+                />
+              </div>
+              <div className="w-full sm:w-1/2">
+                <label className="block text-sm font-medium mb-1">End Date</label>
+                <input 
+                  type="date" 
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className={`w-full p-2 rounded ${isDarkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-100 border-gray-300'} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition-colors duration-200`} 
+                  required
+                />
+              </div>
             </div>
           </div>
           <div>
             <label className={`block mb-1 font-medium ${isDarkMode ? 'text-indigo-300' : 'text-indigo-600'}`}>
               Output Format <span className="text-red-500">*</span>
             </label>
-            <div className="flex space-x-4">
+            <div className="flex flex-wrap gap-2">
               {['XML', 'CSV', 'Tab-delimited'].map((format) => (
                 <button
                   key={format}

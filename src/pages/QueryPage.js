@@ -30,26 +30,30 @@ const QueryPage = ({ isDarkMode }) => {
         Create Your Query
       </h1>
       <div className="flex flex-col md:flex-row gap-8">
-        <GeneSelection
-          isDarkMode={isDarkMode}
-          selectedGenes={selectedGenes}
-          setSelectedGenes={setSelectedGenes}
-        />
-        <QueryParameters
-          isDarkMode={isDarkMode}
-          selectedGenes={selectedGenes}
-          clinicalSignificance={clinicalSignificance}
-          setClinicalSignificance={setClinicalSignificance}
-          outputFormat={outputFormat}
-          setOutputFormat={setOutputFormat}
-          startDate={startDate}
-          setStartDate={setStartDate}
-          endDate={endDate}
-          setEndDate={setEndDate}
-          geneVariationIDs={geneVariationIDs}
-          setGeneVariationIDs={setGeneVariationIDs}
-          handleReviewClick={handleReviewClick}
-        />
+        <div className="w-full md:w-1/3">
+          <GeneSelection
+            isDarkMode={isDarkMode}
+            selectedGenes={selectedGenes}
+            setSelectedGenes={setSelectedGenes}
+          />
+        </div>
+        <div className="w-full md:w-2/3">
+          <QueryParameters
+            isDarkMode={isDarkMode}
+            selectedGenes={selectedGenes}
+            clinicalSignificance={clinicalSignificance}
+            setClinicalSignificance={setClinicalSignificance}
+            outputFormat={outputFormat}
+            setOutputFormat={setOutputFormat}
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
+            geneVariationIDs={geneVariationIDs}
+            setGeneVariationIDs={setGeneVariationIDs}
+            handleReviewClick={handleReviewClick}
+          />
+        </div>
       </div>
       {showReviewModal && (
         <ReviewModal
