@@ -1,14 +1,19 @@
+// components/GeneVariationSearch.js
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 
-const GeneVariationSearch = ({ isDarkMode, geneVariationIDs, onAddID, onRemoveID }) => {
+const GeneVariationSearch = ({ isDarkMode, geneVariationIDs, setGeneVariationIDs }) => {
   const [inputValue, setInputValue] = useState('');
 
   const handleAddID = () => {
-    if (inputValue.trim()) {
-      onAddID(inputValue.trim());
+    if (inputValue.trim() && !geneVariationIDs.includes(inputValue.trim())) {
+      setGeneVariationIDs([...geneVariationIDs, inputValue.trim()]);
       setInputValue('');
     }
+  };
+
+  const handleRemoveID = (idToRemove) => {
+    setGeneVariationIDs(geneVariationIDs.filter(id => id !== idToRemove));
   };
 
   return (
@@ -37,11 +42,11 @@ const GeneVariationSearch = ({ isDarkMode, geneVariationIDs, onAddID, onRemoveID
           <p className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Added IDs:</p>
           <div className="flex flex-wrap gap-2 mt-1">
             {geneVariationIDs.map((id) => (
-              <div key={id} className={`flex items-center px-3 py-1 rounded-full ${isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-200'}`}>
+              <div key={id} className={`flex items-center px-3 py-1 rounded-full ${isDarkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white'}`}>
                 {id}
                 <button 
-                  onClick={() => onRemoveID(id)} 
-                  className="ml-2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                  onClick={() => handleRemoveID(id)} 
+                  className="ml-2 text-white hover:text-gray-200 focus:outline-none"
                   aria-label={`Remove ${id}`}
                 >
                   <X size={14} />

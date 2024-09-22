@@ -1,56 +1,29 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, HelpCircle, Dna, Sun, Moon, LogOut, Menu, X } from 'lucide-react';
 import LoginRegisterModal from './LoginRegisterModal';
 
-const Header = ({ isDarkMode, setIsDarkMode }) => {
+const Header = ({ isDarkMode, setIsDarkMode, user, onLogout, onLogin }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [loggedInUser, setLoggedInUser] = useState(localStorage.getItem('username'));
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const menuRef = useRef(null);
-
-  const handleLogout = () => {
-    localStorage.removeItem('username');
-    setLoggedInUser(null);
-    navigate('/');
-    setIsMenuOpen(false);
-  };
-
-  const handleLoginSuccess = (username) => {
-    localStorage.setItem('username', username);
-    setLoggedInUser(username);
-    navigate('/account');
-    setIsMenuOpen(false);
-  };
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
-        setIsMenuOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [menuRef]);
-
-  const headerClass = isDarkMode ? 'bg-indigo-900' : 'bg-indigo-600';
-  const hoverClass = isDarkMode ? 'hover:bg-indigo-800' : 'hover:bg-indigo-500';
-  const dividerClass = isDarkMode ? 'border-indigo-800' : 'border-indigo-500';
+  const handleLoginSuccess = (userData) => {
+    onLogin(userData);
+    setIsModalOpen(false);
+    navigate('/account');
+  };
 
   return (
     <>
-      <header className={`${headerClass} text-white p-4 transition-colors duration-200`} style={{zIndex: 10}}>
+      <header className={`${isDarkMode ? 'bg-indigo-900' : 'bg-indigo-600'} text-white p-4 transition-colors duration-200`} style={{zIndex: 10}}>
         <div className="container mx-auto flex justify-between items-center">
-          <h1 className="text-2xl font-bold flex items-center">
-            <Dna className="mr-2" size={24} />
+          <h1 className="text-4xl font-bold flex items-center">
+            <Dna className="mr-2" size={36} />
             HelixHunt
           </h1>
           <div className="hidden md:flex items-center space-x-6">
@@ -67,7 +40,7 @@ const Header = ({ isDarkMode, setIsDarkMode }) => {
             <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full hover:bg-indigo-700 transition-colors">
               {isDarkMode ? <Sun size={20} /> : <Moon size={24} />}
             </button>
-            {loggedInUser ? (
+            {user ? (
               <div className="flex space-x-2">
                 <Link 
                   to="/account"
@@ -77,7 +50,7 @@ const Header = ({ isDarkMode, setIsDarkMode }) => {
                   Account
                 </Link>
                 <button 
-                  onClick={handleLogout}
+                  onClick={onLogout}
                   className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded transition-colors flex items-center text-lg"
                 >
                   <LogOut className="mr-2" size={24} />
@@ -100,32 +73,26 @@ const Header = ({ isDarkMode, setIsDarkMode }) => {
         </div>
       </header>
       {isMenuOpen && (
-        <div ref={menuRef} className={`md:hidden ${headerClass} text-white absolute w-full z-50`}>
+        <div className={`md:hidden ${isDarkMode ? 'bg-indigo-900' : 'bg-indigo-600'} text-white absolute w-full z-50`}>
           <nav className="container mx-auto py-4">
             <ul className="space-y-2">
-              <li><Link to="/" className={`block ${hoverClass} transition-colors text-lg py-2 px-4 rounded`} onClick={toggleMenu}>Home</Link></li>
-              <li><Link to="/about" className={`block ${hoverClass} transition-colors text-lg py-2 px-4 rounded`} onClick={toggleMenu}>About</Link></li>
-              <li><Link to="/help" className={`block ${hoverClass} transition-colors text-lg py-2 px-4 rounded`} onClick={toggleMenu}>Help/Tutorial</Link></li>
-              
-              {/* Divider 1 - Between nav links and dark mode toggle */}
-              <li className={`border-t ${dividerClass} my-2`}></li>
-
+              <li><Link to="/" className={`block hover:bg-indigo-700 transition-colors text-lg py-2 px-4 rounded`} onClick={toggleMenu}>Home</Link></li>
+              <li><Link to="/about" className={`block hover:bg-indigo-700 transition-colors text-lg py-2 px-4 rounded`} onClick={toggleMenu}>About</Link></li>
+              <li><Link to="/help" className={`block hover:bg-indigo-700 transition-colors text-lg py-2 px-4 rounded`} onClick={toggleMenu}>Help/Tutorial</Link></li>
+              <li className="border-t border-indigo-500 my-2"></li>
               <li>
-                <button onClick={() => { setIsDarkMode(!isDarkMode); toggleMenu(); }} className={`w-full text-left ${hoverClass} transition-colors text-lg py-2 px-4 rounded flex items-center`}>
+                <button onClick={() => { setIsDarkMode(!isDarkMode); toggleMenu(); }} className={`w-full text-left hover:bg-indigo-700 transition-colors text-lg py-2 px-4 rounded flex items-center`}>
                   {isDarkMode ? <Sun size={18} className="mr-2" /> : <Moon size={18} className="mr-2" />}
                   {isDarkMode ? 'Light Mode' : 'Dark Mode'}
                 </button>
               </li>
-
-              {/* Divider 2 - Between dark mode toggle and user-related actions */}
-              <li className={`border-t ${dividerClass} my-2`}></li>
-
-              {loggedInUser ? (
+              <li className="border-t border-indigo-500 my-2"></li>
+              {user ? (
                 <>
                   <li>
                     <Link 
                       to="/account"
-                      className={`block ${hoverClass} transition-colors text-lg py-2 px-4 rounded flex items-center`}
+                      className={`block hover:bg-indigo-700 transition-colors text-lg py-2 px-4 rounded flex items-center`}
                       onClick={toggleMenu}
                     >
                       <User size={18} className="mr-2" />
@@ -134,8 +101,8 @@ const Header = ({ isDarkMode, setIsDarkMode }) => {
                   </li>
                   <li>
                     <button 
-                      onClick={handleLogout}
-                      className={`w-full text-left ${hoverClass} transition-colors text-lg py-2 px-4 rounded flex items-center`}
+                      onClick={() => { onLogout(); toggleMenu(); }}
+                      className={`w-full text-left hover:bg-indigo-700 transition-colors text-lg py-2 px-4 rounded flex items-center`}
                     >
                       <LogOut size={18} className="mr-2" />
                       Logout
@@ -146,26 +113,13 @@ const Header = ({ isDarkMode, setIsDarkMode }) => {
                 <li>
                   <button 
                     onClick={() => { setIsModalOpen(true); toggleMenu(); }}
-                    className={`w-full text-left ${hoverClass} transition-colors text-lg py-2 px-4 rounded flex items-center`}
+                    className={`w-full text-left hover:bg-indigo-700 transition-colors text-lg py-2 px-4 rounded flex items-center`}
                   >
                     <User size={18} className="mr-2" />
                     Login/Register
                   </button>
                 </li>
               )}
-
-              {/* Divider 3 - Before close button */}
-              <li className={`border-t ${dividerClass} my-2`}></li>
-
-              <li>
-                <button 
-                  onClick={toggleMenu}
-                  className={`w-full text-left ${hoverClass} transition-colors text-lg py-2 px-4 rounded flex items-center`}
-                >
-                  <X size={18} className="mr-2" />
-                  Close Menu
-                </button>
-              </li>
             </ul>
           </nav>
         </div>

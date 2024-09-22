@@ -1,3 +1,4 @@
+// pages/HelpPage.js
 import React from 'react';
 
 const HelpPage = ({ isDarkMode }) => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { addUser, getUser } from '../database/db';
 
 const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => {
   const [isLoginView, setIsLoginView] = useState(true);
@@ -7,9 +8,9 @@ const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => 
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  // Clear credentials when modal is opened or closed
   useEffect(() => {
-    if (isOpen) {
+    if (!isOpen) {
+      // Reset fields when modal is closed
       setUsername('');
       setPassword('');
       setError('');
@@ -32,7 +33,7 @@ const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => 
     return '';
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
@@ -44,43 +45,53 @@ const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => 
       return;
     }
 
-    if (isLoginView) {
-      // Mock login
-      onLoginSuccess(username);
-      handleClose();
-    } else {
-      // Mock registration
-      onLoginSuccess(username);
-      handleClose();
+    try {
+      if (isLoginView) {
+        const user = await getUser(username);
+        if (user && user.password === password) { // In a real app, use proper password comparison
+          console.log("Login successful");
+          onLoginSuccess(user); // Pass the entire user object
+          onClose();
+        } else {
+          setError('Invalid username or password');
+        }
+      } else {
+        const existingUser = await getUser(username);
+        if (existingUser) {
+          setError('Username already exists');
+        } else {
+          const userId = await addUser(username, password);
+          const newUser = { id: userId, username, password };
+          console.log("Registration successful");
+          onLoginSuccess(newUser); // Pass the new user object
+          onClose();
+        }
+      }
+    } catch (error) {
+      console.error('Error during login/register:', error);
+      setError('An error occurred. Please try again.');
     }
-  };
-
-  const handleClose = () => {
-    setUsername('');
-    setPassword('');
-    setError('');
-    onClose();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleClose}>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
       <div 
         className={`relative w-full max-w-2xl ${isDarkMode ? 'bg-gray-800/40' : 'bg-white/40'} backdrop-blur-md rounded-lg shadow-lg overflow-hidden`}
         onClick={e => e.stopPropagation()}
       >
         <button 
-          onClick={handleClose}
+          onClick={onClose}
           className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 z-10"
         >
           <X size={24} />
         </button>
-        <div className="flex transition-transform duration-300 ease-in-out" style={{ transform: isLoginView ? 'translateX(0)' : 'translateX(-50%)' }}>
+        <div className="flex transition-transform duration-300 ease-in-out" style={{ transform: isLoginView ? 'translateX(0)' : 'translateX(-100%)' }}>
           <div className="w-full flex-shrink-0">
             <form onSubmit={handleSubmit} className="p-12 space-y-6">
               <h2 className={`text-3xl font-bold mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                Login
+                {isLoginView ? 'Login' : 'Register'}
               </h2>
               <div>
                 <input
@@ -113,47 +124,7 @@ const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => 
                 type="submit"
                 className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors text-lg font-semibold"
               >
-                Login
-              </button>
-            </form>
-          </div>
-          <div className="w-full flex-shrink-0">
-            <form onSubmit={handleSubmit} className="p-12 space-y-6">
-              <h2 className={`text-3xl font-bold mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                Register
-              </h2>
-              <div>
-                <input
-                  type="text"
-                  placeholder="Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className={`w-full p-3 rounded-lg border ${
-                    isDarkMode 
-                      ? 'bg-gray-700/30 border-gray-600 text-white placeholder-gray-400' 
-                      : 'bg-white/30 border-gray-300 text-gray-800 placeholder-gray-500'
-                  } backdrop-blur-sm`}
-                />
-              </div>
-              <div>
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full p-3 rounded-lg border ${
-                    isDarkMode 
-                      ? 'bg-gray-700/30 border-gray-600 text-white placeholder-gray-400' 
-                      : 'bg-white/30 border-gray-300 text-gray-800 placeholder-gray-500'
-                  } backdrop-blur-sm`}
-                />
-              </div>
-              {error && <p className="text-red-500 text-sm">{error}</p>}
-              <button
-                type="submit"
-                className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors text-lg font-semibold"
-              >
-                Register
+                {isLoginView ? 'Login' : 'Register'}
               </button>
             </form>
           </div>
