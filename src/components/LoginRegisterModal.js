@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { addUser, getUser } from '../database/db';
+import { useThemeConstants } from './ThemeConstants';
 
-const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => {
+const LoginRegisterModal = ({ isOpen, onClose, onLoginSuccess }) => {
+  // State for login/register view, form inputs, and error messages
   const [isLoginView, setIsLoginView] = useState(true);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
+  // Get theme-related constants
+  const themeConstants = useThemeConstants();
+
+  // Reset form fields when modal is closed
   useEffect(() => {
     if (!isOpen) {
-      // Reset fields when modal is closed
       setUsername('');
       setPassword('');
       setError('');
@@ -18,6 +23,7 @@ const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => 
     }
   }, [isOpen]);
 
+  // Validate username
   const validateUsername = (value) => {
     if (value.length < 6 || value.length > 20) {
       return 'Username must be between 6 and 20 characters';
@@ -25,6 +31,7 @@ const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => 
     return '';
   };
 
+  // Validate password
   const validatePassword = (value) => {
     const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,16}$/;
     if (!regex.test(value)) {
@@ -33,6 +40,7 @@ const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => 
     return '';
   };
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -48,9 +56,9 @@ const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => 
     try {
       if (isLoginView) {
         const user = await getUser(username);
-        if (user && user.password === password) { // In a real app, use proper password comparison
+        if (user && user.password === password) {
           console.log("Login successful");
-          onLoginSuccess(user); // Pass the entire user object
+          onLoginSuccess(user);
           onClose();
         } else {
           setError('Invalid username or password');
@@ -63,7 +71,7 @@ const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => 
           const userId = await addUser(username, password);
           const newUser = { id: userId, username, password };
           console.log("Registration successful");
-          onLoginSuccess(newUser); // Pass the new user object
+          onLoginSuccess(newUser);
           onClose();
         }
       }
@@ -78,7 +86,7 @@ const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={onClose}>
       <div 
-        className={`relative w-full max-w-2xl ${isDarkMode ? 'bg-gray-800/40' : 'bg-white/40'} backdrop-blur-md rounded-lg shadow-lg overflow-hidden`}
+        className={`relative w-full max-w-2xl ${themeConstants.modalBackgroundColor} backdrop-blur-md rounded-lg shadow-lg overflow-hidden`}
         onClick={e => e.stopPropagation()}
       >
         <button 
@@ -90,7 +98,7 @@ const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => 
         <div className="flex transition-transform duration-300 ease-in-out" style={{ transform: isLoginView ? 'translateX(0)' : 'translateX(-100%)' }}>
           <div className="w-full flex-shrink-0">
             <form onSubmit={handleSubmit} className="p-12 space-y-6">
-              <h2 className={`text-3xl font-bold mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              <h2 className={`text-3xl font-bold mb-6 ${themeConstants.headingTextColor}`}>
                 {isLoginView ? 'Login' : 'Register'}
               </h2>
               <div>
@@ -99,11 +107,7 @@ const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => 
                   placeholder="Username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className={`w-full p-3 rounded-lg border ${
-                    isDarkMode 
-                      ? 'bg-gray-700/30 border-gray-600 text-white placeholder-gray-400' 
-                      : 'bg-white/30 border-gray-300 text-gray-800 placeholder-gray-500'
-                  } backdrop-blur-sm`}
+                  className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor} backdrop-blur-sm`}
                 />
               </div>
               <div>
@@ -112,17 +116,13 @@ const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => 
                   placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full p-3 rounded-lg border ${
-                    isDarkMode 
-                      ? 'bg-gray-700/30 border-gray-600 text-white placeholder-gray-400' 
-                      : 'bg-white/30 border-gray-300 text-gray-800 placeholder-gray-500'
-                  } backdrop-blur-sm`}
+                  className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor} backdrop-blur-sm`}
                 />
               </div>
               {error && <p className="text-red-500 text-sm">{error}</p>}
               <button
                 type="submit"
-                className="w-full bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700 transition-colors text-lg font-semibold"
+                className={`w-full ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white py-3 rounded-lg transition-colors text-lg font-semibold`}
               >
                 {isLoginView ? 'Login' : 'Register'}
               </button>
@@ -132,7 +132,7 @@ const LoginRegisterModal = ({ isOpen, onClose, isDarkMode, onLoginSuccess }) => 
         <div className="absolute bottom-4 left-0 right-0 text-center">
           <button 
             onClick={() => { setIsLoginView(!isLoginView); setError(''); }}
-            className={`text-sm ${isDarkMode ? 'text-indigo-300 hover:text-indigo-200' : 'text-indigo-600 hover:text-indigo-800'} font-semibold`}
+            className={`text-sm ${themeConstants.linkTextColor} hover:${themeConstants.linkHoverColor} font-semibold`}
           >
             {isLoginView ? "Don't have an account? Register" : "Already have an account? Login"}
           </button>

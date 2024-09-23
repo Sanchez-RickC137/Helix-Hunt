@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 // import DNA2 from "./DNA2.jpg";
 // import DNA3 from "./DNA3.jpg";
 import DNA4 from "./DNA4.png";
-// import DNA5 from "./DNA5.png";
+import DNA5 from "./DNA5.png";
+import DNA6 from "./DNA6.png";
+import DNA7 from "./DNA7.png";
+import DNA8 from "./DNA8.png";
 import { loadSlim } from "@tsparticles/slim";
 
 const ParticlesComponent = (props) => {
@@ -93,16 +96,36 @@ const ParticlesComponent = (props) => {
           options: {
             image: [
               {
-                src: DNA4,
-                width: 32,
-                height: 32,
+                src: DNA8,
+                width: 32, // Adjust to picture
+                height: 10, // Adjust to picture
                 particles: {
                   size: {
-                    value: 50
+                    value: 75
                   }
                 }
               },
-            ]
+              {
+                src: DNA7,
+                width: 32, // Adjust to picture
+                height: 16, // Adjust to picture
+                particles: {
+                  size: {
+                    value: 75
+                  }
+                }
+              },
+              {
+                src: DNA6,
+                width: 16, // Adjust to picture
+                height: 32, // Adjust to picture
+                particles: {
+                  size: {
+                    value: 35
+                  }
+                }
+              },
+              ]
           }
         },
         size: {

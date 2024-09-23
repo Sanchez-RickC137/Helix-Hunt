@@ -1,10 +1,15 @@
-// components/GeneVariationSearch.js
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import { useThemeConstants } from './ThemeConstants';
 
-const GeneVariationSearch = ({ isDarkMode, geneVariationIDs, setGeneVariationIDs }) => {
+const GeneVariationSearch = ({ geneVariationIDs, setGeneVariationIDs }) => {
+  // State for input field
   const [inputValue, setInputValue] = useState('');
+  
+  // Get theme-related constants
+  const themeConstants = useThemeConstants();
 
+  // Handle adding a new gene variation ID
   const handleAddID = () => {
     if (inputValue.trim() && !geneVariationIDs.includes(inputValue.trim())) {
       setGeneVariationIDs([...geneVariationIDs, inputValue.trim()]);
@@ -12,13 +17,14 @@ const GeneVariationSearch = ({ isDarkMode, geneVariationIDs, setGeneVariationIDs
     }
   };
 
+  // Handle removing a gene variation ID
   const handleRemoveID = (idToRemove) => {
     setGeneVariationIDs(geneVariationIDs.filter(id => id !== idToRemove));
   };
 
   return (
     <div className="mb-6">
-      <label className={`block mb-1 font-medium ${isDarkMode ? 'text-indigo-300' : 'text-indigo-600'}`}>
+      <label className={`block mb-1 font-medium ${themeConstants.labelAccentColor}`}>
         Gene Variation IDs (Optional)
       </label>
       <div className="flex mb-2">
@@ -26,23 +32,23 @@ const GeneVariationSearch = ({ isDarkMode, geneVariationIDs, setGeneVariationIDs
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
-          className={`flex-grow p-2 rounded-l ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-gray-100 border-gray-300'} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition-colors duration-200`}
+          className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition-colors duration-200`}
           placeholder="Enter Gene Variation ID"
         />
         <button
           type="button"
           onClick={handleAddID}
-          className={`px-4 py-2 rounded-r ${isDarkMode ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-indigo-500 hover:bg-indigo-600'} text-white transition-colors duration-200`}
+          className={`px-4 py-2 rounded-r ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
         >
           Add
         </button>
       </div>
       {geneVariationIDs.length > 0 && (
         <div className="mt-2">
-          <p className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Added IDs:</p>
+          <p className={`font-medium ${themeConstants.labelTextColor}`}>Added IDs:</p>
           <div className="flex flex-wrap gap-2 mt-1">
             {geneVariationIDs.map((id) => (
-              <div key={id} className={`flex items-center px-3 py-1 rounded-full ${isDarkMode ? 'bg-indigo-600 text-white' : 'bg-indigo-500 text-white'}`}>
+              <div key={id} className={`flex items-center px-3 py-1 rounded-full ${themeConstants.tagBackgroundColor}`}>
                 {id}
                 <button 
                   onClick={() => handleRemoveID(id)} 

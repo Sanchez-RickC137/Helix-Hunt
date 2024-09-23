@@ -1,9 +1,12 @@
-// pages/HelpPage.js
 import React from 'react';
+import { useThemeConstants } from '../components/ThemeConstants';
 
-const HelpPage = ({ isDarkMode }) => {
+const HelpPage = () => {
+  // Get theme-related constants
+  const themeConstants = useThemeConstants();
+
   return (
-    <div className={`container mx-auto mt-8 p-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+    <div className={`container mx-auto mt-8 p-4 ${themeConstants.mainTextColor}`}>
       <h1 className="text-3xl font-bold mb-4">Help & Tutorial</h1>
       <section className="mb-8">
         <h2 className="text-2xl font-semibold mb-2">Getting Started</h2>

@@ -1,16 +1,22 @@
-// pages/AccountPage.js
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import GenePreferences from '../components/GenePreferences';
 import QueryHistory from '../components/QueryHistory';
 import { getQueryHistory, updateGenePreferences } from '../database/db';
+import { useThemeConstants } from '../components/ThemeConstants';
 
-const AccountPage = ({ isDarkMode, user, setUser }) => {
+const AccountPage = ({ user, setUser }) => {
+  // State for query history and loading status
   const [queryHistory, setQueryHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Get theme-related constants
+  const themeConstants = useThemeConstants();
+
+  // Example list of all available genes
   const allGenes = ['BRCA1', 'BRCA2', 'TP53', 'EGFR', 'KRAS', 'APC', 'PTEN', 'RB1', 'VEGF', 'MDM2'];
 
+  // Fetch query history on component mount or when user changes
   useEffect(() => {
     const fetchHistory = async () => {
       if (user && user.id) {
@@ -27,6 +33,7 @@ const AccountPage = ({ isDarkMode, user, setUser }) => {
     fetchHistory();
   }, [user]);
 
+  // Handle updating user's gene preferences
   const handleUpdatePreferences = async (newPreferences) => {
     if (user) {
       try {
@@ -47,7 +54,7 @@ const AccountPage = ({ isDarkMode, user, setUser }) => {
   }
 
   return (
-    <div className={`container mx-auto mt-8 p-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+    <div className={`container mx-auto mt-8 p-4 ${themeConstants.mainTextColor}`}>
       <h1 className="text-3xl font-bold mb-4">My Account</h1>
       <p className="mb-6">Welcome, {user.username}!</p>
       
@@ -55,7 +62,6 @@ const AccountPage = ({ isDarkMode, user, setUser }) => {
         <h2 className="text-2xl font-bold mb-4">Gene Preferences</h2>
         <GenePreferences 
           userId={user.id} 
-          isDarkMode={isDarkMode} 
           initialPreferences={user.genePreferences || []} 
           allGenes={allGenes}
           onUpdatePreferences={handleUpdatePreferences}
@@ -67,7 +73,6 @@ const AccountPage = ({ isDarkMode, user, setUser }) => {
           <h2 className="text-2xl font-bold mb-4">Query History</h2>
           <QueryHistory 
             queryHistory={queryHistory}
-            isDarkMode={isDarkMode}
             onSelectQuery={() => {}} // No action needed on account page
           />
         </div>

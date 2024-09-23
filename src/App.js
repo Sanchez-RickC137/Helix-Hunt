@@ -1,6 +1,7 @@
-// App.js
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import { ThemeProvider } from './components/ThemeContext';
+import { useThemeConstants } from './components/ThemeConstants';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import HomePage from './pages/HomePage';
@@ -11,7 +12,6 @@ import QueryPage from './pages/QueryPage';
 import { getUserById } from './database/db';
 
 function App() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -47,27 +47,35 @@ function App() {
   }
 
   return (
-    <Router>
-      <div className={`min-h-screen flex flex-col ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
-        <Header 
-          isDarkMode={isDarkMode} 
-          setIsDarkMode={setIsDarkMode} 
-          user={user}
-          onLogout={logout}
-          onLogin={login}
-        />
-        <main className="flex-grow">
-          <Routes>
-            <Route path="/" element={<HomePage isDarkMode={isDarkMode} />} />
-            <Route path="/about" element={<AboutPage isDarkMode={isDarkMode} />} />
-            <Route path="/help" element={<HelpPage isDarkMode={isDarkMode} />} />
-            <Route path="/account" element={<AccountPage isDarkMode={isDarkMode} user={user} setUser={setUser} />} />
-            <Route path="/query" element={<QueryPage isDarkMode={isDarkMode} user={user} />} />
-          </Routes>
-        </main>
-        <Footer isDarkMode={isDarkMode} />
-      </div>
-    </Router>
+    <ThemeProvider>
+      <Router>
+        <AppContent user={user} setUser={setUser} login={login} logout={logout} />
+      </Router>
+    </ThemeProvider>
+  );
+}
+
+function AppContent({ user, setUser, login, logout }) {
+  const themeConstants = useThemeConstants();
+
+  return (
+    <div className={`min-h-screen flex flex-col ${themeConstants.mainBackgroundColor} ${themeConstants.mainTextColor}`}>
+      <Header 
+        user={user}
+        onLogout={logout}
+        onLogin={login}
+      />
+      <main className="flex-grow">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/help" element={<HelpPage />} />
+          <Route path="/account" element={<AccountPage user={user} setUser={setUser} />} />
+          <Route path="/query" element={<QueryPage user={user} />} />
+        </Routes>
+      </main>
+      <Footer />
+    </div>
   );
 }
 

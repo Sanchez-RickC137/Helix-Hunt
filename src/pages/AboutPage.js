@@ -1,9 +1,12 @@
-// pages/AboutPage.js
 import React from 'react';
+import { useThemeConstants } from '../components/ThemeConstants';
 
-const AboutPage = ({ isDarkMode }) => {
+const AboutPage = () => {
+  // Get theme-related constants
+  const themeConstants = useThemeConstants();
+
   return (
-    <div className={`container mx-auto mt-8 p-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+    <div className={`container mx-auto mt-8 p-4 ${themeConstants.mainTextColor}`}>
       <h1 className="text-3xl font-bold mb-4">About HelixHunt</h1>
       <p className="mb-4">
         HelixHunt is a cutting-edge platform designed to explore and analyze genetic variations with unprecedented ease and efficiency.
