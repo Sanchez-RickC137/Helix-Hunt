@@ -11,14 +11,14 @@ const QueryParameters = ({
   endDate,
   setEndDate,
   handleReviewClick,
-  selectedGenes,
-  selectedDNAChanges,
-  selectedProteinChanges,
-  selectedVariationIDs
+  selectedGene,
+  selectedDNAChange,
+  selectedProteinChange,
+  selectedVariationID
 }) => {
   const themeConstants = useThemeConstants();
 
-  const isFormValid = selectedVariationIDs.length > 0 && selectedProteinChanges.length > 0 && outputFormat && startDate && endDate;
+  const isFormValid = ((selectedGene && selectedGene.trim() !== '') || (selectedVariationID && selectedVariationID.trim() !== '')) && outputFormat;
 
   const handleClinicalSignificanceClick = (sig) => {
     setClinicalSignificance(prevSig => {
@@ -62,7 +62,6 @@ const QueryParameters = ({
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
               className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition-colors duration-200`} 
-              required
             />
           </div>
           <div className="w-full sm:w-1/2">
@@ -72,7 +71,6 @@ const QueryParameters = ({
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
               className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition-colors duration-200`} 
-              required
             />
           </div>
         </div>
@@ -113,7 +111,7 @@ const QueryParameters = ({
 
       {!isFormValid && (
         <p className={`text-sm ${themeConstants.labelTextColor}`}>
-          Please fill in all required fields: Variant ID, Protein Change, date range, and choose an output format.
+          Please select either a Gene Symbol or a Variation ID, and choose an output format.
         </p>
       )}
     </div>

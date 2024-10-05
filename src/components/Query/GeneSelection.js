@@ -1,23 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
+import debounce from 'lodash/debounce';
 
-const GeneSelection = ({ selectedGenes, setSelectedGenes }) => {
+const GeneSelection = ({ selectedGene, setSelectedGene }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
   const [allGenes, setAllGenes] = useState([]);
-  const [displayedGenes, setDisplayedGenes] = useState([]);
   const themeConstants = useThemeConstants();
 
   useEffect(() => {
     const fetchGenes = async () => {
       try {
-        const response = await fetch('/data/GeneSymbols.txt');
+        const response = await fetch('/data/TranscriptID_GeneSym.txt');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const text = await response.text();
         const genes = text.split('\n').map(gene => gene.trim()).filter(gene => gene);
         setAllGenes(genes);
-        setDisplayedGenes(genes.slice(0, 3));
       } catch (error) {
         console.error('Error loading gene symbols:', error);
       }
@@ -26,65 +26,83 @@ const GeneSelection = ({ selectedGenes, setSelectedGenes }) => {
     fetchGenes();
   }, []);
 
-  useEffect(() => {
-    const filtered = allGenes.filter(gene =>
-      gene.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setDisplayedGenes(filtered);
-  }, [searchTerm, allGenes]);
+  const debouncedSuggestions = useCallback(
+    debounce((searchTerm) => {
+      if (searchTerm.length > 0) {
+        const filteredSuggestions = allGenes
+          .filter(gene => gene.toLowerCase().includes(searchTerm.toLowerCase()));
+        setSuggestions(filteredSuggestions);
+      } else {
+        setSuggestions([]);
+      }
+    }, 300),
+    [allGenes]
+  );
 
-  const toggleGene = (gene) => {
-    if (selectedGenes.includes(gene)) {
-      setSelectedGenes(selectedGenes.filter(g => g !== gene));
-    } else {
-      setSelectedGenes([...selectedGenes, gene]);
+  useEffect(() => {
+    debouncedSuggestions(searchTerm);
+  }, [searchTerm, debouncedSuggestions]);
+
+  const handleSelectGene = () => {
+    if (searchTerm.trim()) {
+      setSelectedGene(searchTerm.trim());
+      setSearchTerm('');
+      setSuggestions([]);
     }
+  };
+
+  const handleInputChange = (e) => {
+    setSearchTerm(e.target.value);
   };
 
   return (
     <div className="w-full">
       <h3 className="text-lg font-semibold mb-2">Gene Selection</h3>
-      <input
-        type="text"
-        placeholder="Search genes..."
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        className={`w-full p-2 mb-4 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50`}
-      />
-      <div className="h-[144px] overflow-y-auto">
-        {displayedGenes.map(gene => (
-          <button
-            key={gene}
-            onClick={() => toggleGene(gene)}
-            className={`w-full px-4 py-2 mb-2 rounded ${
-              selectedGenes.includes(gene)
-                ? `${themeConstants.tagBackgroundColor} ${themeConstants.selectedItemTextColor}`
-                : `${themeConstants.unselectedItemBackgroundColor} hover:${themeConstants.unselectedItemHoverColor}`
-            } transition-colors duration-200`}
-          >
-            {gene}
-          </button>
-        ))}
-        {displayedGenes.length === 0 && (
-          <div className="text-center py-4 text-gray-500">No genes found</div>
-        )}
+      <div className="flex mb-2">
+        <input
+          type="text"
+          placeholder="Search or enter gene..."
+          value={searchTerm}
+          onChange={handleInputChange}
+          className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50`}
+        />
+        <button
+          onClick={handleSelectGene}
+          className={`px-4 py-2 rounded-r ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
+        >
+          Add
+        </button>
       </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {selectedGenes.map(gene => (
+      {suggestions.length > 0 && (
+        <div className="max-h-[120px] overflow-y-auto border border-gray-300 rounded">
+          {suggestions.map((gene, index) => (
+            <div
+              key={index}
+              onClick={() => setSearchTerm(gene)}
+              className={`p-2 cursor-pointer ${
+                index % 2 === 0 ? themeConstants.unselectedItemBackgroundColor : ''
+              } hover:${themeConstants.unselectedItemHoverColor}`}
+            >
+              {gene}
+            </div>
+          ))}
+        </div>
+      )}
+      {selectedGene && (
+        <div className="mt-4">
           <span
-            key={gene}
             className={`inline-block ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}
           >
-            {gene}
+            {selectedGene}
             <button
-              onClick={() => toggleGene(gene)}
+              onClick={() => setSelectedGene(null)}
               className="ml-2 font-bold"
             >
               &times;
             </button>
           </span>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

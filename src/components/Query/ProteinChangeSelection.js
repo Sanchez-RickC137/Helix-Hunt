@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 import debounce from 'lodash/debounce';
 
-const ProteinChangeSelection = ({ selectedProteinChanges, setSelectedProteinChanges }) => {
+const ProteinChangeSelection = ({ selectedProteinChange, setSelectedProteinChange }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [allProteinChanges, setAllProteinChanges] = useState([]);
@@ -11,7 +11,7 @@ const ProteinChangeSelection = ({ selectedProteinChanges, setSelectedProteinChan
   useEffect(() => {
     const fetchProteinChanges = async () => {
       try {
-        const response = await fetch('/data/ProteinChange.txt');
+        const response = await fetch('/data/Protein_Change.txt');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -44,15 +44,9 @@ const ProteinChangeSelection = ({ selectedProteinChanges, setSelectedProteinChan
     debouncedSuggestions(searchTerm);
   }, [searchTerm, debouncedSuggestions]);
 
-  const addProteinChange = () => {
-    if (searchTerm && !selectedProteinChanges.includes(searchTerm)) {
-      setSelectedProteinChanges([...selectedProteinChanges, searchTerm]);
-      setSearchTerm('');
-    }
-  };
-
-  const removeProteinChange = (change) => {
-    setSelectedProteinChanges(selectedProteinChanges.filter(c => c !== change));
+  const handleSelectProteinChange = (change) => {
+    setSelectedProteinChange(change);
+    setSearchTerm('');
   };
 
   return (
@@ -65,10 +59,9 @@ const ProteinChangeSelection = ({ selectedProteinChanges, setSelectedProteinChan
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50`}
-          required
         />
         <button
-          onClick={addProteinChange}
+          onClick={() => handleSelectProteinChange(searchTerm)}
           className={`px-4 py-2 rounded-r ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
         >
           Add
@@ -80,29 +73,28 @@ const ProteinChangeSelection = ({ selectedProteinChanges, setSelectedProteinChan
             <li
               key={index}
               className={`p-2 cursor-pointer hover:${themeConstants.unselectedItemHoverColor}`}
-              onClick={() => setSearchTerm(suggestion)}
+              onClick={() => handleSelectProteinChange(suggestion)}
             >
               {suggestion}
             </li>
           ))}
         </ul>
       )}
-      <div className="mt-2 flex flex-wrap gap-2">
-        {selectedProteinChanges.map((change, index) => (
+      {selectedProteinChange && (
+        <div className="mt-2">
           <span
-            key={index}
             className={`inline-block ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}
           >
-            {change}
+            {selectedProteinChange}
             <button
-              onClick={() => removeProteinChange(change)}
+              onClick={() => setSelectedProteinChange('')}
               className="ml-2 font-bold"
             >
               &times;
             </button>
           </span>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

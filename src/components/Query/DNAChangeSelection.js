@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 import debounce from 'lodash/debounce';
 
-const DNAChangeSelection = ({ selectedDNAChanges, setSelectedDNAChanges }) => {
+const DNAChangeSelection = ({ selectedDNAChange, setSelectedDNAChange }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [allDNAChanges, setAllDNAChanges] = useState([]);
@@ -11,7 +11,7 @@ const DNAChangeSelection = ({ selectedDNAChanges, setSelectedDNAChanges }) => {
   useEffect(() => {
     const fetchDNAChanges = async () => {
       try {
-        const response = await fetch('/data/DNAChange.txt');
+        const response = await fetch('/data/DNA_Change.txt');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -44,15 +44,9 @@ const DNAChangeSelection = ({ selectedDNAChanges, setSelectedDNAChanges }) => {
     debouncedSuggestions(searchTerm);
   }, [searchTerm, debouncedSuggestions]);
 
-  const addDNAChange = () => {
-    if (searchTerm && !selectedDNAChanges.includes(searchTerm)) {
-      setSelectedDNAChanges([...selectedDNAChanges, searchTerm]);
-      setSearchTerm('');
-    }
-  };
-
-  const removeDNAChange = (change) => {
-    setSelectedDNAChanges(selectedDNAChanges.filter(c => c !== change));
+  const handleSelectDNAChange = (change) => {
+    setSelectedDNAChange(change);
+    setSearchTerm('');
   };
 
   return (
@@ -67,7 +61,7 @@ const DNAChangeSelection = ({ selectedDNAChanges, setSelectedDNAChanges }) => {
           className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50`}
         />
         <button
-          onClick={addDNAChange}
+          onClick={() => handleSelectDNAChange(searchTerm)}
           className={`px-4 py-2 rounded-r ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
         >
           Add
@@ -79,29 +73,28 @@ const DNAChangeSelection = ({ selectedDNAChanges, setSelectedDNAChanges }) => {
             <li
               key={index}
               className={`p-2 cursor-pointer hover:${themeConstants.unselectedItemHoverColor}`}
-              onClick={() => setSearchTerm(suggestion)}
+              onClick={() => handleSelectDNAChange(suggestion)}
             >
               {suggestion}
             </li>
           ))}
         </ul>
       )}
-      <div className="mt-2 flex flex-wrap gap-2">
-        {selectedDNAChanges.map((change, index) => (
+      {selectedDNAChange && (
+        <div className="mt-2">
           <span
-            key={index}
             className={`inline-block ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}
           >
-            {change}
+            {selectedDNAChange}
             <button
-              onClick={() => removeDNAChange(change)}
+              onClick={() => setSelectedDNAChange('')}
               className="ml-2 font-bold"
             >
               &times;
             </button>
           </span>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

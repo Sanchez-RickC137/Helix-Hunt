@@ -2,13 +2,12 @@ import React from 'react';
 import { useThemeConstants } from '../components/Page/ThemeConstants';
 
 const AboutPage = () => {
-  // Get theme-related constants
-  const themeConstants = useThemeConstants();
+  const themeConstants = useThemeConstants(); // Get theme-related constants instead o
 
   return (
-    <div className={`container mx-auto mt-8 p-4 ${themeConstants.mainTextColor}`}>
-      <h1 className="text-3xl font-bold mb-4">About HelixHunt</h1>
-      <p className="mb-4">
+    <div className={`container mx-auto mt-8 p-4 ${themeConstants.mainTextColor}`}> {/* 'text-white' : 'text-gray-900' */}
+      <h1 className="text-3xl font-bold mb-4">About HelixHunt</h1> {/* Page Heading */}
+      <p className="mb-4"> {/* Text below */}
         HelixHunt is a cutting-edge platform designed to explore and analyze genetic variations with unprecedented ease and efficiency.
       </p>
       <p className="mb-4">

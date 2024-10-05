@@ -1,19 +1,19 @@
 import React, { useState } from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 
-const VariationIDSelection = ({ selectedVariationIDs, setSelectedVariationIDs }) => {
+const VariationIDSelection = ({ selectedVariationID, setSelectedVariationID }) => {
   const [inputValue, setInputValue] = useState('');
   const themeConstants = useThemeConstants();
 
   const addVariationID = () => {
-    if (inputValue.trim() && !selectedVariationIDs.includes(inputValue.trim())) {
-      setSelectedVariationIDs([...selectedVariationIDs, inputValue.trim()]);
+    if (inputValue.trim()) {
+      setSelectedVariationID(inputValue.trim());
       setInputValue('');
     }
   };
 
-  const removeVariationID = (id) => {
-    setSelectedVariationIDs(selectedVariationIDs.filter(v => v !== id));
+  const removeVariationID = () => {
+    setSelectedVariationID('');
   };
 
   return (
@@ -34,22 +34,21 @@ const VariationIDSelection = ({ selectedVariationIDs, setSelectedVariationIDs })
           Add
         </button>
       </div>
-      <div className="mt-2 flex flex-wrap gap-2">
-        {selectedVariationIDs.map((id, index) => (
+      {selectedVariationID && (
+        <div className="mt-2">
           <span
-            key={index}
             className={`inline-block ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}
           >
-            {id}
+            {selectedVariationID}
             <button
-              onClick={() => removeVariationID(id)}
+              onClick={removeVariationID}
               className="ml-2 font-bold"
             >
               &times;
             </button>
           </span>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

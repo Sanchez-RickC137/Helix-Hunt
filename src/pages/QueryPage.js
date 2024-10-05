@@ -12,14 +12,16 @@ import { getQueryHistory, addQueryToHistory, getUserById } from '../database/db'
 import { useThemeConstants } from '../components/Page/ThemeConstants';
 import { refinedClinvarHtmlTableToJson } from '../utils/clinvarUtils';
 
+const SERVER_URL = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
+
 const QueryPage = ({ user }) => {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showDownloadPrompt, setShowDownloadPrompt] = useState(false);
   const [showResultsPreview, setShowResultsPreview] = useState(false);
-  const [selectedGenes, setSelectedGenes] = useState([]);
-  const [selectedDNAChanges, setSelectedDNAChanges] = useState([]);
-  const [selectedProteinChanges, setSelectedProteinChanges] = useState([]);
-  const [selectedVariationIDs, setSelectedVariationIDs] = useState([]);
+  const [selectedGene, setSelectedGene] = useState(null);
+  const [selectedDNAChange, setSelectedDNAChange] = useState('');
+  const [selectedProteinChange, setSelectedProteinChange] = useState('');
+  const [selectedVariationID, setSelectedVariationID] = useState('');
   const [clinicalSignificance, setClinicalSignificance] = useState([]);
   const [outputFormat, setOutputFormat] = useState('');
   const [startDate, setStartDate] = useState('');
@@ -59,32 +61,32 @@ const QueryPage = ({ user }) => {
     setDebugInfo("Query submission started");
 
     const query = { 
-      selectedGenes, 
-      selectedDNAChanges, 
-      selectedProteinChanges, 
-      selectedVariationIDs,
+      geneSymbol: selectedGene, 
+      dnaChange: selectedDNAChange, 
+      proteinChange: selectedProteinChange, 
+      variantId: selectedVariationID,
       clinicalSignificance, 
       outputFormat, 
       startDate, 
       endDate 
     };
 
+    setDebugInfo(prev => prev + "\nQuery object: " + JSON.stringify(query, null, 2));
+
     try {
-      if (selectedVariationIDs.length === 0) {
-        throw new Error("Please select at least one Variation ID");
-      }
-      if (selectedProteinChanges.length === 0) {
-        throw new Error("Please select at least one Protein Change");
+      if (!selectedGene && !selectedVariationID) {
+        throw new Error("Please select either a Gene Symbol or a Variation ID");
       }
 
-      const variantId = selectedVariationIDs[0];
-      const proteinChange = selectedProteinChanges[0];
-      setDebugInfo(prev => prev + `\nFetching data for Variant ID: ${variantId} and Protein Change: ${proteinChange}`);
-
-      const url = `http://localhost:5000/api/clinvar?id=${variantId}&term=${encodeURIComponent(proteinChange)}`;
-      setDebugInfo(prev => prev + `\nMaking request to: ${url}`);
+      setDebugInfo(prev => prev + `\nSending request to: ${SERVER_URL}/api/clinvar`);
       
-      const response = await fetch(url);
+      const response = await fetch(`${SERVER_URL}/api/clinvar`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(query),
+      });
       
       setDebugInfo(prev => prev + `\nResponse status: ${response.status}`);
       
@@ -92,17 +94,10 @@ const QueryPage = ({ user }) => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const responseText = await response.text();
-      setDebugInfo(prev => prev + `\nReceived data: ${responseText.substring(0, 100)}...`);
+      const data = await response.json();
+      setDebugInfo(prev => prev + `\nReceived data: ${JSON.stringify(data).substring(0, 100)}...`);
 
-      const jsonData = refinedClinvarHtmlTableToJson(responseText);
-      setDebugInfo(prev => prev + `\nConverted HTML to JSON: ${jsonData.substring(0, 100)}...`);
-
-      setQueryResults({
-        summary: null,
-        detail: JSON.parse(jsonData),
-        html: responseText
-      });
+      setQueryResults(data);
 
       if (user) {
         try {
@@ -128,30 +123,15 @@ const QueryPage = ({ user }) => {
   };
 
   const handleSelectHistoricalQuery = (query) => {
-    setSelectedGenes(query.selectedGenes || []);
-    setSelectedDNAChanges(query.selectedDNAChanges || []);
-    setSelectedProteinChanges(query.selectedProteinChanges || []);
-    setSelectedVariationIDs(query.selectedVariationIDs || []);
+    setSelectedGene(query.geneSymbol || null);
+    setSelectedDNAChange(query.dnaChange || '');
+    setSelectedProteinChange(query.proteinChange || '');
+    setSelectedVariationID(query.variantId || '');
     setClinicalSignificance(query.clinicalSignificance || []);
     setOutputFormat(query.outputFormat || '');
     setStartDate(query.startDate || '');
     setEndDate(query.endDate || '');
     setDebugInfo("Historical query selected");
-  };
-
-  const handleLoadPreferences = async () => {
-    if (user && user.id) {
-      try {
-        const userData = await getUserById(user.id);
-        if (userData && userData.genePreferences) {
-          setSelectedGenes(userData.genePreferences);
-          setDebugInfo("User preferences loaded");
-        }
-      } catch (error) {
-        console.error("Error loading gene preferences:", error);
-        setDebugInfo(prev => prev + "\nError loading gene preferences: " + error.message);
-      }
-    }
   };
 
   const handlePreviewResults = () => {
@@ -161,7 +141,7 @@ const QueryPage = ({ user }) => {
 
   const handleClosePreview = () => {
     setShowResultsPreview(false);
-    // We don't set showDownloadPrompt to false here, so it remains accessible
+    setDebugInfo("Results preview closed");
   };
 
   return (
@@ -171,31 +151,23 @@ const QueryPage = ({ user }) => {
       </h1>
       <div className="flex flex-col md:flex-row gap-8">
         <div className={`w-full md:w-1/3 ${themeConstants.sectionBackgroundColor} rounded-lg shadow-lg p-6 transition-colors duration-200`}>
-          {user && (
-            <button
-              onClick={handleLoadPreferences}
-              className={`mb-4 px-4 py-2 rounded text-sm ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
-            >
-              Load My Gene Preferences
-            </button>
-          )}
           <GeneSelection
-            selectedGenes={selectedGenes}
-            setSelectedGenes={setSelectedGenes}
+            selectedGene={selectedGene}
+            setSelectedGene={setSelectedGene}
           />
           <DNAChangeSelection
-            selectedDNAChanges={selectedDNAChanges}
-            setSelectedDNAChanges={setSelectedDNAChanges}
+            selectedDNAChange={selectedDNAChange}
+            setSelectedDNAChange={setSelectedDNAChange}
           />
           <ProteinChangeSelection
-            selectedProteinChanges={selectedProteinChanges}
-            setSelectedProteinChanges={setSelectedProteinChanges}
+            selectedProteinChange={selectedProteinChange}
+            setSelectedProteinChange={setSelectedProteinChange}
           />
         </div>
         <div className={`w-full md:w-2/3 ${themeConstants.sectionBackgroundColor} rounded-lg shadow-lg p-6 transition-colors duration-200`}>
           <VariationIDSelection
-            selectedVariationIDs={selectedVariationIDs}
-            setSelectedVariationIDs={setSelectedVariationIDs}
+            selectedVariationID={selectedVariationID}
+            setSelectedVariationID={setSelectedVariationID}
           />
           <QueryParameters
             clinicalSignificance={clinicalSignificance}
@@ -207,10 +179,10 @@ const QueryPage = ({ user }) => {
             endDate={endDate}
             setEndDate={setEndDate}
             handleReviewClick={handleReviewClick}
-            selectedGenes={selectedGenes}
-            selectedDNAChanges={selectedDNAChanges}
-            selectedProteinChanges={selectedProteinChanges}
-            selectedVariationIDs={selectedVariationIDs}
+            selectedGene={selectedGene}
+            selectedDNAChange={selectedDNAChange}
+            selectedProteinChange={selectedProteinChange}
+            selectedVariationID={selectedVariationID}
           />
         </div>
       </div>
@@ -225,10 +197,10 @@ const QueryPage = ({ user }) => {
       {showReviewModal && (
         <ReviewModal
           setShowReviewModal={setShowReviewModal}
-          selectedGenes={selectedGenes}
-          selectedDNAChanges={selectedDNAChanges}
-          selectedProteinChanges={selectedProteinChanges}
-          selectedVariationIDs={selectedVariationIDs}
+          selectedGene={selectedGene}
+          selectedDNAChange={selectedDNAChange}
+          selectedProteinChange={selectedProteinChange}
+          selectedVariationID={selectedVariationID}
           clinicalSignificance={clinicalSignificance}
           startDate={startDate}
           endDate={endDate}
