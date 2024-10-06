@@ -1,5 +1,6 @@
 import React from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
+import { X } from 'lucide-react';
 
 const QueryParameters = ({
   clinicalSignificance,
@@ -12,7 +13,9 @@ const QueryParameters = ({
   setEndDate,
   handleReviewClick,
   addedFullNames,
-  addedVariationIDs
+  addedVariationIDs,
+  removeFullName,
+  removeVariationID
 }) => {
   const themeConstants = useThemeConstants();
 
@@ -37,8 +40,14 @@ const QueryParameters = ({
             <h4 className="text-md font-semibold">Full Names:</h4>
             <div className="flex flex-wrap gap-2">
               {addedFullNames.map((name, index) => (
-                <span key={index} className={`inline-block ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}>
+                <span key={index} className={`inline-flex items-center ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}>
                   {name}
+                  <button
+                    onClick={() => removeFullName(name)}
+                    className="ml-2 focus:outline-none"
+                  >
+                    <X size={14} />
+                  </button>
                 </span>
               ))}
             </div>
@@ -47,8 +56,14 @@ const QueryParameters = ({
             <h4 className="text-md font-semibold">Variation IDs:</h4>
             <div className="flex flex-wrap gap-2">
               {addedVariationIDs.map((id, index) => (
-                <span key={index} className={`inline-block ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}>
+                <span key={index} className={`inline-flex items-center ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}>
                   {id}
+                  <button
+                    onClick={() => removeVariationID(id)}
+                    className="ml-2 focus:outline-none"
+                  >
+                    <X size={14} />
+                  </button>
                 </span>
               ))}
             </div>
