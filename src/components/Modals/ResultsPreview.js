@@ -23,8 +23,7 @@ const HelpPopup = ({ content, position }) => {
 const ResultsPreview = ({ results, onClose }) => {
   const [activeView, setActiveView] = useState('view');
   const [helpPopup, setHelpPopup] = useState(null);
-  const [variantDetails, setVariantDetails] = useState({});
-  const [assertionList, setAssertionList] = useState([]);
+  const [processedResults, setProcessedResults] = useState([]);
   const [error, setError] = useState(null);
   const themeConstants = useThemeConstants();
 
@@ -32,75 +31,59 @@ const ResultsPreview = ({ results, onClose }) => {
     setError(null);
     console.log('Raw results:', results);
 
-    if (results && results.variantDetailsHtml) {
-      console.log('Raw variant details HTML:', results.variantDetailsHtml);
-      try {
-        const details = parseVariantDetails(results.variantDetailsHtml);
-        setVariantDetails(details);
-        console.log('Parsed variant details:', details);
-      } catch (err) {
-        console.error('Error parsing variant details:', err);
-        setError('Error parsing variant details');
-      }
-    } else {
-      console.log('No variant details HTML provided');
-    }
-
-    if (results && results.assertionListTable) {
-      console.log('Raw assertion list table HTML:', results.assertionListTable);
-      try {
-        const parsedList = JSON.parse(refinedClinvarHtmlTableToJson(results.assertionListTable));
-        console.log('Parsed assertion list:', parsedList);
-        if (Array.isArray(parsedList) && parsedList.length > 0) {
-          setAssertionList(parsedList);
-        } else {
-          console.error('Parsed assertion list is empty or not an array');
-          setError('No assertion data found');
+    const processResults = async () => {
+      const processed = [];
+      for (const result of results) {
+        try {
+          const variantDetails = parseVariantDetails(result.data.variantDetailsHtml);
+          const assertionList = JSON.parse(refinedClinvarHtmlTableToJson(result.data.assertionListTable));
+          processed.push({
+            query: result.query,
+            variantDetails,
+            assertionList
+          });
+        } catch (err) {
+          console.error(`Error processing result for query ${result.query}:`, err);
+          setError(prev => [...(prev || []), `Error processing result for query ${result.query}: ${err.message}`]);
         }
-      } catch (err) {
-        console.error("Error parsing assertion list:", err);
-        setError('Error parsing assertion list');
       }
-    } else {
-      console.log('No assertion list table HTML provided');
-    }
+      setProcessedResults(processed);
+    };
+
+    processResults();
   }, [results]);
 
   const renderJsonView = () => {
     return (
       <div className="space-y-8">
-        <div className="mb-8 p-4 bg-gray-100 rounded-lg">
-          <h3 className="text-xl font-semibold mb-4">Variant Details</h3>
-          <pre className="whitespace-pre-wrap overflow-auto max-h-96">
-            {JSON.stringify(variantDetails, null, 2)}
-          </pre>
-        </div>
-        <div className="mb-8 p-4 bg-gray-100 rounded-lg">
-          <h3 className="text-xl font-semibold mb-4">Assertion List</h3>
-          <pre className="whitespace-pre-wrap overflow-auto max-h-96">
-            {JSON.stringify(assertionList, null, 2)}
-          </pre>
-        </div>
+        {processedResults.map((result, index) => (
+          <div key={index} className="mb-8 p-4 bg-gray-100 rounded-lg">
+            <h3 className="text-xl font-semibold mb-4">Result for query: {result.query}</h3>
+            <div className="mb-4">
+              <h4 className="text-lg font-semibold mb-2">Variant Details</h4>
+              <pre className="whitespace-pre-wrap overflow-auto max-h-96">
+                {JSON.stringify(result.variantDetails, null, 2)}
+              </pre>
+            </div>
+            <div>
+              <h4 className="text-lg font-semibold mb-2">Assertion List</h4>
+              <pre className="whitespace-pre-wrap overflow-auto max-h-96">
+                {JSON.stringify(result.assertionList, null, 2)}
+              </pre>
+            </div>
+          </div>
+        ))}
       </div>
     );
   };
 
-  const renderValue = (value) => {
-    if (value === null || value === undefined) {
-      return 'N/A';
-    }
-    if (typeof value === 'object') {
-      return JSON.stringify(value);
-    }
-    return String(value);
-  };
-
   const renderTableView = () => {
-    if (!assertionList || assertionList.length === 0) {
+    if (processedResults.length === 0) {
       return <p>No data available for table view</p>;
     }
 
     const columns = [
+      "Query",
       "Transcript ID",
       "Gene Symbol",
       "DNA Change",
@@ -124,50 +107,109 @@ const ResultsPreview = ({ results, onClose }) => {
     ];
 
     return (
-      <div className="overflow-x-auto">
+      <div className="table-container-with-scrollbar">
+        <style jsx>{`
+          .table-container-with-scrollbar {
+            overflow-x: auto;
+            overflow-y: auto;
+            max-height: 70vh;
+          }
+          .table-container-with-scrollbar::-webkit-scrollbar {
+            -webkit-appearance: none;
+            width: 7px;
+            height: 7px;
+          }
+          .table-container-with-scrollbar::-webkit-scrollbar-thumb {
+            border-radius: 4px;
+            background-color: rgba(0, 0, 0, .5);
+            box-shadow: 0 0 1px rgba(255, 255, 255, .5);
+          }
+          .table-container-with-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 0, 0, .5) transparent;
+          }
+        `}</style>
         <table className="min-w-full bg-white border border-gray-300">
           <thead>
             <tr className="bg-gray-100">
               {columns.map((column, index) => (
-                <th key={index} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th key={index} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap sticky top-0 bg-gray-100 z-10">
                   {column}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {assertionList.map((row, rowIndex) => (
-              <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                <td className="px-4 py-2 text-sm text-gray-900">{variantDetails.transcriptID}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{variantDetails.geneSymbol}</td> {/* Need to implement*/} 
-                <td className="px-4 py-2 text-sm text-gray-900">{variantDetails.dnaChange}</td> {/* Need to implement*/} 
-                <td className="px-4 py-2 text-sm text-gray-900">{variantDetails.proteinChange}</td> {/* Need to implement*/} 
-                <td className="px-4 py-2 text-sm text-gray-900">{variantDetails.fullName}</td> {/* Need to implement*/} 
-                <td className="px-4 py-2 text-sm text-gray-900">{variantDetails.variationId}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{variantDetails.accessionId}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{row.Classification.value}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{row.Classification.date}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{row['Review status'].stars}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{row['Review status']['assertion criteria']}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{row['Review status'].method}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{row.Condition.name}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{row.Condition['Affected status']}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{row.Condition['Allele origin']}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{row.Submitter.name}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{row.Submitter.Accession}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{row.Submitter['First in ClinVar']}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{row.Submitter['Last updated']}</td>
-                <td className="px-4 py-2 text-sm text-gray-900">{row['More information'].Comment}</td>
-              </tr>
-            ))}
+            {processedResults.flatMap((result, resultIndex) => 
+              result.assertionList.map((row, rowIndex) => (
+                <tr key={`${resultIndex}-${rowIndex}`} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                  {columns.map((column, colIndex) => (
+                    <td key={colIndex} className="px-4 py-2 text-sm text-gray-900 border-b border-gray-200">
+                      <div className="h-20 overflow-y-auto">
+                        {renderCellContent(column, row, result)}
+                      </div>
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
     );
   };
 
+  const renderCellContent = (column, row, result) => {
+    switch (column) {
+      case "Query":
+        return result.query;
+      case "Transcript ID":
+        return result.variantDetails.transcriptID;
+      case "Gene Symbol":
+        return result.variantDetails.geneSymbol;
+      case "DNA Change":
+        return result.variantDetails.dnaChange;
+      case "Protein Change":
+        return result.variantDetails.proteinChange;
+      case "Gene Name":
+        return result.variantDetails.fullName;
+      case "Variation ID":
+        return result.variantDetails.variationId;
+      case "Accession ID":
+        return result.variantDetails.accessionId;
+      case "Classification":
+        return `${row.Classification.value || 'N/A'}\n${row.Classification.date || 'N/A'}`;
+      case "Last Evaluated":
+        return row.Classification.date;
+      case "Review Status":
+        return `${row['Review status'].stars || 'N/A'}\n${row['Review status']['assertion criteria'] || 'N/A'}`;
+      case "Assertion Criteria":
+        return row['Review status']['assertion criteria'];
+      case "Method":
+        return row['Review status'].method;
+      case "Condition":
+        return row.Condition.name;
+      case "Affected Status":
+        return row.Condition['Affected status'];
+      case "Allele Origin":
+        return row.Condition['Allele origin'];
+      case "Submitter":
+        return row.Submitter.name;
+      case "Submitter Accession":
+        return row.Submitter.Accession;
+      case "First in ClinVar":
+        return row.Submitter['First in ClinVar'];
+      case "Last Updated":
+        return row.Submitter['Last updated'];
+      case "Comment":
+        return row['More information'].Comment;
+      default:
+        return 'N/A';
+    }
+  };
+
   const renderDefaultView = () => {
-    if (!assertionList || assertionList.length === 0) {
+    if (processedResults.length === 0) {
       return <p>No data available</p>;
     }
 
@@ -181,92 +223,97 @@ const ResultsPreview = ({ results, onClose }) => {
 
     return (
       <div className="space-y-8">
-        <div className="mb-8 p-4 bg-gray-100 rounded-lg">
-          <div className="flex justify-center space-x-8">
-            <p><strong>Gene Name:</strong> {variantDetails.fullName}</p>
-            <p><strong>Variation ID:</strong> {variantDetails.variationId}</p>
-            <p><strong>Accession ID:</strong> {variantDetails.accessionId}</p>
+        {processedResults.map((result, resultIndex) => (
+          <div key={resultIndex} className="mb-8 p-4 bg-gray-100 rounded-lg">
+            <h3 className="text-xl font-semibold mb-4">Result for query: {result.query}</h3>
+            <div className="mb-4 p-4 bg-white rounded-lg">
+              <div className="flex justify-center space-x-8">
+                <p><strong>Gene Name:</strong> {result.variantDetails.fullName}</p>
+                <p><strong>Variation ID:</strong> {result.variantDetails.variationId}</p>
+                <p><strong>Accession ID:</strong> {result.variantDetails.accessionId}</p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white border border-gray-300 table-fixed">
+                <thead>
+                  <tr className="bg-gray-100">
+                    {columns.map((column, index) => (
+                      <th key={index} className="w-1/5 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          {column.name}
+                          <div className="ml-1 relative">
+                            <HelpCircle 
+                              size={16} 
+                              className="text-gray-400 cursor-help"
+                              onMouseEnter={(e) => {
+                                const rect = e.target.getBoundingClientRect();
+                                setHelpPopup({ content: column.help, position: { x: rect.left, y: rect.bottom + 5 } });
+                              }}
+                              onMouseLeave={() => setHelpPopup(null)}
+                            />
+                          </div>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.assertionList.map((row, rowIndex) => (
+                    <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div>{row.Classification.value || 'N/A'}</div>
+                          <div className="text-xs">{row.Classification.date || 'N/A'}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div>{row['Review status'].stars || 'N/A'}</div>
+                          <div className="text-xs">{row['Review status']['assertion criteria'] || 'N/A'}</div>
+                          <div className="text-xs">Method: {row['Review status'].method || 'N/A'}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div>{row.Condition.name || 'N/A'}</div>
+                          <div className="text-xs">Affected status: {row.Condition['Affected status'] || 'N/A'}</div>
+                          <div className="text-xs">Allele origin: {row.Condition['Allele origin'] || 'N/A'}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div>{row.Submitter.name || 'N/A'}</div>
+                          <div className="text-xs">Accession: {row.Submitter.Accession || 'N/A'}</div>
+                          <div className="text-xs">First in ClinVar: {row.Submitter['First in ClinVar'] || 'N/A'}</div>
+                          <div className="text-xs">Last updated: {row.Submitter['Last updated'] || 'N/A'}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          {row['More information'].Comment && (
+                            <div className="mb-1">
+                              <strong>Comment:</strong> {row['More information'].Comment}
+                            </div>
+                          )}
+                          {Object.keys(row['More information'].Publications).length > 0 && (
+                            <div className="mb-1">
+                              <strong>Publications:</strong> {Object.keys(row['More information'].Publications).join(', ')}
+                            </div>
+                          )}
+                          {Object.keys(row['More information']['Other databases']).length > 0 && (
+                            <div className="mb-1">
+                              <strong>Other databases:</strong> {Object.keys(row['More information']['Other databases']).join(', ')}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full bg-white border border-gray-300 table-fixed">
-            <thead>
-              <tr className="bg-gray-100">
-                {columns.map((column, index) => (
-                  <th key={index} className="w-1/5 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <div className="flex items-center">
-                      {column.name}
-                      <div className="ml-1 relative">
-                        <HelpCircle 
-                          size={16} 
-                          className="text-gray-400 cursor-help"
-                          onMouseEnter={(e) => {
-                            const rect = e.target.getBoundingClientRect();
-                            setHelpPopup({ content: column.help, position: { x: rect.left, y: rect.bottom + 5 } });
-                          }}
-                          onMouseLeave={() => setHelpPopup(null)}
-                        />
-                      </div>
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {assertionList.map((row, rowIndex) => (
-                <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                  <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                    <div className="h-full overflow-y-auto">
-                      <div>{row.Classification.value || 'N/A'}</div>
-                      <div className="text-xs">{row.Classification.date || 'N/A'}</div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                    <div className="h-full overflow-y-auto">
-                      <div>{row['Review status'].stars || 'N/A'}</div>
-                      <div className="text-xs">{row['Review status']['assertion criteria'] || 'N/A'}</div>
-                      <div className="text-xs">Method: {row['Review status'].method || 'N/A'}</div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                    <div className="h-full overflow-y-auto">
-                      <div>{row.Condition.name || 'N/A'}</div>
-                      <div className="text-xs">Affected status: {row.Condition['Affected status'] || 'N/A'}</div>
-                      <div className="text-xs">Allele origin: {row.Condition['Allele origin'] || 'N/A'}</div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                    <div className="h-full overflow-y-auto">
-                      <div>{row.Submitter.name || 'N/A'}</div>
-                      <div className="text-xs">Accession: {row.Submitter.Accession || 'N/A'}</div>
-                      <div className="text-xs">First in ClinVar: {row.Submitter['First in ClinVar'] || 'N/A'}</div>
-                      <div className="text-xs">Last updated: {row.Submitter['Last updated'] || 'N/A'}</div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                    <div className="h-full overflow-y-auto">
-                      {row['More information'].Comment && (
-                        <div className="mb-1">
-                          <strong>Comment:</strong> {row['More information'].Comment}
-                        </div>
-                      )}
-                      {Object.keys(row['More information'].Publications).length > 0 && (
-                        <div className="mb-1">
-                          <strong>Publications:</strong> {Object.keys(row['More information'].Publications).join(', ')}
-                        </div>
-                      )}
-                      {Object.keys(row['More information']['Other databases']).length > 0 && (
-                        <div className="mb-1">
-                          <strong>Other databases:</strong> {Object.keys(row['More information']['Other databases']).join(', ')}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        ))}
       </div>
     );
   };
