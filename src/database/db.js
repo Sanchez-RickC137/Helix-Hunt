@@ -30,7 +30,12 @@ export const getUser = async (username) => {
 export const addQueryToHistory = async (userId, query) => {
   try {
     const queryToStore = {
-      ...query,
+      fullNames: query.fullNames || [],
+      variationIDs: query.variationIDs || [],
+      clinicalSignificance: query.clinicalSignificance || [],
+      outputFormat: query.outputFormat || '',
+      startDate: query.startDate || '',
+      endDate: query.endDate || '',
       timestamp: new Date().toISOString()
     };
     await db.queryHistory.add({ userId, query: queryToStore });
@@ -50,6 +55,16 @@ export const getQueryHistory = async (userId) => {
     return history.slice(0, 5).map(item => item.query);
   } catch (error) {
     console.error("Error fetching query history:", error);
+    throw error;
+  }
+};
+
+export const clearQueryHistory = async (userId) => {
+  try {
+    await db.queryHistory.where('userId').equals(userId).delete();
+    console.log(`Query history cleared for user ${userId}`);
+  } catch (error) {
+    console.error("Error clearing query history:", error);
     throw error;
   }
 };
@@ -81,3 +96,17 @@ export const updateUserPreferences = async (userId, preferences) => {
     throw error;
   }
 };
+
+export const resetPassword = async (username, newPassword) => {
+  try {
+    const user = await getUser(username);
+    if (!user) {
+      throw new Error('User not found');
+    }
+    await db.users.update(user.id, { password: newPassword });
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    throw error;
+  }
+};
+

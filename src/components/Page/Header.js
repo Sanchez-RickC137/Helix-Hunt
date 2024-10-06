@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, HelpCircle, Dna, Sun, Moon, LogOut, Menu, X } from 'lucide-react';
 import LoginRegisterModal from '../Modals/LoginRegisterModal';
+import ForgotPasswordModal from '../Modals/ForgotPasswordModal';
 import { useTheme } from './ThemeContext';
 
 const Header = ({ user, onLogout, onLogin }) => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isForgotPasswordModalOpen, setIsForgotPasswordModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
   const { isDarkMode, setIsDarkMode } = useTheme();
@@ -16,8 +18,13 @@ const Header = ({ user, onLogout, onLogin }) => {
 
   const handleLoginSuccess = (userData) => {
     onLogin(userData);
-    setIsModalOpen(false);
+    setIsLoginModalOpen(false);
     navigate('/account');
+  };
+
+  const handleForgotPassword = () => {
+    setIsLoginModalOpen(false);
+    setIsForgotPasswordModalOpen(true);
   };
 
   return (
@@ -63,7 +70,7 @@ const Header = ({ user, onLogout, onLogin }) => {
               </div>
             ) : (
               <button 
-                onClick={() => setIsModalOpen(true)}
+                onClick={() => setIsLoginModalOpen(true)}
                 className="bg-indigo-500 hover:bg-indigo-400 px-4 py-2 rounded transition-colors flex items-center text-lg"
               >
                 <User className="mr-2" size={24} />
@@ -82,9 +89,15 @@ const Header = ({ user, onLogout, onLogin }) => {
         </div>
       )}
       <LoginRegisterModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        isOpen={isLoginModalOpen} 
+        onClose={() => setIsLoginModalOpen(false)} 
         onLoginSuccess={handleLoginSuccess}
+        onForgotPassword={handleForgotPassword}
+      />
+      
+      <ForgotPasswordModal
+        isOpen={isForgotPasswordModalOpen}
+        onClose={() => setIsForgotPasswordModalOpen(false)}
       />
     </>
   );
