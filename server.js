@@ -13,49 +13,27 @@ app.post('/api/clinvar', async (req, res) => {
   console.log('Received request:', JSON.stringify(req.body, null, 2));
   
   try {
-    const { geneSymbol, dnaChange, proteinChange, variantId } = req.body;
-    
+    const { fullName, variantId } = req.body;
+    console.log(fullName);
     /**
      * 1. Will hold full URL for query
-     * 2. Will hold full Gene Name if all fields present. 
-     * 3. If a variant ID is present, that is all that is required to reach the target page.
-     * 4. If a gene symbol parameter is provided
-     * 5. Must have DNA change for a protein change parameter to be used.
-     */
+     * 2. Check if variant ID being utilized 
+     * 3. If a variant ID is not present, must be using full name
+     **/
     let url; // 1
-    let searchTerm; // 2
-    if (variantId) { // 3 
+    let searchTerm;
+    if (variantId) { // 2
       url = `https://www.ncbi.nlm.nih.gov/clinvar/variation/${variantId}/`;
       console.log('Using Variant ID URL:', url); // Console debug
-    } else if (geneSymbol) { // 4
-      if (proteinChange && !dnaChange) { // 5
-        console.log('Error: DNA change is required when protein change is provided'); // Console debug
-        return res.status(400).json({ error: 'DNA change is required when protein change is provided' }); // Server debug
-      }
-      
-      /**
-       * Construct the clinvar search term
-       * 1. Set equal to the base name
-       * 2. If DNA change parameter is provided
-       * 3. Add on to the full gene name for query
-       * 4. If Protein change parameter is provided
-       * 5. Add on to the full gene name for query. There is a required space that is needed
-       * 6. Construct the url. Encode the search term 
-       */
-      searchTerm = geneSymbol; // 1
-      if (dnaChange) { // 2
-        searchTerm += `:${dnaChange}`; // 3
-        if (proteinChange) { // 4 
-          searchTerm += ` (${proteinChange})`; // 5 
-        }
-      }
-      url = `https://www.ncbi.nlm.nih.gov/clinvar?term=${encodeURIComponent(searchTerm)}`; // 6
-      console.log('Using Gene Symbol URL:', url); // Console debug
+    } else if (fullName) { // 3
+      url = `https://www.ncbi.nlm.nih.gov/clinvar?term=${encodeURIComponent(fullName)}`;
+      searchTerm = fullName;
+      console.log('Using Full Name URL:', url); // Console debug
     } else {
-      console.log('Error: Neither gene symbol nor variant ID provided'); // Console debug
-      return res.status(400).json({ error: 'Either gene symbol or variant ID is required' }); // Server debug
+      console.log('Error: Neither full name nor variant ID provided'); // Console debug
+      return res.status(400).json({ error: 'Either full name or variant ID is required' }); // Server debug
     }
-
+      
     console.log(`Fetching data from URL: ${url}`);
 
     const response = await axios.get(url);
@@ -70,7 +48,7 @@ app.post('/api/clinvar', async (req, res) => {
      * 4. Base url
      * 5. Counter for while loop
      * 6. Bool for while loop
-     * 7. Entries.text() holds the full gene name to caper with.
+     * 7. Entries.text() holds the full gene name to compare with.
      * 8. Check if this entry matches the gene name
      * 9. If matched, update url for target page.
      * 10. Exit loop
@@ -86,9 +64,9 @@ app.post('/api/clinvar', async (req, res) => {
 		  const entryText = $(entries[i]).text().trim(); // 7
 		  console.log(`Checking entry ${i}: ${entryText}`); // Console debug
 		  if (entryText === searchTerm) { // 8 
-			nextPage += $(entries[i]).attr('href'); // 9 
-			isFound = true; // 10
-			console.log('Found correct link:', nextPage); // Console debug
+        nextPage += $(entries[i]).attr('href'); // 9 
+        isFound = true; // 10
+        console.log('Found correct link:', nextPage); // Console debug
 		  } else {
 			i++; // 11
 		  }

@@ -79,6 +79,14 @@ const QueryPage = ({ user }) => {
     }
   };
 
+  const removeFullName = (nameToRemove) => {
+    setAddedFullNames(addedFullNames.filter(name => name !== nameToRemove));
+  };
+
+  const removeVariationID = (idToRemove) => {
+    setAddedVariationIDs(addedVariationIDs.filter(id => id !== idToRemove));
+  };
+
   const handleReviewClick = () => {
     setShowReviewModal(true);
     setDebugInfo("Review modal opened");
@@ -241,6 +249,8 @@ const QueryPage = ({ user }) => {
             handleReviewClick={handleReviewClick}
             addedFullNames={addedFullNames}
             addedVariationIDs={addedVariationIDs}
+            removeFullName={removeFullName}
+            removeVariationID={removeVariationID}
           />
         </div>
       </div>
