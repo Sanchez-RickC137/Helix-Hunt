@@ -30,7 +30,8 @@ const GeneSelection = ({ selectedGene, setSelectedGene }) => {
     debounce((searchTerm) => {
       if (searchTerm.length > 0) {
         const filteredSuggestions = allGenes
-          .filter(gene => gene.toLowerCase().includes(searchTerm.toLowerCase()));
+          .filter(gene => gene.toLowerCase().includes(searchTerm.toLowerCase()))
+          .slice(0, 5);
         setSuggestions(filteredSuggestions);
       } else {
         setSuggestions([]);
@@ -43,59 +44,51 @@ const GeneSelection = ({ selectedGene, setSelectedGene }) => {
     debouncedSuggestions(searchTerm);
   }, [searchTerm, debouncedSuggestions]);
 
-  const handleSelectGene = () => {
-    if (searchTerm.trim()) {
-      setSelectedGene(searchTerm.trim());
-      setSearchTerm('');
-      setSuggestions([]);
-    }
-  };
-
-  const handleInputChange = (e) => {
-    setSearchTerm(e.target.value);
+  const handleSelectGene = (gene) => {
+    setSelectedGene(gene);
+    setSearchTerm('');
+    setSuggestions([]);
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full mb-4">
       <h3 className="text-lg font-semibold mb-2">Gene Selection</h3>
       <div className="flex mb-2">
         <input
           type="text"
           placeholder="Search or enter gene..."
           value={searchTerm}
-          onChange={handleInputChange}
+          onChange={(e) => setSearchTerm(e.target.value)}
           className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50`}
         />
         <button
-          onClick={handleSelectGene}
+          onClick={() => handleSelectGene(searchTerm)}
           className={`px-4 py-2 rounded-r ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
         >
-          Add
+          Select
         </button>
       </div>
       {suggestions.length > 0 && (
-        <div className="max-h-[120px] overflow-y-auto border border-gray-300 rounded">
-          {suggestions.map((gene, index) => (
-            <div
+        <ul className={`${themeConstants.sectionBackgroundColor} border border-gray-300 rounded mt-1`}>
+          {suggestions.map((suggestion, index) => (
+            <li
               key={index}
-              onClick={() => setSearchTerm(gene)}
-              className={`p-2 cursor-pointer ${
-                index % 2 === 0 ? themeConstants.unselectedItemBackgroundColor : ''
-              } hover:${themeConstants.unselectedItemHoverColor}`}
+              className={`p-2 cursor-pointer hover:${themeConstants.unselectedItemHoverColor}`}
+              onClick={() => handleSelectGene(suggestion)}
             >
-              {gene}
-            </div>
+              {suggestion}
+            </li>
           ))}
-        </div>
+        </ul>
       )}
       {selectedGene && (
-        <div className="mt-4">
+        <div className="mt-2">
           <span
             className={`inline-block ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}
           >
             {selectedGene}
             <button
-              onClick={() => setSelectedGene(null)}
+              onClick={() => setSelectedGene('')}
               className="ml-2 font-bold"
             >
               &times;

@@ -10,7 +10,6 @@ import ResultsPreview from '../components/Modals/ResultsPreview';
 import QueryHistory from '../components/Query/QueryHistory';
 import { getQueryHistory, addQueryToHistory, getUserById } from '../database/db';
 import { useThemeConstants } from '../components/Page/ThemeConstants';
-import { refinedClinvarHtmlTableToJson } from '../utils/clinvarUtils';
 
 const SERVER_URL = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
 
@@ -18,18 +17,20 @@ const QueryPage = ({ user }) => {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showDownloadPrompt, setShowDownloadPrompt] = useState(false);
   const [showResultsPreview, setShowResultsPreview] = useState(false);
-  const [selectedGene, setSelectedGene] = useState(null);
+  const [selectedGene, setSelectedGene] = useState('');
   const [selectedDNAChange, setSelectedDNAChange] = useState('');
   const [selectedProteinChange, setSelectedProteinChange] = useState('');
-  const [selectedVariationID, setSelectedVariationID] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [addedFullNames, setAddedFullNames] = useState([]);
+  const [addedVariationIDs, setAddedVariationIDs] = useState([]);
   const [clinicalSignificance, setClinicalSignificance] = useState([]);
   const [outputFormat, setOutputFormat] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [queryHistory, setQueryHistory] = useState([]);
-  const [queryResults, setQueryResults] = useState(null);
+  const [queryResults, setQueryResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [errors, setErrors] = useState([]);
   const [debugInfo, setDebugInfo] = useState('');
 
   const themeConstants = useThemeConstants();
@@ -50,6 +51,34 @@ const QueryPage = ({ user }) => {
     fetchHistory();
   }, [user]);
 
+  useEffect(() => {
+    // Generate full name when gene, DNA change, or protein change is updated
+    if (selectedGene || selectedDNAChange || selectedProteinChange) {
+      let newFullName = selectedGene || '';
+      if (selectedDNAChange) newFullName += `:${selectedDNAChange}`;
+      if (selectedProteinChange) newFullName += ` (${selectedProteinChange})`;
+      setFullName(newFullName);
+    } else {
+      setFullName('');
+    }
+  }, [selectedGene, selectedDNAChange, selectedProteinChange]);
+
+  const handleAddFullName = () => {
+    if (fullName && !addedFullNames.includes(fullName)) {
+      setAddedFullNames([...addedFullNames, fullName]);
+      setSelectedGene('');
+      setSelectedDNAChange('');
+      setSelectedProteinChange('');
+      setFullName('');
+    }
+  };
+
+  const handleAddVariationID = (id) => {
+    if (id && !addedVariationIDs.includes(id)) {
+      setAddedVariationIDs([...addedVariationIDs, id]);
+    }
+  };
+
   const handleReviewClick = () => {
     setShowReviewModal(true);
     setDebugInfo("Review modal opened");
@@ -57,76 +86,90 @@ const QueryPage = ({ user }) => {
 
   const handleSubmit = async () => {
     setLoading(true);
-    setError(null);
+    setErrors([]);
+    setQueryResults([]);
     setDebugInfo("Query submission started");
 
-    const query = { 
-      geneSymbol: selectedGene, 
-      dnaChange: selectedDNAChange, 
-      proteinChange: selectedProteinChange, 
-      variantId: selectedVariationID,
-      clinicalSignificance, 
-      outputFormat, 
-      startDate, 
-      endDate 
-    };
+    const queries = [...addedFullNames, ...addedVariationIDs];
 
-    setDebugInfo(prev => prev + "\nQuery object: " + JSON.stringify(query, null, 2));
-
-    try {
-      if (!selectedGene && !selectedVariationID) {
-        throw new Error("Please select either a Gene Symbol or a Variation ID");
-      }
-
-      setDebugInfo(prev => prev + `\nSending request to: ${SERVER_URL}/api/clinvar`);
-      
-      const response = await fetch(`${SERVER_URL}/api/clinvar`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(query),
-      });
-      
-      setDebugInfo(prev => prev + `\nResponse status: ${response.status}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      setDebugInfo(prev => prev + `\nReceived data: ${JSON.stringify(data).substring(0, 100)}...`);
-
-      setQueryResults(data);
-
-      if (user) {
-        try {
-          const updatedHistory = await addQueryToHistory(user.id, query);
-          setQueryHistory(updatedHistory);
-          setDebugInfo(prev => prev + "\nQuery added to history");
-        } catch (error) {
-          console.error("Error adding query to history:", error);
-          setDebugInfo(prev => prev + "\nError adding query to history: " + error.message);
-        }
-      }
-    
-      setShowReviewModal(false);
-      setShowDownloadPrompt(true);
-      setDebugInfo(prev => prev + "\nQuery completed successfully");
-    } catch (error) {
-      console.error("Error performing ClinVar query:", error);
-      setError(error.message || "An error occurred while fetching data");
-      setDebugInfo(prev => prev + "\nError performing query: " + error.message);
-    } finally {
+    if (queries.length === 0) {
+      setErrors(["No queries added. Please add at least one full name or variation ID."]);
       setLoading(false);
+      return;
     }
+
+    const results = [];
+    const newErrors = [];
+
+    for (const query of queries) {
+      const isVariationID = addedVariationIDs.includes(query);
+      const queryObject = {
+        geneSymbol: isVariationID ? '' : query.split(':')[0],
+        dnaChange: isVariationID ? '' : (query.split(':')[1] || '').split(' ')[0],
+        proteinChange: isVariationID ? '' : (query.match(/\(([^)]+)\)/) || [])[1] || '',
+        variantId: isVariationID ? query : '',
+        clinicalSignificance,
+        outputFormat,
+        startDate,
+        endDate
+      };
+
+      setDebugInfo(prev => prev + `\nSending request for query: ${JSON.stringify(queryObject)}`);
+
+      try {
+        const response = await fetch(`${SERVER_URL}/api/clinvar`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(queryObject),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        results.push({ query, data });
+        setDebugInfo(prev => prev + `\nReceived data for query: ${query}`);
+      } catch (error) {
+        console.error(`Error performing ClinVar query for ${query}:`, error);
+        newErrors.push(`Error fetching data for ${query}: ${error.message}`);
+        setDebugInfo(prev => prev + `\nError performing query for ${query}: ${error.message}`);
+      }
+    }
+
+    setQueryResults(results);
+    setErrors(newErrors);
+
+    if (user) {
+      try {
+        const queryToSave = {
+          fullNames: addedFullNames,
+          variationIDs: addedVariationIDs,
+          clinicalSignificance,
+          outputFormat,
+          startDate,
+          endDate
+        };
+        const updatedHistory = await addQueryToHistory(user.id, queryToSave);
+        setQueryHistory(updatedHistory);
+        setDebugInfo(prev => prev + "\nQuery added to history");
+      } catch (error) {
+        console.error("Error adding query to history:", error);
+        setDebugInfo(prev => prev + "\nError adding query to history: " + error.message);
+      }
+    }
+
+    setShowReviewModal(false);
+    setShowDownloadPrompt(true);
+    setLoading(false);
+    setDebugInfo(prev => prev + "\nQuery completed");
   };
 
   const handleSelectHistoricalQuery = (query) => {
-    setSelectedGene(query.geneSymbol || null);
-    setSelectedDNAChange(query.dnaChange || '');
-    setSelectedProteinChange(query.proteinChange || '');
-    setSelectedVariationID(query.variantId || '');
+    setAddedFullNames(query.fullNames || []);
+    setAddedVariationIDs(query.variationIDs || []);
     setClinicalSignificance(query.clinicalSignificance || []);
     setOutputFormat(query.outputFormat || '');
     setStartDate(query.startDate || '');
@@ -163,12 +206,29 @@ const QueryPage = ({ user }) => {
             selectedProteinChange={selectedProteinChange}
             setSelectedProteinChange={setSelectedProteinChange}
           />
+          <div className="mt-4">
+            <h3 className="text-lg font-semibold mb-2">Generated Full Name</h3>
+            <div className="flex">
+              <input
+                type="text"
+                value={fullName}
+                readOnly
+                className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50`}
+              />
+              <button
+                onClick={handleAddFullName}
+                className={`px-4 py-2 rounded-r ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
+              >
+                Add
+              </button>
+            </div>
+          </div>
+          <VariationIDSelection
+            addedVariationIDs={addedVariationIDs}
+            onAddVariationID={handleAddVariationID}
+          />
         </div>
         <div className={`w-full md:w-2/3 ${themeConstants.sectionBackgroundColor} rounded-lg shadow-lg p-6 transition-colors duration-200`}>
-          <VariationIDSelection
-            selectedVariationID={selectedVariationID}
-            setSelectedVariationID={setSelectedVariationID}
-          />
           <QueryParameters
             clinicalSignificance={clinicalSignificance}
             setClinicalSignificance={setClinicalSignificance}
@@ -179,10 +239,8 @@ const QueryPage = ({ user }) => {
             endDate={endDate}
             setEndDate={setEndDate}
             handleReviewClick={handleReviewClick}
-            selectedGene={selectedGene}
-            selectedDNAChange={selectedDNAChange}
-            selectedProteinChange={selectedProteinChange}
-            selectedVariationID={selectedVariationID}
+            addedFullNames={addedFullNames}
+            addedVariationIDs={addedVariationIDs}
           />
         </div>
       </div>
@@ -197,10 +255,8 @@ const QueryPage = ({ user }) => {
       {showReviewModal && (
         <ReviewModal
           setShowReviewModal={setShowReviewModal}
-          selectedGene={selectedGene}
-          selectedDNAChange={selectedDNAChange}
-          selectedProteinChange={selectedProteinChange}
-          selectedVariationID={selectedVariationID}
+          addedFullNames={addedFullNames}
+          addedVariationIDs={addedVariationIDs}
           clinicalSignificance={clinicalSignificance}
           startDate={startDate}
           endDate={endDate}
@@ -222,7 +278,16 @@ const QueryPage = ({ user }) => {
         />
       )}
       {loading && <div className="mt-4 text-center">Loading...</div>}
-      {error && <div className="mt-4 text-center text-red-500">{error}</div>}
+      {errors.length > 0 && (
+        <div className="mt-4">
+          <h3 className="text-lg font-semibold mb-2">Errors:</h3>
+          <ul className="list-disc list-inside">
+            {errors.map((error, index) => (
+              <li key={index} className="text-red-500">{error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
       
       {/* Debug Information */}
       <div className="mt-8 p-4 bg-gray-100 rounded-lg">

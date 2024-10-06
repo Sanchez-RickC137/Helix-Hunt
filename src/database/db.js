@@ -4,7 +4,7 @@ import Dexie from 'dexie';
 const db = new Dexie('HelixHuntDB');
 db.version(1).stores({
   users: '++id, username, password',
-  queryHistory: '++id, userId, query'
+  queryHistory: '++id, userId, query, timestamp'
 });
 
 export const addUser = async (username, password) => {
@@ -29,7 +29,11 @@ export const getUser = async (username) => {
 
 export const addQueryToHistory = async (userId, query) => {
   try {
-    await db.queryHistory.add({ userId, query, timestamp: new Date().toISOString() });
+    const queryToStore = {
+      ...query,
+      timestamp: new Date().toISOString()
+    };
+    await db.queryHistory.add({ userId, query: queryToStore });
     return await getQueryHistory(userId);
   } catch (error) {
     console.error("Error adding query to history:", error);

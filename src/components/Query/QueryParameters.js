@@ -11,14 +11,12 @@ const QueryParameters = ({
   endDate,
   setEndDate,
   handleReviewClick,
-  selectedGene,
-  selectedDNAChange,
-  selectedProteinChange,
-  selectedVariationID
+  addedFullNames,
+  addedVariationIDs
 }) => {
   const themeConstants = useThemeConstants();
 
-  const isFormValid = ((selectedGene && selectedGene.trim() !== '') || (selectedVariationID && selectedVariationID.trim() !== '')) && outputFormat;
+  const isFormValid = (addedFullNames.length > 0 || addedVariationIDs.length > 0) && outputFormat;
 
   const handleClinicalSignificanceClick = (sig) => {
     setClinicalSignificance(prevSig => {
@@ -32,6 +30,32 @@ const QueryParameters = ({
 
   return (
     <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold mb-2">Added Queries</h3>
+        <div className="space-y-2">
+          <div>
+            <h4 className="text-md font-semibold">Full Names:</h4>
+            <div className="flex flex-wrap gap-2">
+              {addedFullNames.map((name, index) => (
+                <span key={index} className={`inline-block ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}>
+                  {name}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h4 className="text-md font-semibold">Variation IDs:</h4>
+            <div className="flex flex-wrap gap-2">
+              {addedVariationIDs.map((id, index) => (
+                <span key={index} className={`inline-block ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}>
+                  {id}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div>
         <h3 className="text-lg font-semibold mb-2">Clinical Significance</h3>
         <div className="flex flex-wrap gap-2">
@@ -106,12 +130,12 @@ const QueryParameters = ({
             : 'bg-gray-400 cursor-not-allowed text-gray-200'
         } transition-colors duration-200`}
       >
-        Review Query
+        Review Queries
       </button>
 
       {!isFormValid && (
         <p className={`text-sm ${themeConstants.labelTextColor}`}>
-          Please select either a Gene Symbol or a Variation ID, and choose an output format.
+          Please add at least one full name or variation ID, and choose an output format.
         </p>
       )}
     </div>
