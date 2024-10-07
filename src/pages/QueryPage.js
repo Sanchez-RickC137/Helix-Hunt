@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Plus } from 'lucide-react';
 import GeneSelection from '../components/Query/GeneSelection';
 import DNAChangeSelection from '../components/Query/DNAChangeSelection';
 import ProteinChangeSelection from '../components/Query/ProteinChangeSelection';
@@ -32,7 +33,6 @@ const QueryPage = ({ user }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState([]);
   const [debugInfo, setDebugInfo] = useState('');
-
   const themeConstants = useThemeConstants();
 
   useEffect(() => {
@@ -195,10 +195,42 @@ const QueryPage = ({ user }) => {
     setDebugInfo("Results preview closed");
   };
 
+  const handleLoadFullNamePreferences = async () => {
+    if (!user) return;
+    try {
+      const userData = await getUserById(user.id);
+      if (userData && userData.fullNamePreferences && userData.fullNamePreferences.length > 0) {
+        setAddedFullNames(prevNames => [...new Set([...prevNames, ...userData.fullNamePreferences])]);
+        setDebugInfo(prev => prev + "\nFull name preferences loaded successfully");
+      } else {
+        setDebugInfo(prev => prev + "\nNo full name preferences found");
+      }
+    } catch (error) {
+      console.error('Error loading full name preferences:', error);
+      setDebugInfo(prev => prev + "\nError loading full name preferences: " + error.message);
+    }
+  };
+
+  const handleLoadVariationIDPreferences = async () => {
+    if (!user) return;
+    try {
+      const userData = await getUserById(user.id);
+      if (userData && userData.variationIDPreferences && userData.variationIDPreferences.length > 0) {
+        setAddedVariationIDs(prevIDs => [...new Set([...prevIDs, ...userData.variationIDPreferences])]);
+        setDebugInfo(prev => prev + "\nVariation ID preferences loaded successfully");
+      } else {
+        setDebugInfo(prev => prev + "\nNo variation ID preferences found");
+      }
+    } catch (error) {
+      console.error('Error loading variation ID preferences:', error);
+      setDebugInfo(prev => prev + "\nError loading variation ID preferences: " + error.message);
+    }
+  };
+
   return (
     <div className={`container mx-auto mt-8 p-4 ${themeConstants.mainTextColor}`}>
       <h1 className={`text-3xl font-bold mb-6 ${themeConstants.headingTextColor}`}>
-        Create Your Query
+        Query Builder
       </h1>
       <div className="flex flex-col md:flex-row gap-8">
         <div className={`w-full md:w-1/3 ${themeConstants.sectionBackgroundColor} rounded-lg shadow-lg p-6 transition-colors duration-200`}>
@@ -215,7 +247,7 @@ const QueryPage = ({ user }) => {
             setSelectedProteinChange={setSelectedProteinChange}
           />
           <div className="mt-4">
-            <h3 className="text-lg font-semibold mb-2">Generated Full Name</h3>
+            <h3 className="text-lg font-semibold mb-2">Generated Gene Full Name</h3>
             <div className="flex">
               <input
                 type="text"
@@ -227,7 +259,7 @@ const QueryPage = ({ user }) => {
                 onClick={handleAddFullName}
                 className={`px-4 py-2 rounded-r ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
               >
-                Add
+                Add to Query
               </button>
             </div>
           </div>
@@ -235,6 +267,24 @@ const QueryPage = ({ user }) => {
             addedVariationIDs={addedVariationIDs}
             onAddVariationID={handleAddVariationID}
           />
+          {user && (
+            <div className="flex justify-evenly space-x-4 mb-4">
+              <button
+                onClick={handleLoadFullNamePreferences}
+                className={`flex items-center justify-center px-3 py-2 ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white rounded transition-colors duration-200`}
+              >
+                {/* <Plus size={20} /> */}
+                <span className="ml-2">Add User Gene Full Names </span>
+              </button>
+              <button
+                onClick={handleLoadVariationIDPreferences}
+                className={`flex items-center justify-center px-3 py-2 ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white rounded transition-colors duration-200`}
+              >
+                {/* <Plus size={20} /> */}
+                <span className="ml-2">Add User Variation IDs</span>
+              </button>
+            </div>
+          )}
         </div>
         <div className={`w-full md:w-2/3 ${themeConstants.sectionBackgroundColor} rounded-lg shadow-lg p-6 transition-colors duration-200`}>
           <QueryParameters

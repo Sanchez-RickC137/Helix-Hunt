@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 import debounce from 'lodash/debounce';
+import { Plus } from 'lucide-react';
 
 const ProteinChangeSelection = ({ selectedProteinChange, setSelectedProteinChange }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -52,7 +53,7 @@ const ProteinChangeSelection = ({ selectedProteinChange, setSelectedProteinChang
 
   return (
     <div className="w-full mb-4">
-      <h3 className="text-lg font-semibold mb-2">Protein Change Selection</h3>
+      <h3 className="text-lg font-semibold mb-2">Protein Change</h3>
       <div className="flex mb-2">
         <input
           type="text"
@@ -63,9 +64,9 @@ const ProteinChangeSelection = ({ selectedProteinChange, setSelectedProteinChang
         />
         <button
           onClick={() => handleSelectProteinChange(searchTerm)}
-          className={`px-4 py-2 rounded-r ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
+          className={`px-4 py-2 rounded-r ${themeConstants.primaryButtonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
         >
-          Select
+          <Plus size={20}/>
         </button>
       </div>
       {suggestions.length > 0 && (
