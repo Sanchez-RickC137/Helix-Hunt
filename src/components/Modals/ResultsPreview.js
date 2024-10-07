@@ -93,7 +93,7 @@ const ResultsPreview = ({ results, onClose }) => {
       "Accession ID",
       "Classification",
       "Last Evaluated",
-      "Review Status",
+      // "Review Status",
       "Assertion Criteria",
       "Method",
       "Condition",
@@ -181,8 +181,8 @@ const ResultsPreview = ({ results, onClose }) => {
         return `${row.Classification.value || 'N/A'}\n${row.Classification.date || 'N/A'}`;
       case "Last Evaluated":
         return row.Classification.date;
-      case "Review Status":
-        return `${row['Review status'].stars || 'N/A'}\n${row['Review status']['assertion criteria'] || 'N/A'}`;
+      // case "Review Status":
+      //   return `${row['Review status'].stars || 'N/A'}\n${row['Review status']['assertion criteria'] || 'N/A'}`;
       case "Assertion Criteria":
         return row['Review status']['assertion criteria'];
       case "Method":

@@ -34,7 +34,7 @@ const QueryParameters = ({
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold mb-2">Added Queries</h3>
+        <h3 className="text-lg font-semibold mb-2">Query Parameters</h3>
         <div className="space-y-2">
           <div>
             <h4 className="text-md font-semibold">Full Names:</h4>
@@ -145,7 +145,7 @@ const QueryParameters = ({
             : 'bg-gray-400 cursor-not-allowed text-gray-200'
         } transition-colors duration-200`}
       >
-        Review Queries
+        Review Query
       </button>
 
       {!isFormValid && (

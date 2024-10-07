@@ -14,7 +14,7 @@ const VariationIDSelection = ({ onAddVariationID }) => {
 
   return (
     <div className="w-full mb-6">
-      <h3 className="text-lg font-semibold mb-2">Variation ID Selection</h3>
+      <h3 className="text-lg font-semibold mb-2">Variation ID</h3>
       <div className="flex mb-2">
         <input
           type="text"
@@ -27,7 +27,7 @@ const VariationIDSelection = ({ onAddVariationID }) => {
           onClick={handleAddVariationID}
           className={`px-4 py-2 rounded-r ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
         >
-          Add
+          Add to Query
         </button>
       </div>
     </div>

@@ -110,3 +110,57 @@ export const resetPassword = async (username, newPassword) => {
   }
 };
 
+export const updateFullNamePreferences = async (userId, fullNamePreferences) => {
+  try {
+    await db.users.update(userId, { fullNamePreferences });
+    console.log('Full name preferences updated successfully');
+  } catch (error) {
+    console.error("Error updating full name preferences:", error);
+    throw error;
+  }
+};
+
+export const updateVariationIDPreferences = async (userId, variationIDPreferences) => {
+  try {
+    await db.users.update(userId, { variationIDPreferences });
+    console.log('Variation ID preferences updated successfully');
+  } catch (error) {
+    console.error("Error updating variation ID preferences:", error);
+    throw error;
+  }
+};
+
+export const getUserPreferences = async (userId) => {
+  try {
+    const user = await getUserById(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+    return {
+      genePreferences: user.genePreferences || [],
+      fullNamePreferences: user.fullNamePreferences || [],
+      variationIDPreferences: user.variationIDPreferences || []
+    };
+  } catch (error) {
+    console.error("Error fetching user preferences:", error);
+    throw error;
+  }
+};
+
+export const updateUserPassword = async (userId, currentPassword, newPassword) => {
+  try {
+    const user = await db.users.get(userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+    if (user.password !== currentPassword) {
+      throw new Error('Current password is incorrect');
+    }
+    await db.users.update(userId, { password: newPassword });
+  } catch (error) {
+    console.error("Error updating password:", error);
+    throw error;
+  }
+};
+
+
