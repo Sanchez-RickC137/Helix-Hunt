@@ -52,7 +52,6 @@ const QueryPage = ({ user }) => {
   }, [user]);
 
   useEffect(() => {
-    // Generate full name when gene, DNA change, or protein change is updated
     if (selectedGene || selectedDNAChange || selectedProteinChange) {
       let newFullName = selectedGene || '';
       if (selectedDNAChange) newFullName += `:${selectedDNAChange}`;
@@ -92,6 +91,20 @@ const QueryPage = ({ user }) => {
     setDebugInfo("Review modal opened");
   };
 
+  const resetQuery = () => {
+    setSelectedGene('');
+    setSelectedDNAChange('');
+    setSelectedProteinChange('');
+    setFullName('');
+    setAddedFullNames([]);
+    setAddedVariationIDs([]);
+    setClinicalSignificance([]);
+    setOutputFormat('');
+    setStartDate('');
+    setEndDate('');
+    setDebugInfo('Query reset');
+  };
+
   const handleSubmit = async () => {
     setLoading(true);
     setErrors([]);
@@ -110,12 +123,9 @@ const QueryPage = ({ user }) => {
     const newErrors = [];
 
     for (const query of queries) {
-      const isVariationID = addedVariationIDs.includes(query);
       const queryObject = {
-        geneSymbol: isVariationID ? '' : query.split(':')[0],
-        dnaChange: isVariationID ? '' : (query.split(':')[1] || '').split(' ')[0],
-        proteinChange: isVariationID ? '' : (query.match(/\(([^)]+)\)/) || [])[1] || '',
-        variantId: isVariationID ? query : '',
+        fullName: addedFullNames.includes(query) ? query : '',
+        variantId: addedVariationIDs.includes(query) ? query : '',
         clinicalSignificance,
         outputFormat,
         startDate,
@@ -273,14 +283,12 @@ const QueryPage = ({ user }) => {
                 onClick={handleLoadFullNamePreferences}
                 className={`flex items-center justify-center px-3 py-2 ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white rounded transition-colors duration-200`}
               >
-                {/* <Plus size={20} /> */}
                 <span className="ml-2">Add User Gene Full Names </span>
               </button>
               <button
                 onClick={handleLoadVariationIDPreferences}
                 className={`flex items-center justify-center px-3 py-2 ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white rounded transition-colors duration-200`}
               >
-                {/* <Plus size={20} /> */}
                 <span className="ml-2">Add User Variation IDs</span>
               </button>
             </div>
@@ -297,6 +305,7 @@ const QueryPage = ({ user }) => {
             endDate={endDate}
             setEndDate={setEndDate}
             handleReviewClick={handleReviewClick}
+            handleResetClick={resetQuery}
             addedFullNames={addedFullNames}
             addedVariationIDs={addedVariationIDs}
             removeFullName={removeFullName}

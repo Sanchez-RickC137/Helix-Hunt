@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { X, HelpCircle } from 'lucide-react';
 import { useThemeConstants } from '../Page/ThemeConstants';
-const { parseVariantDetails, refinedClinvarHtmlTableToJson } = require('../../utils/clinvarUtils');
 
 const HelpPopup = ({ content, position }) => {
   return ReactDOM.createPortal(
@@ -31,22 +30,12 @@ const ResultsPreview = ({ results, onClose }) => {
     setError(null);
     console.log('Raw results:', results);
 
-    const processResults = async () => {
-      const processed = [];
-      for (const result of results) {
-        try {
-          const variantDetails = parseVariantDetails(result.data.variantDetailsHtml);
-          const assertionList = JSON.parse(refinedClinvarHtmlTableToJson(result.data.assertionListTable));
-          processed.push({
-            query: result.query,
-            variantDetails,
-            assertionList
-          });
-        } catch (err) {
-          console.error(`Error processing result for query ${result.query}:`, err);
-          setError(prev => [...(prev || []), `Error processing result for query ${result.query}: ${err.message}`]);
-        }
-      }
+    const processResults = () => {
+      const processed = results.map(result => ({
+        query: result.query,
+        variantDetails: result.data.variantDetails,
+        assertionList: result.data.assertionList
+      }));
       setProcessedResults(processed);
     };
 
@@ -93,7 +82,6 @@ const ResultsPreview = ({ results, onClose }) => {
       "Accession ID",
       "Classification",
       "Last Evaluated",
-      // "Review Status",
       "Assertion Criteria",
       "Method",
       "Condition",
@@ -181,8 +169,6 @@ const ResultsPreview = ({ results, onClose }) => {
         return `${row.Classification.value || 'N/A'}\n${row.Classification.date || 'N/A'}`;
       case "Last Evaluated":
         return row.Classification.date;
-      // case "Review Status":
-      //   return `${row['Review status'].stars || 'N/A'}\n${row['Review status']['assertion criteria'] || 'N/A'}`;
       case "Assertion Criteria":
         return row['Review status']['assertion criteria'];
       case "Method":

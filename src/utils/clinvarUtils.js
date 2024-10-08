@@ -12,33 +12,26 @@ function parseVariantDetails(html) {
     accessionID: "",
   };
 
-  // Extract variant details
   try {
-  details.geneSymbol = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim().split('(')[1].trim().split(')')[0].trim();
+    details.geneSymbol = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim().split('(')[1].trim().split(')')[0].trim();
 
-  if (details.geneSymbol && details.geneSymbol.length < 10) {
-    details.dnaChange = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim().split(':')[1].trim().split(' ')[0].trim();
-    details.transcriptID = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim().split('(')[0].trim();
+    if (details.geneSymbol && details.geneSymbol.length < 10) {
+      details.dnaChange = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim().split(':')[1].trim().split(' ')[0].trim();
+      details.transcriptID = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim().split('(')[0].trim();
+    }
+    else {
+      details.geneSymbol = "";
+    }
+
+    if (details.dnaChange)
+      details.proteinChange = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim().split(' (')[1].trim().split(')')[0].trim();
+
+    details.fullName = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim();
+
+  } catch(error) {
+    console.error('Error parsing variant details:', error);
   }
-  else {
-    details.geneSymbol = "";
-  }
 
-  if (details.dnaChange)
-    details.proteinChange = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim().split(' (')[1].trim().split(')')[0].trim();
-
-  details.fullName = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim()
-
-
-
-  }
-  catch(error){
-    console.log(error);
-  }
-  
-
-  console.log(details.fullName);
-  
   $('dl.dl-leftalign dd').each((i, el) => {
     const text = $(el).text();
     if (text.includes('Variation ID:')) {
@@ -53,19 +46,12 @@ function parseVariantDetails(html) {
 }
 
 function refinedClinvarHtmlTableToJson(html) {
-  console.log('Starting to parse HTML table');
   const $ = cheerio.load(html);
   const results = [];
 
-  console.log('Table HTML:', $.html('table')); // Console debugging
-
-  let rows = $('tbody tr'); // Put each table row entry into a row
-  console.log(rows); // Console debugging
-
-  console.log(`Found ${rows.length} rows in the table`); // Console debugging
+  let rows = $('tbody tr');
 
   rows.each((index, row) => {
-    console.log(`Processing row ${index + 1}`);
     const $row = $(row);
     const entry = {
       Classification: {},
@@ -83,7 +69,6 @@ function refinedClinvarHtmlTableToJson(html) {
     const $classificationCell = $row.find('td:nth-child(1)');
     entry.Classification.value = $classificationCell.find('.germline-submission > div').contents().first().text().trim();
     entry.Classification.date = $classificationCell.find('.smaller').last().text().trim().replace(/[()]/g, '');
-    console.log('Classification:', entry.Classification);
 
     // Review status
     const $reviewStatusCell = $row.find('td:nth-child(2)');
@@ -93,7 +78,6 @@ function refinedClinvarHtmlTableToJson(html) {
     if ($methodDiv.text().startsWith('Method:')) {
       entry['Review status'].method = $methodDiv.text().replace('Method:', '').trim();
     }
-    console.log('Review status:', entry['Review status']);
 
     // Condition
     const $conditionCell = $row.find('td:nth-child(3)');
@@ -106,7 +90,6 @@ function refinedClinvarHtmlTableToJson(html) {
         entry.Condition['Allele origin'] = text.replace('Allele origin:', '').trim();
       }
     });
-    console.log('Condition:', entry.Condition);
 
     // Submitter
     const $submitterCell = $row.find('td:nth-child(4)');
@@ -118,7 +101,6 @@ function refinedClinvarHtmlTableToJson(html) {
         entry.Submitter[key] = value;
       }
     });
-    console.log('Submitter:', entry.Submitter);
 
     // More information
     const $moreInfoCell = $row.find('td:nth-child(5)');
@@ -143,13 +125,11 @@ function refinedClinvarHtmlTableToJson(html) {
     if ($commentDiv.length) {
       entry['More information'].Comment = $commentDiv.text().replace('Comment:', '').trim();
     }
-    console.log('More information:', entry['More information']);
 
     results.push(entry);
   });
 
-  console.log(`Parsed ${results.length} entries from the table`);
-  return JSON.stringify(results, null, 2);
+  return results;
 }
 
 module.exports = {
