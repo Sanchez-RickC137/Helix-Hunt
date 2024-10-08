@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const cheerio = require('cheerio');
+const { parseVariantDetails, refinedClinvarHtmlTableToJson } = require('./src/utils/clinvarUtils');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -13,25 +14,19 @@ app.post('/api/clinvar', async (req, res) => {
   console.log('Received request:', JSON.stringify(req.body, null, 2));
   
   try {
-    const { fullName, variantId } = req.body;
-    console.log(fullName);
-    /**
-     * 1. Will hold full URL for query
-     * 2. Check if variant ID being utilized 
-     * 3. If a variant ID is not present, must be using full name
-     **/
-    let url; // 1
+    const { fullName, variantId, clinicalSignificance, outputFormat, startDate, endDate } = req.body;
+    let url;
     let searchTerm;
-    if (variantId) { // 2
+    if (variantId) {
       url = `https://www.ncbi.nlm.nih.gov/clinvar/variation/${variantId}/`;
-      console.log('Using Variant ID URL:', url); // Console debug
-    } else if (fullName) { // 3
+      console.log('Using Variant ID URL:', url);
+    } else if (fullName) {
       url = `https://www.ncbi.nlm.nih.gov/clinvar?term=${encodeURIComponent(fullName)}`;
       searchTerm = fullName;
-      console.log('Using Full Name URL:', url); // Console debug
+      console.log('Using Full Name URL:', url);
     } else {
-      console.log('Error: Neither full name nor variant ID provided'); // Console debug
-      return res.status(400).json({ error: 'Either full name or variant ID is required' }); // Server debug
+      console.log('Error: Neither full name nor variant ID provided');
+      return res.status(400).json({ error: 'Either full name or variant ID is required' });
     }
       
     console.log(`Fetching data from URL: ${url}`);
@@ -41,79 +36,58 @@ app.post('/api/clinvar', async (req, res) => {
     
     let $ = cheerio.load(response.data);
 
-    /**
-     * 1. Check if we're on the target page or a search results page. VCV indicates target page
-     * 2. We're on a search results page, find the correct link
-     * 3. Use cheerio syntax to grab the table with this classname. Same every time
-     * 4. Base url
-     * 5. Counter for while loop
-     * 6. Bool for while loop
-     * 7. Entries.text() holds the full gene name to compare with.
-     * 8. Check if this entry matches the gene name
-     * 9. If matched, update url for target page.
-     * 10. Exit loop
-     * 11. Counter increment
-     */
-    if ($('title').text().substring(0, 3) !== "VCV") { // 1
-		console.log('On search results page, looking for correct link'); // 2
-		const entries = $('.blocklevelaintable'); // 3
-		let nextPage = "https://www.ncbi.nlm.nih.gov"; // 4
-		let i = 0; // 5
-		let isFound = false; // 6
-		while (i < entries.length && !isFound) {
-		  const entryText = $(entries[i]).text().trim(); // 7
-		  console.log(`Checking entry ${i}: ${entryText}`); // Console debug
-		  if (entryText === searchTerm) { // 8 
-        nextPage += $(entries[i]).attr('href'); // 9 
-        isFound = true; // 10
-        console.log('Found correct link:', nextPage); // Console debug
-		  } else {
-			i++; // 11
-		  }
-		}
+    if ($('title').text().substring(0, 3) !== "VCV") {
+      console.log('On search results page, looking for correct link');
+      const entries = $('.blocklevelaintable');
+      let nextPage = "https://www.ncbi.nlm.nih.gov";
+      let i = 0;
+      let isFound = false;
+      while (i < entries.length && !isFound) {
+        const entryText = $(entries[i]).text().trim();
+        console.log(`Checking entry ${i}: ${entryText}`);
+        if (entryText === searchTerm) {
+          nextPage += $(entries[i]).attr('href');
+          isFound = true;
+          console.log('Found correct link:', nextPage);
+        } else {
+          i++;
+        }
+      }
       
-      // If gene name wasn't found
       if (!isFound) {
-        console.log('Error: Target variation not found'); // Console debug
-        return res.status(404).json({ error: 'Target variation not found' }); // Server debug
+        console.log('Error: Target variation not found');
+        return res.status(404).json({ error: 'Target variation not found' });
       }
 
-      /**
-       * 1. Fetch the target page with axios
-       * 2. Load date into $ using cheerio
-       */
-      console.log('Fetching target page:', nextPage); // Console debug
-      const targetResponse = await axios.get(nextPage); // 1
-      console.log('Target page received, status:', targetResponse.status); // Console debug
-      $ = cheerio.load(targetResponse.data); // 2 
+      console.log('Fetching target page:', nextPage);
+      const targetResponse = await axios.get(nextPage);
+      console.log('Target page received, status:', targetResponse.status);
+      $ = cheerio.load(targetResponse.data);
     } else {
-      console.log('Already on target page'); // Console debug
+      console.log('Already on target page');
     }
 
-	/**
-     * 1. Extract the variant-details-list table which represents the identifiers
-     * 2. Extract the assertion-list table which represents the submissions
-	 * 3. Check for tables
-     */
-    const variantDetailsHtml = $('#id_first').html(); // 1
-    const assertionListTable = $('#assertion-list').prop('outerHTML'); // 2
+    const variantDetailsHtml = $('#id_first').html();
+    const assertionListTable = $('#assertion-list').prop('outerHTML');
 
     if (!variantDetailsHtml || !assertionListTable) {
-      console.log('Error: Required data not found in the HTML'); // Console debug
-      return res.status(404).json({ error: 'Required data not found' }); // Server debug
+      console.log('Error: Required data not found in the HTML');
+      return res.status(404).json({ error: 'Required data not found' });
     }
 
-    console.log('Data extracted successfully'); // Console debug
-    console.log('Variant details HTML (first 200 chars):\n\n', variantDetailsHtml.substring(0, 200)); // Console debug
-    console.log('Assertion list table HTML (first 200 chars):\n\n', assertionListTable.substring(0, 200)); // Console debug
+    console.log('Data extracted successfully');
 
-	// Export as separate itmes in response object.
-    const responseData = {
-      variantDetailsHtml,
-      assertionListTable
+    // Process the data using the utility functions
+    const variantDetails = parseVariantDetails(variantDetailsHtml);
+    const assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
+
+    // Prepare the processed data to send to the frontend
+    const processedData = {
+      variantDetails,
+      assertionList
     };
 
-    res.json(responseData);
+    res.json(processedData);
   } catch (error) {
     console.error('Error fetching ClinVar data:', error);
     res.status(500).json({ error: 'An error occurred while fetching data', details: error.message });

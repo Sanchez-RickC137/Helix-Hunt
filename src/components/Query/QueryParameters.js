@@ -1,6 +1,6 @@
 import React from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
-import { X } from 'lucide-react';
+import { X, RotateCcw } from 'lucide-react';
 
 const QueryParameters = ({
   clinicalSignificance,
@@ -12,6 +12,7 @@ const QueryParameters = ({
   endDate,
   setEndDate,
   handleReviewClick,
+  handleResetClick,
   addedFullNames,
   addedVariationIDs,
   removeFullName,
@@ -135,22 +136,32 @@ const QueryParameters = ({
         </div>
       </div>
 
-      <button 
-        type="button" 
-        onClick={handleReviewClick}
-        disabled={!isFormValid}
-        className={`w-full px-6 py-3 rounded-lg flex items-center justify-center ${
-          isFormValid
-            ? `${themeConstants.primaryButtonBackgroundColor} hover:${themeConstants.primaryButtonHoverColor} text-white`
-            : 'bg-gray-400 cursor-not-allowed text-gray-200'
-        } transition-colors duration-200`}
-      >
-        Review Query
-      </button>
+      <div className="flex items-center space-x-4">
+        <button 
+          type="button" 
+          onClick={handleReviewClick}
+          disabled={!isFormValid}
+          className={`flex-grow px-6 py-3 rounded-lg flex items-center justify-center text-base ${
+            isFormValid
+              ? `${themeConstants.primaryButtonBackgroundColor} hover:${themeConstants.primaryButtonHoverColor} text-white`
+              : 'bg-gray-400 cursor-not-allowed text-gray-200'
+          } transition-colors duration-200`}
+        >
+          Review Query
+        </button>
+        <button 
+          type="button" 
+          onClick={handleResetClick}
+          className="px-6 py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors duration-200 flex items-center justify-center text-base"
+        >
+          <RotateCcw className="mr-2" size={18} />
+          Reset
+        </button>
+      </div>
 
       {!isFormValid && (
         <p className={`text-sm ${themeConstants.labelTextColor}`}>
-          Please add at least one full name or variation ID, and choose an output format.
+          Please add at least one full name or variation ID, and select an output format. Clinical significance and date ranges are optional filters.
         </p>
       )}
     </div>
