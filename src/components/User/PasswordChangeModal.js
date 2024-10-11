@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useThemeConstants } from '../Page/ThemeConstants';
-import { updateUserPassword } from '../../database/db';
+import axiosInstance from '../../utils/axiosInstance';
 
-const PasswordChangeModal = ({ isOpen, onClose, userId }) => {
+const PasswordChangeModal = ({ isOpen, onClose, username }) => {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -22,14 +22,20 @@ const PasswordChangeModal = ({ isOpen, onClose, userId }) => {
     }
 
     try {
-      await updateUserPassword(userId, currentPassword, newPassword);
-      setMessage('Password updated successfully');
+      const response = await axiosInstance.post('/api/change-password', {
+        username,
+        currentPassword,
+        newPassword
+      });
+      console.log('Password change response:', response);
+      setMessage(response.data.message || 'Password updated successfully');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setTimeout(() => onClose(), 2000); // Close modal after 2 seconds
     } catch (err) {
-      setError(err.message || 'Failed to update password');
+      console.error('Password change error:', err);
+      setError(err.response?.data?.error || 'Failed to update password. Please try again.');
     }
   };
 

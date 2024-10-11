@@ -2,24 +2,32 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { User, HelpCircle, Dna, Sun, Moon, LogOut, Menu, X } from 'lucide-react';
 import LoginRegisterModal from '../Modals/LoginRegisterModal';
-import ForgotPasswordModal from '../Modals/ForgotPasswordModal';
+import ForgotPasswordModal from '../User/ForgotPasswordModal';
 import { useTheme } from './ThemeContext';
+import { useUser } from '../../contexts/UserContext';
 
-const Header = ({ user, onLogout, onLogin }) => {
+const Header = () => {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isForgotPasswordModalOpen, setIsForgotPasswordModalOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
-  const { isDarkMode, setIsDarkMode } = useTheme();
+  const { isDarkMode, toggleDarkMode } = useTheme();
+  const { user, login, logout } = useUser();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
   const handleLoginSuccess = (userData) => {
-    onLogin(userData);
+    login(userData.user, userData.token);
     setIsLoginModalOpen(false);
     navigate('/account');
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    logout();
+    navigate('/');
   };
 
   const handleForgotPassword = () => {
@@ -48,7 +56,7 @@ const Header = ({ user, onLogout, onLogin }) => {
                 </Link></li>
               </ul>
             </nav>
-            <button onClick={() => setIsDarkMode(!isDarkMode)} className="p-2 rounded-full hover:bg-indigo-500 transition-colors">
+            <button onClick={toggleDarkMode} className="p-2 rounded-full hover:bg-indigo-500 transition-colors">
               {isDarkMode ? <Sun size={20} /> : <Moon size={24} />}
             </button>
             {user ? (
@@ -61,7 +69,7 @@ const Header = ({ user, onLogout, onLogin }) => {
                   Account
                 </Link>
                 <button 
-                  onClick={onLogout}
+                  onClick={handleLogout}
                   className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded transition-colors flex items-center text-lg"
                 >
                   <LogOut className="mr-2" size={24} />
@@ -84,8 +92,47 @@ const Header = ({ user, onLogout, onLogin }) => {
         </div>
       </header>
       {isMenuOpen && (
-        <div className="md:hidden bg-indigo-600 text-white absolute w-full z-50">
-          {/* Mobile menu content */}
+        <div className="md:hidden fixed top-16 right-0 left-0 bottom-0 z-50">
+          <div className="bg-indigo-600 bg-opacity-70 backdrop-blur-lg p-4 overflow-y-auto">
+            <nav>
+              <ul className="space-y-4 text-center">
+                <li><Link to="/" className="block text-white hover:text-indigo-200 transition-colors text-lg" onClick={toggleMenu}>Home</Link></li>
+                <li><Link to="/about" className="block text-white hover:text-indigo-200 transition-colors text-lg" onClick={toggleMenu}>About</Link></li>
+                <li><Link to="/help" className="block text-white justify-center hover:text-indigo-200 transition-colors flex items-center text-lg" onClick={toggleMenu}>
+                  <HelpCircle className="mr-2" size={20}/>
+                  Help/Tutorial
+                </Link></li>
+              </ul>
+            </nav>
+              <button onClick={toggleDarkMode} className="w-full text-left text-white hover:bg-indigo-500 p-3 rounded transition-colors flex justify-center items-center text-lg">
+                {isDarkMode ? <Sun size={20} className="mr-2" /> : <Moon size={24} className="mr-2" />}
+                {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+              </button>
+              {user ? (
+                <div className= "flex space-evenly" > 
+                  <Link 
+                    to="/account"
+                    className="block w-full m-4 bg-indigo-500 hover:bg-indigo-400 px-4 py-3 rounded transition-colors text-white text-lg"
+                    onClick={toggleMenu}
+                  >
+                    Account
+                  </Link>
+                  <button 
+                    onClick={() => { handleLogout(); toggleMenu(); }}
+                    className="w-full m-4 bg-red-500 hover:bg-red-600 px-4 py-3 rounded transition-colors text-left text-white text-lg"
+                  >
+                    Logout
+                  </button>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => { setIsLoginModalOpen(true); toggleMenu(); }}
+                  className="w-full bg-indigo-500 hover:bg-indigo-400 px-4 py-3 rounded transition-colors text-left text-white text-lg"
+                >
+                  Login/Register
+                </button>
+              )}
+          </div>
         </div>
       )}
       <LoginRegisterModal 

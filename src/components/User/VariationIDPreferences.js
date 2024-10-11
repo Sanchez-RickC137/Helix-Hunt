@@ -2,24 +2,19 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 
-const VariationIDPreferences = ({ userId, initialPreferences, onUpdatePreferences }) => {
-  const [preferences, setPreferences] = useState(initialPreferences);
+const VariationIDPreferences = ({ preferences, onUpdatePreferences }) => {
   const [newPreference, setNewPreference] = useState('');
   const themeConstants = useThemeConstants();
 
   const handleAddPreference = () => {
     if (newPreference && !preferences.includes(newPreference)) {
-      const updatedPreferences = [...preferences, newPreference];
-      setPreferences(updatedPreferences);
-      onUpdatePreferences(updatedPreferences);
+      onUpdatePreferences([...preferences, newPreference]);
       setNewPreference('');
     }
   };
 
   const handleRemovePreference = (pref) => {
-    const updatedPreferences = preferences.filter(p => p !== pref);
-    setPreferences(updatedPreferences);
-    onUpdatePreferences(updatedPreferences);
+    onUpdatePreferences(preferences.filter(p => p !== pref));
   };
 
   return (

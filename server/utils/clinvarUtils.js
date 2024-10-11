@@ -35,10 +35,10 @@ function parseVariantDetails(html) {
   $('dl.dl-leftalign dd').each((i, el) => {
     const text = $(el).text();
     if (text.includes('Variation ID:')) {
-      details.variationId = text.match(/Variation ID: (\d+)/)[1];
+      details.variationID = text.match(/Variation ID: (\d+)/)[1];
     }
     if (text.includes('Accession:')) {
-      details.accessionId = text.match(/Accession: (VCV\d+\.\d+)/)[1];
+      details.accessionID = text.match(/Accession: (VCV\d+\.\d+)/)[1];
     }
   });
 

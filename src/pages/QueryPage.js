@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus } from 'lucide-react';
+import axiosInstance from '../utils/axiosInstance';
+import { useUser } from '../contexts/UserContext';
 import GeneSelection from '../components/Query/GeneSelection';
 import DNAChangeSelection from '../components/Query/DNAChangeSelection';
 import ProteinChangeSelection from '../components/Query/ProteinChangeSelection';
@@ -9,12 +10,11 @@ import ReviewModal from '../components/Modals/ReviewModal';
 import DownloadPrompt from '../components/Modals/DownloadPrompt';
 import ResultsPreview from '../components/Modals/ResultsPreview';
 import QueryHistory from '../components/Query/QueryHistory';
-import { getQueryHistory, addQueryToHistory, getUserById } from '../database/db';
+import timeOperation from '../utils/timing';
 import { useThemeConstants } from '../components/Page/ThemeConstants';
 
-const SERVER_URL = process.env.REACT_APP_SERVER_URL || 'http://localhost:5000';
-
-const QueryPage = ({ user }) => {
+const QueryPage = () => {
+  const { user, preferences, queryHistory, saveQuery, fetchQueryHistory } = useUser();
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showDownloadPrompt, setShowDownloadPrompt] = useState(false);
   const [showResultsPreview, setShowResultsPreview] = useState(false);
@@ -28,7 +28,6 @@ const QueryPage = ({ user }) => {
   const [outputFormat, setOutputFormat] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [queryHistory, setQueryHistory] = useState([]);
   const [queryResults, setQueryResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState([]);
@@ -36,20 +35,10 @@ const QueryPage = ({ user }) => {
   const themeConstants = useThemeConstants();
 
   useEffect(() => {
-    const fetchHistory = async () => {
-      if (user && user.id) {
-        try {
-          const history = await getQueryHistory(user.id);
-          setQueryHistory(history);
-        } catch (error) {
-          console.error("Error fetching query history:", error);
-          setDebugInfo(prev => prev + "\nError fetching query history: " + error.message);
-        }
-      }
-    };
-
-    fetchHistory();
-  }, [user]);
+    if (user) {
+      fetchQueryHistory();
+    }
+  }, [user, fetchQueryHistory]);
 
   useEffect(() => {
     if (selectedGene || selectedDNAChange || selectedProteinChange) {
@@ -108,90 +97,48 @@ const QueryPage = ({ user }) => {
   const handleSubmit = async () => {
     setLoading(true);
     setErrors([]);
-    setQueryResults([]);
+    setQueryResults(null);
     setDebugInfo("Query submission started");
-
-    const queries = [...addedFullNames, ...addedVariationIDs];
-
-    if (queries.length === 0) {
-      setErrors(["No queries added. Please add at least one full name or variation ID."]);
+  
+    const query = {
+      fullNames: addedFullNames,
+      variationIDs: addedVariationIDs,
+      clinicalSignificance,
+      outputFormat,
+      startDate,
+      endDate
+    };
+  
+    try {
+      const response = await timeOperation('ClinVar query', () => 
+        axiosInstance.post('/api/clinvar', query)
+      );
+      setQueryResults(response.data);
+      setShowReviewModal(false);
+      setShowDownloadPrompt(true);
+      
+      if (user) {
+        await timeOperation('Save query to history', () => 
+          saveQuery(query)
+        );
+      }
+    } catch (error) {
+      console.error('Error performing ClinVar query:', error);
+      setErrors([`Error fetching data: ${error.message}`]);
+      setDebugInfo(prev => prev + `\nError performing query: ${error.message}`);
+    } finally {
       setLoading(false);
-      return;
+      setDebugInfo(prev => prev + "\nQuery completed");
     }
-
-    const results = [];
-    const newErrors = [];
-
-    for (const query of queries) {
-      const queryObject = {
-        fullName: addedFullNames.includes(query) ? query : '',
-        variantId: addedVariationIDs.includes(query) ? query : '',
-        clinicalSignificance,
-        outputFormat,
-        startDate,
-        endDate
-      };
-
-      setDebugInfo(prev => prev + `\nSending request for query: ${JSON.stringify(queryObject)}`);
-
-      try {
-        const response = await fetch(`${SERVER_URL}/api/clinvar`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(queryObject),
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
-        const data = await response.json();
-        results.push({ query, data });
-        setDebugInfo(prev => prev + `\nReceived data for query: ${query}`);
-      } catch (error) {
-        console.error(`Error performing ClinVar query for ${query}:`, error);
-        newErrors.push(`Error fetching data for ${query}: ${error.message}`);
-        setDebugInfo(prev => prev + `\nError performing query for ${query}: ${error.message}`);
-      }
-    }
-
-    setQueryResults(results);
-    setErrors(newErrors);
-
-    if (user) {
-      try {
-        const queryToSave = {
-          fullNames: addedFullNames,
-          variationIDs: addedVariationIDs,
-          clinicalSignificance,
-          outputFormat,
-          startDate,
-          endDate
-        };
-        const updatedHistory = await addQueryToHistory(user.id, queryToSave);
-        setQueryHistory(updatedHistory);
-        setDebugInfo(prev => prev + "\nQuery added to history");
-      } catch (error) {
-        console.error("Error adding query to history:", error);
-        setDebugInfo(prev => prev + "\nError adding query to history: " + error.message);
-      }
-    }
-
-    setShowReviewModal(false);
-    setShowDownloadPrompt(true);
-    setLoading(false);
-    setDebugInfo(prev => prev + "\nQuery completed");
   };
 
   const handleSelectHistoricalQuery = (query) => {
-    setAddedFullNames(query.fullNames || []);
-    setAddedVariationIDs(query.variationIDs || []);
-    setClinicalSignificance(query.clinicalSignificance || []);
-    setOutputFormat(query.outputFormat || '');
-    setStartDate(query.startDate || '');
-    setEndDate(query.endDate || '');
+    setAddedFullNames(query.full_names || []);
+    setAddedVariationIDs(query.variation_ids || []);
+    setClinicalSignificance(query.clinical_significance || []);
+    setOutputFormat(query.output_format || '');
+    setStartDate(query.start_date || '');
+    setEndDate(query.end_date || '');
     setDebugInfo("Historical query selected");
   };
 
@@ -205,36 +152,14 @@ const QueryPage = ({ user }) => {
     setDebugInfo("Results preview closed");
   };
 
-  const handleLoadFullNamePreferences = async () => {
-    if (!user) return;
-    try {
-      const userData = await getUserById(user.id);
-      if (userData && userData.fullNamePreferences && userData.fullNamePreferences.length > 0) {
-        setAddedFullNames(prevNames => [...new Set([...prevNames, ...userData.fullNamePreferences])]);
-        setDebugInfo(prev => prev + "\nFull name preferences loaded successfully");
-      } else {
-        setDebugInfo(prev => prev + "\nNo full name preferences found");
-      }
-    } catch (error) {
-      console.error('Error loading full name preferences:', error);
-      setDebugInfo(prev => prev + "\nError loading full name preferences: " + error.message);
-    }
+  const handleLoadVariationIDPreferences = () => {
+    setAddedVariationIDs(prevIDs => [...new Set([...prevIDs, ...(preferences.variationIDPreferences || [])])]);
+    setDebugInfo("Variation ID preferences loaded");
   };
 
-  const handleLoadVariationIDPreferences = async () => {
-    if (!user) return;
-    try {
-      const userData = await getUserById(user.id);
-      if (userData && userData.variationIDPreferences && userData.variationIDPreferences.length > 0) {
-        setAddedVariationIDs(prevIDs => [...new Set([...prevIDs, ...userData.variationIDPreferences])]);
-        setDebugInfo(prev => prev + "\nVariation ID preferences loaded successfully");
-      } else {
-        setDebugInfo(prev => prev + "\nNo variation ID preferences found");
-      }
-    } catch (error) {
-      console.error('Error loading variation ID preferences:', error);
-      setDebugInfo(prev => prev + "\nError loading variation ID preferences: " + error.message);
-    }
+  const handleLoadFullNamePreferences = () => {
+    setAddedFullNames(prevNames => [...new Set([...prevNames, ...(preferences.fullNamePreferences || [])])]);
+    setDebugInfo("Full name preferences loaded");
   };
 
   return (
@@ -283,13 +208,13 @@ const QueryPage = ({ user }) => {
                 onClick={handleLoadFullNamePreferences}
                 className={`flex items-center justify-center px-3 py-2 ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white rounded transition-colors duration-200`}
               >
-                <span className="ml-2">Add User Gene Full Names </span>
+                <span className="ml-2">Load Full Names</span>
               </button>
               <button
                 onClick={handleLoadVariationIDPreferences}
                 className={`flex items-center justify-center px-3 py-2 ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white rounded transition-colors duration-200`}
               >
-                <span className="ml-2">Add User Variation IDs</span>
+                <span className="ml-2">Load Variation IDs</span>
               </button>
             </div>
           )}
@@ -358,7 +283,6 @@ const QueryPage = ({ user }) => {
         </div>
       )}
       
-      {/* Debug Information */}
       <div className="mt-8 p-4 bg-gray-100 rounded-lg">
         <h3 className="text-lg font-semibold mb-2">Debug Information:</h3>
         <pre className="whitespace-pre-wrap">{debugInfo}</pre>

@@ -7,7 +7,7 @@ export const useThemeConstants = () => {
   // Return an object with all theme-related constants
   return {
     // Main background and text colors
-    mainBackgroundColor: isDarkMode ? 'bg-gray-900' : 'bg-gray-100',
+    mainBackgroundColor: isDarkMode ? 'bg-gray-900' : 'bg-white',
     mainTextColor: isDarkMode ? 'text-white' : 'text-gray-900',
     
     // Heading text color

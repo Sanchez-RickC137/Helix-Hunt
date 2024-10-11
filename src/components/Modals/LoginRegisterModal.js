@@ -1,77 +1,46 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { addUser, getUser } from '../../database/db';
 import { useThemeConstants } from '../Page/ThemeConstants';
+import { useUser } from '../../contexts/UserContext';
+import axiosInstance from '../../utils/axiosInstance';
 
-const LoginRegisterModal = ({ isOpen, onClose, onLoginSuccess, onForgotPassword }) => {
+const LoginRegisterModal = ({ isOpen, onClose, onForgotPassword }) => {
   const [isLoginView, setIsLoginView] = useState(true);
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  
+  const { login } = useUser();
   const themeConstants = useThemeConstants();
 
   useEffect(() => {
     if (!isOpen) {
       setUsername('');
+      setEmail('');
       setPassword('');
       setError('');
       setIsLoginView(true);
     }
   }, [isOpen]);
 
-  const validateUsername = (value) => {
-    if (value.length < 6 || value.length > 20) {
-      return 'Username must be between 6 and 20 characters';
-    }
-    return '';
-  };
-
-  const validatePassword = (value) => {
-    const regex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,16}$/;
-    if (!regex.test(value)) {
-      return 'Password must be 8-16 characters and include uppercase, lowercase, number, and symbol';
-    }
-    return '';
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    const usernameError = validateUsername(username);
-    const passwordError = validatePassword(password);
-
-    if (usernameError || passwordError) {
-      setError(usernameError || passwordError);
-      return;
-    }
-
     try {
       if (isLoginView) {
-        const user = await getUser(username);
-        if (user && user.password === password) {
-          console.log("Login successful");
-          onLoginSuccess(user);
-          onClose();
-        } else {
-          setError('Invalid username or password');
-        }
+        const response = await axiosInstance.post('/api/login', { username, password });
+        await login(response.data.user, response.data.token);
+        onClose();
       } else {
-        const existingUser = await getUser(username);
-        if (existingUser) {
-          setError('Username already exists');
-        } else {
-          const userId = await addUser(username, password);
-          const newUser = { id: userId, username, password };
-          console.log("Registration successful");
-          onLoginSuccess(newUser);
-          onClose();
-        }
+        await axiosInstance.post('/api/register', { username, email, password });
+        const loginResponse = await axiosInstance.post('/api/login', { username, password });
+        await login(loginResponse.data.user, loginResponse.data.token);
+        onClose();
       }
     } catch (error) {
       console.error('Error during login/register:', error);
-      setError('An error occurred. Please try again.');
+      setError(error.response?.data?.error || 'An error occurred. Please try again.');
     }
   };
 
@@ -89,11 +58,11 @@ const LoginRegisterModal = ({ isOpen, onClose, onLoginSuccess, onForgotPassword 
         >
           <X size={24} />
         </button>
-        <div className="flex transition-transform duration-300 ease-in-out" style={{ transform: isLoginView ? 'translateX(0)' : 'translateX(-100%)' }}>
-          <div className="w-full flex-shrink-0">
+        <div className="flex transition-transform duration-300 ease-in-out" style={{ width: '200%', transform: isLoginView ? 'translateX(0)' : 'translateX(-50%)' }}>
+          <div className="w-1/2 flex-shrink-0">
             <form onSubmit={handleSubmit} className="p-12 space-y-6">
               <h2 className={`text-3xl font-bold mb-6 ${themeConstants.headingTextColor}`}>
-                Login
+                {isLoginView ? 'Login' : 'Register'}
               </h2>
               <div>
                 <input
@@ -102,8 +71,21 @@ const LoginRegisterModal = ({ isOpen, onClose, onLoginSuccess, onForgotPassword 
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor} backdrop-blur-sm`}
+                  required
                 />
               </div>
+              {!isLoginView && (
+                <div>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor} backdrop-blur-sm`}
+                    required
+                  />
+                </div>
+              )}
               <div>
                 <input
                   type="password"
@@ -111,6 +93,7 @@ const LoginRegisterModal = ({ isOpen, onClose, onLoginSuccess, onForgotPassword 
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor} backdrop-blur-sm`}
+                  required
                 />
               </div>
               {error && <p className="text-red-500 text-sm">{error}</p>}
@@ -118,50 +101,23 @@ const LoginRegisterModal = ({ isOpen, onClose, onLoginSuccess, onForgotPassword 
                 type="submit"
                 className={`w-full ${themeConstants.buttonBackgroundColor} text-white py-3 rounded-lg hover:${themeConstants.buttonHoverColor} transition-colors text-lg font-semibold`}
               >
-                Login
+                {isLoginView ? 'Login' : 'Register'}
               </button>
-              <div className="text-center">
-                <button 
-                  type="button"
-                  onClick={onForgotPassword}
-                  className={`text-sm ${themeConstants.linkTextColor} ${themeConstants.linkHoverColor} font-semibold`}
-                >
-                  Forgot Password?
-                </button>
-              </div>
+              {isLoginView && onForgotPassword && (
+                <div className="text-center">
+                  <button 
+                    type="button"
+                    onClick={onForgotPassword}
+                    className={`text-sm ${themeConstants.linkTextColor} ${themeConstants.linkHoverColor} font-semibold`}
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+              )}
             </form>
           </div>
-          <div className="w-full flex-shrink-0">
-            <form onSubmit={handleSubmit} className="p-12 space-y-6">
-              <h2 className={`text-3xl font-bold mb-6 ${themeConstants.headingTextColor}`}>
-                Register
-              </h2>
-              <div>
-                <input
-                  type="text"
-                  placeholder="Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor} backdrop-blur-sm`}
-                />
-              </div>
-              <div>
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor} backdrop-blur-sm`}
-                />
-              </div>
-              {error && <p className="text-red-500 text-sm">{error}</p>}
-              <button
-                type="submit"
-                className={`w-full ${themeConstants.buttonBackgroundColor} text-white py-3 rounded-lg hover:${themeConstants.buttonHoverColor} transition-colors text-lg font-semibold`}
-              >
-                Register
-              </button>
-            </form>
+          <div className="w-1/2 flex-shrink-0">
+            {/* Register form content (if needed) */}
           </div>
         </div>
         <div className="absolute bottom-4 left-0 right-0 text-center">

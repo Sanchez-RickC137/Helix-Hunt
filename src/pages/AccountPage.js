@@ -1,61 +1,57 @@
 import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
+import axiosInstance from '../utils/axiosInstance';  // Add this import
+import { useUser } from '../contexts/UserContext';
 import FullNamePreferences from '../components/User/FullNamePreferences';
 import VariationIDPreferences from '../components/User/VariationIDPreferences';
 import PasswordChangeModal from '../components/User/PasswordChangeModal';
 import QueryHistory from '../components/Query/QueryHistory';
-import {
-  getQueryHistory,
-  updateFullNamePreferences,
-  updateVariationIDPreferences,
-  getUserPreferences
-} from '../database/db';
 import { useThemeConstants } from '../components/Page/ThemeConstants';
 
-const AccountPage = ({ user, setUser }) => {
+const AccountPage = () => {
+  const { user, preferences, updatePreferences, savePreferences, loading } = useUser();
+  const [localPreferences, setLocalPreferences] = useState(preferences);
   const [queryHistory, setQueryHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [debugInfo, setDebugInfo] = useState('');
   const themeConstants = useThemeConstants();
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (user && user.id) {
-        try {
-          const [history, preferences] = await Promise.all([
-            getQueryHistory(user.id),
-            getUserPreferences(user.id)
-          ]);
-          setQueryHistory(history);
-          setUser(prevUser => ({ ...prevUser, ...preferences }));
-        } catch (error) {
-          console.error("Error fetching user data:", error);
-        }
-      }
-      setLoading(false);
-    };
-    fetchData();
-  }, [user, setUser]);
-
-  const handleUpdateFullNamePreferences = async (newPreferences) => {
     if (user) {
-      try {
-        await updateFullNamePreferences(user.id, newPreferences);
-        setUser(prevUser => ({ ...prevUser, fullNamePreferences: newPreferences }));
-      } catch (error) {
-        console.error("Error updating full name preferences:", error);
-      }
+      fetchQueryHistory();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    console.log('Preferences in AccountPage:', preferences);
+    setLocalPreferences(preferences);
+  }, [preferences]);
+
+  const fetchQueryHistory = async () => {
+    try {
+      const response = await axiosInstance.get('/api/query-history');
+      setQueryHistory(response.data);
+    } catch (error) {
+      console.error("Error fetching query history:", error);
+      setDebugInfo(prev => prev + "\nError fetching query history: " + error.message);
     }
   };
 
-  const handleUpdateVariationIDPreferences = async (newPreferences) => {
-    if (user) {
-      try {
-        await updateVariationIDPreferences(user.id, newPreferences);
-        setUser(prevUser => ({ ...prevUser, variationIDPreferences: newPreferences }));
-      } catch (error) {
-        console.error("Error updating variation ID preferences:", error);
-      }
+  const handleUpdateFullNamePreferences = (newFullNamePreferences) => {
+    setLocalPreferences(prev => ({ ...prev, fullNamePreferences: newFullNamePreferences }));
+  };
+
+  const handleUpdateVariationIDPreferences = (newVariationIDPreferences) => {
+    setLocalPreferences(prev => ({ ...prev, variationIDPreferences: newVariationIDPreferences }));
+  };
+
+  const handleSavePreferences = async () => {
+    try {
+      await savePreferences(localPreferences);
+      updatePreferences(localPreferences);
+      console.log('Preferences saved successfully');
+    } catch (error) {
+      console.error('Error saving preferences:', error);
     }
   };
 
@@ -84,8 +80,7 @@ const AccountPage = ({ user, setUser }) => {
         <div className={`${themeConstants.sectionBackgroundColor} p-4 rounded-lg shadow`}>
           <h2 className="text-2xl font-bold mb-4">Full Name Preferences</h2>
           <FullNamePreferences
-            userId={user.id}
-            initialPreferences={user.fullNamePreferences || []}
+            preferences={localPreferences.fullNamePreferences}
             onUpdatePreferences={handleUpdateFullNamePreferences}
           />
         </div>
@@ -93,11 +88,19 @@ const AccountPage = ({ user, setUser }) => {
         <div className={`${themeConstants.sectionBackgroundColor} p-4 rounded-lg shadow`}>
           <h2 className="text-2xl font-bold mb-4">Variation ID Preferences</h2>
           <VariationIDPreferences
-            userId={user.id}
-            initialPreferences={user.variationIDPreferences || []}
+            preferences={localPreferences.variationIDPreferences}
             onUpdatePreferences={handleUpdateVariationIDPreferences}
           />
         </div>
+      </div>
+
+      <div className="flex justify-center mb-8">
+        <button
+          onClick={handleSavePreferences}
+          className={`px-6 py-3 rounded ${themeConstants.primaryButtonBackgroundColor} hover:${themeConstants.primaryButtonHoverColor} text-white transition-colors duration-200`}
+        >
+          Save Preferences
+        </button>
       </div>
 
       {queryHistory.length > 0 && (
@@ -112,8 +115,13 @@ const AccountPage = ({ user, setUser }) => {
       <PasswordChangeModal
         isOpen={isPasswordModalOpen}
         onClose={() => setIsPasswordModalOpen(false)}
-        userId={user.id}
+        username={user ? user.username : ''}
       />
+
+      <div className="mt-8 p-4 bg-gray-100 rounded-lg">
+        <h3 className="text-lg font-semibold mb-2">Debug Information:</h3>
+        <pre className="whitespace-pre-wrap">{debugInfo}</pre>
+      </div>
     </div>
   );
 };

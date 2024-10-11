@@ -28,14 +28,29 @@ const ResultsPreview = ({ results, onClose }) => {
 
   useEffect(() => {
     setError(null);
-    console.log('Raw results:', results);
+    // console.log('Raw results:', results);
 
     const processResults = () => {
-      const processed = results.map(result => ({
-        query: result.query,
-        variantDetails: result.data.variantDetails,
-        assertionList: result.data.assertionList
-      }));
+      if (!results || !Array.isArray(results)) {
+        setError('No valid results to display');
+        return;
+      }
+      
+      const processed = results.map(result => {
+        if (result.error) {
+          return {
+            query: result.searchTerm || 'Unknown query',
+            error: result.error,
+            details: result.details
+          };
+        }
+        return {
+          query: result.searchTerm,
+          variantDetails: result.variantDetails,
+          assertionList: result.assertionList
+        };
+      });
+      
       setProcessedResults(processed);
     };
 
@@ -162,9 +177,9 @@ const ResultsPreview = ({ results, onClose }) => {
       case "Gene Name":
         return result.variantDetails.fullName;
       case "Variation ID":
-        return result.variantDetails.variationId;
+        return result.variantDetails.variationID;
       case "Accession ID":
-        return result.variantDetails.accessionId;
+        return result.variantDetails.accessionID;
       case "Classification":
         return `${row.Classification.value || 'N/A'}\n${row.Classification.date || 'N/A'}`;
       case "Last Evaluated":
@@ -212,92 +227,103 @@ const ResultsPreview = ({ results, onClose }) => {
         {processedResults.map((result, resultIndex) => (
           <div key={resultIndex} className="mb-8 p-4 bg-gray-100 rounded-lg">
             <h3 className="text-xl font-semibold mb-4">Result for query: {result.query}</h3>
-            <div className="mb-4 p-4 bg-white rounded-lg">
-              <div className="flex justify-center space-x-8">
-                <p><strong>Gene Name:</strong> {result.variantDetails.fullName}</p>
-                <p><strong>Variation ID:</strong> {result.variantDetails.variationId}</p>
-                <p><strong>Accession ID:</strong> {result.variantDetails.accessionId}</p>
+            {result.error ? (
+              <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
+                <p><strong>Error:</strong> {result.error}</p>
+                {result.details && <p><strong>Details:</strong> {result.details}</p>}
               </div>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white border border-gray-300 table-fixed">
-                <thead>
-                  <tr className="bg-gray-100">
-                    {columns.map((column, index) => (
-                      <th key={index} className="w-1/5 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        <div className="flex items-center">
-                          {column.name}
-                          <div className="ml-1 relative">
-                            <HelpCircle 
-                              size={16} 
-                              className="text-gray-400 cursor-help"
-                              onMouseEnter={(e) => {
-                                const rect = e.target.getBoundingClientRect();
-                                setHelpPopup({ content: column.help, position: { x: rect.left, y: rect.bottom + 5 } });
-                              }}
-                              onMouseLeave={() => setHelpPopup(null)}
-                            />
-                          </div>
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.assertionList.map((row, rowIndex) => (
-                    <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                        <div className="h-full overflow-y-auto">
-                          <div>{row.Classification.value || 'N/A'}</div>
-                          <div className="text-xs">{row.Classification.date || 'N/A'}</div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                        <div className="h-full overflow-y-auto">
-                          <div>{row['Review status'].stars || 'N/A'}</div>
-                          <div className="text-xs">{row['Review status']['assertion criteria'] || 'N/A'}</div>
-                          <div className="text-xs">Method: {row['Review status'].method || 'N/A'}</div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                        <div className="h-full overflow-y-auto">
-                          <div>{row.Condition.name || 'N/A'}</div>
-                          <div className="text-xs">Affected status: {row.Condition['Affected status'] || 'N/A'}</div>
-                          <div className="text-xs">Allele origin: {row.Condition['Allele origin'] || 'N/A'}</div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                        <div className="h-full overflow-y-auto">
-                          <div>{row.Submitter.name || 'N/A'}</div>
-                          <div className="text-xs">Accession: {row.Submitter.Accession || 'N/A'}</div>
-                          <div className="text-xs">First in ClinVar: {row.Submitter['First in ClinVar'] || 'N/A'}</div>
-                          <div className="text-xs">Last updated: {row.Submitter['Last updated'] || 'N/A'}</div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                        <div className="h-full overflow-y-auto">
-                          {row['More information'].Comment && (
-                            <div className="mb-1">
-                              <strong>Comment:</strong> {row['More information'].Comment}
+            ) : result.variantDetails ? (
+              <>
+                <div className="mb-4 p-4 bg-white rounded-lg">
+                  <div className="flex justify-center space-x-8">
+                    <p><strong>Gene Name:</strong> {result.variantDetails.fullName}</p>
+                    <p><strong>Variation ID:</strong> {result.variantDetails.variationId}</p>
+                    <p><strong>Accession ID:</strong> {result.variantDetails.accessionId}</p>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full bg-white border border-gray-300 table-fixed">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        {columns.map((column, index) => (
+                          <th key={index} className="w-1/5 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <div className="flex items-center">
+                              {column.name}
+                              <div className="ml-1 relative">
+                                <HelpCircle 
+                                  size={16} 
+                                  className="text-gray-400 cursor-help"
+                                  onMouseEnter={(e) => {
+                                    const rect = e.target.getBoundingClientRect();
+                                    setHelpPopup({ content: column.help, position: { x: rect.left, y: rect.bottom + 5 } });
+                                  }}
+                                  onMouseLeave={() => setHelpPopup(null)}
+                                />
+                              </div>
                             </div>
-                          )}
-                          {Object.keys(row['More information'].Publications).length > 0 && (
-                            <div className="mb-1">
-                              <strong>Publications:</strong> {Object.keys(row['More information'].Publications).join(', ')}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {result.assertionList.map((row, rowIndex) => (
+                        <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                          <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                            <div className="h-full overflow-y-auto">
+                              <div>{row.Classification.value || 'N/A'}</div>
+                              <div className="text-xs">{row.Classification.date || 'N/A'}</div>
                             </div>
-                          )}
-                          {Object.keys(row['More information']['Other databases']).length > 0 && (
-                            <div className="mb-1">
-                              <strong>Other databases:</strong> {Object.keys(row['More information']['Other databases']).join(', ')}
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                            <div className="h-full overflow-y-auto">
+                              <div>{row['Review status'].stars || 'N/A'}</div>
+                              <div className="text-xs">{row['Review status']['assertion criteria'] || 'N/A'}</div>
+                              <div className="text-xs">Method: {row['Review status'].method || 'N/A'}</div>
                             </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                            <div className="h-full overflow-y-auto">
+                              <div>{row.Condition.name || 'N/A'}</div>
+                              <div className="text-xs">Affected status: {row.Condition['Affected status'] || 'N/A'}</div>
+                              <div className="text-xs">Allele origin: {row.Condition['Allele origin'] || 'N/A'}</div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                            <div className="h-full overflow-y-auto">
+                              <div>{row.Submitter.name || 'N/A'}</div>
+                              <div className="text-xs">Accession: {row.Submitter.Accession || 'N/A'}</div>
+                              <div className="text-xs">First in ClinVar: {row.Submitter['First in ClinVar'] || 'N/A'}</div>
+                              <div className="text-xs">Last updated: {row.Submitter['Last updated'] || 'N/A'}</div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                            <div className="h-full overflow-y-auto">
+                              {row['More information'].Comment && (
+                                <div className="mb-1">
+                                  <strong>Comment:</strong> {row['More information'].Comment}
+                                </div>
+                              )}
+                              {Object.keys(row['More information'].Publications).length > 0 && (
+                                <div className="mb-1">
+                                  <strong>Publications:</strong> {Object.keys(row['More information'].Publications).join(', ')}
+                                </div>
+                              )}
+                              {Object.keys(row['More information']['Other databases']).length > 0 && (
+                                <div className="mb-1">
+                                  <strong>Other databases:</strong> {Object.keys(row['More information']['Other databases']).join(', ')}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+          ) : (
+            <p>No data available for this result.</p>
+            )}
           </div>
         ))}
       </div>

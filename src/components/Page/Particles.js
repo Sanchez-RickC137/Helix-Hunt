@@ -1,5 +1,5 @@
 import Particles, { initParticlesEngine } from "@tsparticles/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 // import DNA1 from "../images/DNA1.jpg";
 // import DNA2 from "../images/DNA2.jpg";
 // import DNA3 from "../images/DNA3.jpg";
@@ -11,13 +11,13 @@ import DNA8 from "../../images/DNA8.png";
 import { loadSlim } from "@tsparticles/slim";
 
 const ParticlesComponent = (props) => {
-  const [init, setInit] = useState(false);
+  // const [init, setInit] = useState(false);
 
   useEffect(() => {
     initParticlesEngine(async (engine) => {
       await loadSlim(engine);
     }).then(() => {
-      setInit(true);
+      // setInit(true);
     });
   }, []);
 
