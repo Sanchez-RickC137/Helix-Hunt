@@ -1,10 +1,26 @@
+/**
+ * Theme constants module
+ * Provides consistent theme-based styling throughout the application
+ * Adapts styles based on light/dark mode
+ */
+
 import { useTheme } from './ThemeContext';
 
+/**
+ * Custom hook to access theme-based styling constants
+ * Provides comprehensive set of styles for components
+ * 
+ * @returns {Object} Theme styling constants including:
+ * - Background colors
+ * - Text colors
+ * - Input styling
+ * - Button styling
+ * - UI element styling
+ */
 export const useThemeConstants = () => {
-	const theme = useTheme();
-	const isDarkMode = theme ? theme.isDarkMode : false;
+  const theme = useTheme();
+  const isDarkMode = theme ? theme.isDarkMode : false;
 
-  // Return an object with all theme-related constants
   return {
     // Main background and text colors
     mainBackgroundColor: isDarkMode ? 'bg-gray-900' : 'bg-white',
@@ -29,7 +45,7 @@ export const useThemeConstants = () => {
     secondaryButtonHoverColor: isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-400',
     primaryButtonBackgroundColor: isDarkMode ? 'bg-green-600' : 'bg-green-500',
     primaryButtonHoverColor: isDarkMode ? 'hover:bg-green-700' : 'hover:bg-green-600',
-		selectedItemTextColor: 'text-white',
+    selectedItemTextColor: 'text-white',
     
     // Other UI element styling
     labelTextColor: isDarkMode ? 'text-gray-300' : 'text-gray-700',

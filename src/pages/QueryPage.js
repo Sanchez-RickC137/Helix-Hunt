@@ -11,35 +11,50 @@ import DownloadPrompt from '../components/Modals/DownloadPrompt';
 import ResultsPreview from '../components/Modals/ResultsPreview';
 import QueryHistory from '../components/Query/QueryHistory';
 import timeOperation from '../utils/timing';
+import { processAndFilterResults } from '../utils/resultFiltering';
 import { useThemeConstants } from '../components/Page/ThemeConstants';
 
 const QueryPage = () => {
+  // User context and theme hooks
   const { user, preferences, queryHistory, saveQuery, fetchQueryHistory } = useUser();
+  const themeConstants = useThemeConstants();
+
+  // Modal state management
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showDownloadPrompt, setShowDownloadPrompt] = useState(false);
   const [showResultsPreview, setShowResultsPreview] = useState(false);
+
+  // Query input state
   const [selectedGene, setSelectedGene] = useState('');
   const [selectedDNAChange, setSelectedDNAChange] = useState('');
   const [selectedProteinChange, setSelectedProteinChange] = useState('');
   const [fullName, setFullName] = useState('');
   const [addedFullNames, setAddedFullNames] = useState([]);
   const [addedVariationIDs, setAddedVariationIDs] = useState([]);
+
+  // Query parameters state
   const [clinicalSignificance, setClinicalSignificance] = useState([]);
   const [outputFormat, setOutputFormat] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  // Results and status state
   const [queryResults, setQueryResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState([]);
   const [debugInfo, setDebugInfo] = useState('');
-  const themeConstants = useThemeConstants();
-
+  
+  // Fetch query history on user login
   useEffect(() => {
     if (user) {
       fetchQueryHistory();
     }
   }, [user, fetchQueryHistory]);
 
+  /**
+   * Updates full name when gene, DNA change, or protein change selections change
+   * Combines selections into a formatted full name string
+   */
   useEffect(() => {
     if (selectedGene || selectedDNAChange || selectedProteinChange) {
       let newFullName = selectedGene || '';
@@ -51,6 +66,10 @@ const QueryPage = () => {
     }
   }, [selectedGene, selectedDNAChange, selectedProteinChange]);
 
+  /**
+   * Adds current full name to query list
+   * Clears selection fields after adding
+   */
   const handleAddFullName = () => {
     if (fullName && !addedFullNames.includes(fullName)) {
       setAddedFullNames([...addedFullNames, fullName]);
@@ -61,12 +80,17 @@ const QueryPage = () => {
     }
   };
 
+  /**
+   * Adds variation ID to query list
+   * @param {string} id - Variation ID to add
+   */
   const handleAddVariationID = (id) => {
     if (id && !addedVariationIDs.includes(id)) {
       setAddedVariationIDs([...addedVariationIDs, id]);
     }
   };
 
+  // Query list management functions
   const removeFullName = (nameToRemove) => {
     setAddedFullNames(addedFullNames.filter(name => name !== nameToRemove));
   };
@@ -75,11 +99,17 @@ const QueryPage = () => {
     setAddedVariationIDs(addedVariationIDs.filter(id => id !== idToRemove));
   };
 
+  /**
+   * Opens review modal and logs debug info
+   */
   const handleReviewClick = () => {
     setShowReviewModal(true);
     setDebugInfo("Review modal opened");
   };
 
+  /**
+   * Resets all query inputs and parameters
+   */
   const resetQuery = () => {
     setSelectedGene('');
     setSelectedDNAChange('');
@@ -94,6 +124,10 @@ const QueryPage = () => {
     setDebugInfo('Query reset');
   };
 
+  /**
+   * Submits query to backend and processes results
+   * Handles error states and updates query history
+   */
   const handleSubmit = async () => {
     setLoading(true);
     setErrors([]);
@@ -113,10 +147,19 @@ const QueryPage = () => {
       const response = await timeOperation('ClinVar query', () => 
         axiosInstance.post('/api/clinvar', query)
       );
-      setQueryResults(response.data);
+      
+      // Process and filter results
+      const filteredResults = processAndFilterResults(response.data, {
+        clinicalSignificance,
+        startDate,
+        endDate
+      });
+      
+      setQueryResults(filteredResults);
       setShowReviewModal(false);
       setShowDownloadPrompt(true);
       
+      // Save query to history if user is logged in
       if (user) {
         await timeOperation('Save query to history', () => 
           saveQuery(query)
@@ -263,6 +306,7 @@ const QueryPage = () => {
           setShowDownloadPrompt={setShowDownloadPrompt}
           onPreviewResults={handlePreviewResults}
           themeConstants={themeConstants}
+          results={queryResults}
         />
       )}
       {showResultsPreview && (

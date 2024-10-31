@@ -1,15 +1,38 @@
+/**
+ * UserContext provides global user state management and authentication
+ * Handles user login, logout, preferences, and query history
+ */
+
 import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import axiosInstance from '../utils/axiosInstance';
 import timeOperation from '../utils/timing';
 
+// Create context for user data
 const UserContext = createContext();
 
+/**
+ * UserProvider component that wraps the application and provides user-related state and functions
+ * 
+ * Features:
+ * - User authentication state
+ * - User preferences management
+ * - Query history tracking
+ * - Token-based authentication
+ * 
+ * @param {object} props - Component props
+ * @param {ReactNode} props.children - Child components to wrap
+ */
 export const UserProvider = ({ children }) => {
+  // State management
   const [user, setUser] = useState(null);
   const [preferences, setPreferences] = useState({ fullNamePreferences: [], variationIDPreferences: [] });
   const [queryHistory, setQueryHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  /**
+   * Fetches user details from the server
+   * Called after authentication or when user data needs refresh
+   */
   const fetchUserDetails = useCallback(async () => {
     if (!user) return;
     try {
@@ -22,6 +45,10 @@ export const UserProvider = ({ children }) => {
     }
   }, [user]);
 
+  /**
+   * Fetches user preferences from the server
+   * Includes full name and variation ID preferences
+   */
   const fetchPreferences = useCallback(async () => {
     if (!user) return;
     try {
@@ -35,6 +62,10 @@ export const UserProvider = ({ children }) => {
     }
   }, [user]);
 
+  /**
+   * Fetches user's query history
+   * Limited to most recent queries
+   */
   const fetchQueryHistory = useCallback(async () => {
     if (!user) return;
     try {
@@ -48,6 +79,13 @@ export const UserProvider = ({ children }) => {
     }
   }, [user]);
 
+  /**
+   * Handles user login
+   * Sets up authentication token and fetches user data
+   * 
+   * @param {object} userData - User information
+   * @param {string} token - JWT authentication token
+   */
   const login = async (userData, token) => {
     setUser(userData);
     localStorage.setItem('token', token);
@@ -56,6 +94,10 @@ export const UserProvider = ({ children }) => {
     await fetchQueryHistory();
   };
 
+  /**
+   * Handles user logout
+   * Clears all user-related state and local storage
+   */
   const logout = () => {
     setUser(null);
     setPreferences({ fullNamePreferences: [], variationIDPreferences: [] });
@@ -64,6 +106,11 @@ export const UserProvider = ({ children }) => {
     delete axiosInstance.defaults.headers.common['Authorization'];
   };
 
+  /**
+   * Saves a new query to history
+   * 
+   * @param {object} query - Query details to save
+   */
   const saveQuery = async (query) => {
     try {
       await timeOperation('Save query to history', () => 
@@ -75,10 +122,20 @@ export const UserProvider = ({ children }) => {
     }
   };
 
+  /**
+   * Updates user preferences in state
+   * 
+   * @param {object} newPreferences - Updated preferences object
+   */
   const updatePreferences = (newPreferences) => {
     setPreferences(newPreferences);
   };
 
+  /**
+   * Saves updated preferences to the server
+   * 
+   * @param {object} newPreferences - Updated preferences to save
+   */
   const savePreferences = async (newPreferences) => {
     try {
       await timeOperation('Update user preferences', () => 
@@ -91,6 +148,7 @@ export const UserProvider = ({ children }) => {
     }
   };
 
+  // Initialize user session from stored token
   useEffect(() => {
     const initializeUser = async () => {
       const token = localStorage.getItem('token');
@@ -111,6 +169,7 @@ export const UserProvider = ({ children }) => {
     initializeUser();
   }, []);
 
+  // Fetch user data when user state changes
   useEffect(() => {
     if (user) {
       fetchPreferences();
@@ -118,6 +177,7 @@ export const UserProvider = ({ children }) => {
     }
   }, [user, fetchPreferences, fetchQueryHistory]);
 
+  // Provide context value to children
   return (
     <UserContext.Provider value={{
       user,
@@ -138,6 +198,13 @@ export const UserProvider = ({ children }) => {
   );
 };
 
+/**
+ * Custom hook to use user context
+ * Provides access to user state and functions
+ * 
+ * @returns {object} User context value
+ * @throws {Error} If used outside of UserProvider
+ */
 export const useUser = () => useContext(UserContext);
 
 export default UserProvider;

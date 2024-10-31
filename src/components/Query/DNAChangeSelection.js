@@ -1,14 +1,28 @@
+/**
+ * DNA change selection component with autocomplete
+ * Handles search and selection of DNA sequence changes
+ * Provides suggestions from predefined list
+ * 
+ * @param {Object} props
+ * @param {string} props.selectedDNAChange - Currently selected DNA change
+ * @param {Function} props.setSelectedDNAChange - Function to update selected DNA change
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 import debounce from 'lodash/debounce';
-import { Plus } from 'lucide-react';
+import { Plus, Minus } from 'lucide-react';
 
 const DNAChangeSelection = ({ selectedDNAChange, setSelectedDNAChange }) => {
+  // State management
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [allDNAChanges, setAllDNAChanges] = useState([]);
   const themeConstants = useThemeConstants();
 
+  /**
+   * Fetches DNA change data on component mount
+   */
   useEffect(() => {
     const fetchDNAChanges = async () => {
       try {
@@ -17,16 +31,21 @@ const DNAChangeSelection = ({ selectedDNAChange, setSelectedDNAChange }) => {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const text = await response.text();
-        const dnaChanges = text.split('\n').map(change => change.trim()).filter(change => change);
+        const dnaChanges = text.split('\n')
+          .map(change => change.trim())
+          .filter(change => change);
         setAllDNAChanges(dnaChanges);
       } catch (error) {
         console.error('Error loading DNA changes:', error);
       }
     };
-
     fetchDNAChanges();
   }, []);
 
+  /**
+   * Debounced function to update suggestions based on search term
+   * Filters suggestions to top 5 matches
+   */
   const debouncedSuggestions = useCallback(
     debounce((searchTerm) => {
       if (searchTerm.length > 0) {
@@ -41,15 +60,34 @@ const DNAChangeSelection = ({ selectedDNAChange, setSelectedDNAChange }) => {
     [allDNAChanges]
   );
 
+  /**
+   * Updates suggestions when search term changes
+   */
   useEffect(() => {
     debouncedSuggestions(searchTerm);
   }, [searchTerm, debouncedSuggestions]);
 
-  const handleSelectDNAChange = (change) => {
+  /**
+   * Handles selection of DNA change from suggestions
+   */
+  const handleSelectDNAChange = useCallback((change) => {
     setSelectedDNAChange(change);
     setSearchTerm('');
     setSuggestions([]);
-  };
+  }, [setSelectedDNAChange]);
+
+  /**
+   * Handles add/remove button click
+   * Toggles between adding new change and removing selected change
+   */
+  const handleButtonClick = useCallback(() => {
+    if (selectedDNAChange) {
+      setSelectedDNAChange('');
+      setSearchTerm('');
+    } else if (searchTerm) {
+      handleSelectDNAChange(searchTerm);
+    }
+  }, [selectedDNAChange, searchTerm, setSelectedDNAChange, handleSelectDNAChange]);
 
   return (
     <div className="w-full mb-4">
@@ -58,18 +96,23 @@ const DNAChangeSelection = ({ selectedDNAChange, setSelectedDNAChange }) => {
         <input
           type="text"
           placeholder="Enter DNA change..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          value={selectedDNAChange || searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            if (selectedDNAChange) setSelectedDNAChange('');
+          }}
           className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50`}
         />
         <button
-          onClick={() => handleSelectDNAChange(searchTerm)}
-          className={`px-4 py-2 rounded-r ${themeConstants.primaryButtonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
+          onClick={handleButtonClick}
+          className={`px-4 py-2 rounded-r ${selectedDNAChange ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} text-white transition-colors duration-200`}
         >
-          <Plus size={20}/>
+          {selectedDNAChange ? <Minus size={20}/> : <Plus size={20}/>}
         </button>
       </div>
-      {suggestions.length > 0 && (
+
+      {/* Suggestions dropdown */}
+      {suggestions.length > 0 && !selectedDNAChange && (
         <ul className={`${themeConstants.sectionBackgroundColor} border border-gray-300 rounded mt-1`}>
           {suggestions.map((suggestion, index) => (
             <li
@@ -81,21 +124,6 @@ const DNAChangeSelection = ({ selectedDNAChange, setSelectedDNAChange }) => {
             </li>
           ))}
         </ul>
-      )}
-      {selectedDNAChange && (
-        <div className="mt-2">
-          <span
-            className={`inline-block ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}
-          >
-            {selectedDNAChange}
-            <button
-              onClick={() => setSelectedDNAChange('')}
-              className="ml-2 font-bold"
-            >
-              &times;
-            </button>
-          </span>
-        </div>
       )}
     </div>
   );

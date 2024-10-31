@@ -1,3 +1,22 @@
+/**
+ * Query parameters configuration component
+ * Handles selection of clinical significance, date ranges, and display of selected queries
+ * 
+ * @param {Object} props
+ * @param {string[]} props.clinicalSignificance - Selected clinical significance values
+ * @param {Function} props.setClinicalSignificance - Updates clinical significance selection
+ * @param {string} props.startDate - Start date for query range
+ * @param {Function} props.setStartDate - Updates start date
+ * @param {string} props.endDate - End date for query range
+ * @param {Function} props.setEndDate - Updates end date
+ * @param {Function} props.handleReviewClick - Handler for review button click
+ * @param {Function} props.handleResetClick - Handler for reset button click
+ * @param {string[]} props.addedFullNames - List of selected full names
+ * @param {string[]} props.addedVariationIDs - List of selected variation IDs
+ * @param {Function} props.removeFullName - Handler to remove a full name
+ * @param {Function} props.removeVariationID - Handler to remove a variation ID
+ */
+
 import React from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 import { X, RotateCcw } from 'lucide-react';
@@ -5,8 +24,6 @@ import { X, RotateCcw } from 'lucide-react';
 const QueryParameters = ({
   clinicalSignificance,
   setClinicalSignificance,
-  outputFormat,
-  setOutputFormat,
   startDate,
   setStartDate,
   endDate,
@@ -20,8 +37,13 @@ const QueryParameters = ({
 }) => {
   const themeConstants = useThemeConstants();
 
-  const isFormValid = (addedFullNames.length > 0 || addedVariationIDs.length > 0) && outputFormat;
+  // Validate form has at least one query parameter
+  const isFormValid = (addedFullNames.length > 0 || addedVariationIDs.length > 0);
 
+  /**
+   * Toggles clinical significance selection
+   * @param {string} sig - Clinical significance value to toggle
+   */
   const handleClinicalSignificanceClick = (sig) => {
     setClinicalSignificance(prevSig => {
       if (prevSig.includes(sig)) {
@@ -34,11 +56,13 @@ const QueryParameters = ({
 
   return (
     <div className="space-y-6">
+      {/* Query Parameters Section */}
       <div>
-        <h3 className="text-lg font-semibold mb-2">Query Parameters</h3>
+        <h3 className="text-xl font-semibold mb-2">Query Parameters</h3>
         <div className="space-y-2">
+          {/* Full Names Display */}
           <div>
-            <h4 className="text-md font-semibold">Full Names:</h4>
+            <h4 className="text-lg font-semibold">Full Names:</h4>
             <div className="flex flex-wrap gap-2">
               {addedFullNames.map((name, index) => (
                 <span key={index} className={`inline-flex items-center ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}>
@@ -53,8 +77,10 @@ const QueryParameters = ({
               ))}
             </div>
           </div>
+
+          {/* Variation IDs Display */}
           <div>
-            <h4 className="text-md font-semibold">Variation IDs:</h4>
+            <h4 className="text-lg font-semibold">Variation IDs:</h4>
             <div className="flex flex-wrap gap-2">
               {addedVariationIDs.map((id, index) => (
                 <span key={index} className={`inline-flex items-center ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}>
@@ -72,6 +98,7 @@ const QueryParameters = ({
         </div>
       </div>
 
+      {/* Clinical Significance Section */}
       <div>
         <h3 className="text-lg font-semibold mb-2">Clinical Significance</h3>
         <div className="flex flex-wrap gap-2">
@@ -92,7 +119,8 @@ const QueryParameters = ({
         </div>
       </div>
 
-      <div>
+      {/* Date Range Section */}
+      <div className={`mb-6 pb-6 border-b ${themeConstants.borderColor}`}>
         <h3 className="text-lg font-semibold mb-2">Date Range</h3>
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
           <div className="w-full sm:w-1/2">
@@ -116,26 +144,7 @@ const QueryParameters = ({
         </div>
       </div>
 
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Output Format</h3>
-        <div className="flex flex-wrap gap-2">
-          {['XML', 'CSV', 'Tab-delimited'].map((format) => (
-            <button
-              key={format}
-              type="button"
-              onClick={() => setOutputFormat(format)}
-              className={`px-3 py-1 rounded-full cursor-pointer ${
-                outputFormat === format 
-                  ? `${themeConstants.tagBackgroundColor} ${themeConstants.selectedItemTextColor}`
-                  : `${themeConstants.unselectedItemBackgroundColor} hover:${themeConstants.unselectedItemHoverColor}`
-              } transition-colors duration-200`}
-            >
-              {format}
-            </button>
-          ))}
-        </div>
-      </div>
-
+      {/* Action Buttons */}
       <div className="flex items-center space-x-4">
         <button 
           type="button" 
@@ -159,11 +168,10 @@ const QueryParameters = ({
         </button>
       </div>
 
-      {!isFormValid && (
-        <p className={`text-sm ${themeConstants.labelTextColor}`}>
-          Please add at least one full name or variation ID, and select an output format. Clinical significance and date ranges are optional filters.
-        </p>
-      )}
+      {/* Help Text */}
+      <p className={`text-md text-center ${themeConstants.labelTextColor}`}>
+        Please add at least one full name or variation ID. Clinical significance and date ranges are optional filters.
+      </p>
     </div>
   );
 };

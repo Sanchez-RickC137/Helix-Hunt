@@ -1,3 +1,14 @@
+/**
+ * Combined login and registration modal component
+ * Handles user authentication and new account creation
+ * Provides smooth transition between login and registration views
+ * 
+ * @param {Object} props
+ * @param {boolean} props.isOpen - Controls modal visibility
+ * @param {Function} props.onClose - Function to close the modal
+ * @param {Function} props.onForgotPassword - Handler for forgot password action
+ */
+
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useThemeConstants } from '../Page/ThemeConstants';
@@ -5,14 +16,19 @@ import { useUser } from '../../contexts/UserContext';
 import axiosInstance from '../../utils/axiosInstance';
 
 const LoginRegisterModal = ({ isOpen, onClose, onForgotPassword }) => {
+  // State management
   const [isLoginView, setIsLoginView] = useState(true);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  
   const { login } = useUser();
   const themeConstants = useThemeConstants();
 
+  /**
+   * Reset form state when modal closes
+   */
   useEffect(() => {
     if (!isOpen) {
       setUsername('');
@@ -23,16 +39,22 @@ const LoginRegisterModal = ({ isOpen, onClose, onForgotPassword }) => {
     }
   }, [isOpen]);
 
+  /**
+   * Handles form submission for both login and registration
+   * @param {Event} e - Form submission event
+   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     try {
       if (isLoginView) {
+        // Handle login
         const response = await axiosInstance.post('/api/login', { username, password });
         await login(response.data.user, response.data.token);
         onClose();
       } else {
+        // Handle registration
         await axiosInstance.post('/api/register', { username, email, password });
         const loginResponse = await axiosInstance.post('/api/login', { username, password });
         await login(loginResponse.data.user, loginResponse.data.token);

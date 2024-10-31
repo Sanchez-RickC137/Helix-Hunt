@@ -1,17 +1,33 @@
+/**
+ * Forgot password modal component
+ * Handles password reset workflow
+ * Includes email verification and new password setup
+ * 
+ * @param {Object} props
+ * @param {boolean} props.isOpen - Controls modal visibility
+ * @param {Function} props.onClose - Callback to close modal
+ */
+
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import axiosInstance from '../../utils/axiosInstance';
 import { useThemeConstants } from '../Page/ThemeConstants';
 
 const ForgotPasswordModal = ({ isOpen, onClose }) => {
+  // Form state
   const [email, setEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [emailVerified, setEmailVerified] = useState(false);
+
   const themeConstants = useThemeConstants();
 
+  /**
+   * Verifies email existence in system
+   * @param {Event} e - Form submission event
+   */
   const handleEmailCheck = async (e) => {
     e.preventDefault();
     setError('');
@@ -30,11 +46,17 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
     }
   };
 
+  /**
+   * Handles password reset submission
+   * Validates passwords and updates user's password
+   * @param {Event} e - Form submission event
+   */
   const handlePasswordReset = async (e) => {
     e.preventDefault();
     setError('');
     setMessage('');
 
+    // Validate password match
     if (newPassword !== confirmPassword) {
       setError("Passwords don't match");
       return;
@@ -54,13 +76,18 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className={`relative w-full max-w-md ${themeConstants.sectionBackgroundColor} rounded-lg shadow-lg overflow-hidden`}>
+        {/* Close button */}
         <button onClick={onClose} className="absolute top-4 right-4 text-gray-500 hover:text-gray-700">
           <X size={24} />
         </button>
+
+        {/* Form content */}
         <form onSubmit={emailVerified ? handlePasswordReset : handleEmailCheck} className="p-8 space-y-4">
           <h2 className={`text-2xl font-bold mb-4 ${themeConstants.headingTextColor}`}>
             {emailVerified ? 'Reset Password' : 'Verify Email'}
           </h2>
+
+          {/* Email verification step */}
           {!emailVerified && (
             <div>
               <input
@@ -73,6 +100,8 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
               />
             </div>
           )}
+
+          {/* Password reset step */}
           {emailVerified && (
             <>
               <div>
@@ -97,8 +126,12 @@ const ForgotPasswordModal = ({ isOpen, onClose }) => {
               </div>
             </>
           )}
+
+          {/* Error and success messages */}
           {error && <p className="text-red-500 text-sm">{error}</p>}
           {message && <p className="text-green-500 text-sm">{message}</p>}
+
+          {/* Submit button */}
           <button
             type="submit"
             className={`w-full ${themeConstants.buttonBackgroundColor} text-white py-2 rounded hover:${themeConstants.buttonHoverColor} transition-colors`}

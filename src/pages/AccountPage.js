@@ -9,33 +9,16 @@ import QueryHistory from '../components/Query/QueryHistory';
 import { useThemeConstants } from '../components/Page/ThemeConstants';
 
 const AccountPage = () => {
-  const { user, preferences, updatePreferences, savePreferences, loading } = useUser();
+  const { user, preferences, updatePreferences, savePreferences, queryHistory, loading } = useUser();
   const [localPreferences, setLocalPreferences] = useState(preferences);
-  const [queryHistory, setQueryHistory] = useState([]);
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [debugInfo, setDebugInfo] = useState('');
   const themeConstants = useThemeConstants();
 
   useEffect(() => {
-    if (user) {
-      fetchQueryHistory();
-    }
-  }, [user]);
-
-  useEffect(() => {
     console.log('Preferences in AccountPage:', preferences);
     setLocalPreferences(preferences);
   }, [preferences]);
-
-  const fetchQueryHistory = async () => {
-    try {
-      const response = await axiosInstance.get('/api/query-history');
-      setQueryHistory(response.data);
-    } catch (error) {
-      console.error("Error fetching query history:", error);
-      setDebugInfo(prev => prev + "\nError fetching query history: " + error.message);
-    }
-  };
 
   const handleUpdateFullNamePreferences = (newFullNamePreferences) => {
     setLocalPreferences(prev => ({ ...prev, fullNamePreferences: newFullNamePreferences }));

@@ -28,8 +28,6 @@ const ResultsPreview = ({ results, onClose }) => {
 
   useEffect(() => {
     setError(null);
-    // console.log('Raw results:', results);
-
     const processResults = () => {
       if (!results || !Array.isArray(results)) {
         setError('No valid results to display');
@@ -58,9 +56,15 @@ const ResultsPreview = ({ results, onClose }) => {
   }, [results]);
 
   const renderJsonView = () => {
+    const successfulResults = processedResults.filter(result => !result.error);
+
+    if (successfulResults.length === 0) {
+      return <p>No data available for any queries.</p>;
+    }
+
     return (
       <div className="space-y-8">
-        {processedResults.map((result, index) => (
+        {successfulResults.map((result, index) => (
           <div key={index} className="mb-8 p-4 bg-gray-100 rounded-lg">
             <h3 className="text-xl font-semibold mb-4">Result for query: {result.query}</h3>
             <div className="mb-4">
@@ -82,7 +86,9 @@ const ResultsPreview = ({ results, onClose }) => {
   };
 
   const renderTableView = () => {
-    if (processedResults.length === 0) {
+    const successfulResults = processedResults.filter(result => !result.error);
+    
+    if (successfulResults.length === 0) {
       return <p>No data available for table view</p>;
     }
 
@@ -111,27 +117,6 @@ const ResultsPreview = ({ results, onClose }) => {
 
     return (
       <div className="table-container-with-scrollbar">
-        <style jsx>{`
-          .table-container-with-scrollbar {
-            overflow-x: auto;
-            overflow-y: auto;
-            max-height: 70vh;
-          }
-          .table-container-with-scrollbar::-webkit-scrollbar {
-            -webkit-appearance: none;
-            width: 7px;
-            height: 7px;
-          }
-          .table-container-with-scrollbar::-webkit-scrollbar-thumb {
-            border-radius: 4px;
-            background-color: rgba(0, 0, 0, .5);
-            box-shadow: 0 0 1px rgba(255, 255, 255, .5);
-          }
-          .table-container-with-scrollbar {
-            scrollbar-width: thin;
-            scrollbar-color: rgba(0, 0, 0, .5) transparent;
-          }
-        `}</style>
         <table className="min-w-full bg-white border border-gray-300">
           <thead>
             <tr className="bg-gray-100">
@@ -143,7 +128,7 @@ const ResultsPreview = ({ results, onClose }) => {
             </tr>
           </thead>
           <tbody>
-            {processedResults.flatMap((result, resultIndex) => 
+            {successfulResults.flatMap((result, resultIndex) => 
               result.assertionList.map((row, rowIndex) => (
                 <tr key={`${resultIndex}-${rowIndex}`} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                   {columns.map((column, colIndex) => (
@@ -210,8 +195,10 @@ const ResultsPreview = ({ results, onClose }) => {
   };
 
   const renderDefaultView = () => {
-    if (processedResults.length === 0) {
-      return <p>No data available</p>;
+    const successfulResults = processedResults.filter(result => !result.error);
+
+    if (successfulResults.length === 0) {
+      return <p>No data available for any queries.</p>;
     }
 
     const columns = [
@@ -224,106 +211,95 @@ const ResultsPreview = ({ results, onClose }) => {
 
     return (
       <div className="space-y-8">
-        {processedResults.map((result, resultIndex) => (
+        {successfulResults.map((result, resultIndex) => (
           <div key={resultIndex} className="mb-8 p-4 bg-gray-100 rounded-lg">
             <h3 className="text-xl font-semibold mb-4">Result for query: {result.query}</h3>
-            {result.error ? (
-              <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
-                <p><strong>Error:</strong> {result.error}</p>
-                {result.details && <p><strong>Details:</strong> {result.details}</p>}
+            <div className="mb-4 p-4 bg-white rounded-lg">
+              <div className="flex justify-center space-x-8">
+                <p><strong>Gene Name:</strong> {result.variantDetails.fullName}</p>
+                <p><strong>Variation ID:</strong> {result.variantDetails.variationID}</p>
+                <p><strong>Accession ID:</strong> {result.variantDetails.accessionID}</p>
               </div>
-            ) : result.variantDetails ? (
-              <>
-                <div className="mb-4 p-4 bg-white rounded-lg">
-                  <div className="flex justify-center space-x-8">
-                    <p><strong>Gene Name:</strong> {result.variantDetails.fullName}</p>
-                    <p><strong>Variation ID:</strong> {result.variantDetails.variationId}</p>
-                    <p><strong>Accession ID:</strong> {result.variantDetails.accessionId}</p>
-                  </div>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full bg-white border border-gray-300 table-fixed">
-                    <thead>
-                      <tr className="bg-gray-100">
-                        {columns.map((column, index) => (
-                          <th key={index} className="w-1/5 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            <div className="flex items-center">
-                              {column.name}
-                              <div className="ml-1 relative">
-                                <HelpCircle 
-                                  size={16} 
-                                  className="text-gray-400 cursor-help"
-                                  onMouseEnter={(e) => {
-                                    const rect = e.target.getBoundingClientRect();
-                                    setHelpPopup({ content: column.help, position: { x: rect.left, y: rect.bottom + 5 } });
-                                  }}
-                                  onMouseLeave={() => setHelpPopup(null)}
-                                />
-                              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white border border-gray-300 table-fixed">
+                <thead>
+                  <tr className="bg-gray-100">
+                    {columns.map((column, index) => (
+                      <th key={index} className="w-1/5 px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <div className="flex items-center">
+                          {column.name}
+                          <div className="ml-1 relative">
+                            <HelpCircle 
+                              size={16} 
+                              className="text-gray-400 cursor-help"
+                              onMouseEnter={(e) => {
+                                const rect = e.target.getBoundingClientRect();
+                                setHelpPopup({ content: column.help, position: { x: rect.left, y: rect.bottom + 5 } });
+                              }}
+                              onMouseLeave={() => setHelpPopup(null)}
+                            />
+                          </div>
+                        </div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.assertionList.map((row, rowIndex) => (
+                    <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div>{row.Classification.value || 'N/A'}</div>
+                          <div className="text-xs">{row.Classification.date || 'N/A'}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div>{row['Review status'].stars || 'N/A'}</div>
+                          <div className="text-xs">{row['Review status']['assertion criteria'] || 'N/A'}</div>
+                          <div className="text-xs">Method: {row['Review status'].method || 'N/A'}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div>{row.Condition.name || 'N/A'}</div>
+                          <div className="text-xs">Affected status: {row.Condition['Affected status'] || 'N/A'}</div>
+                          <div className="text-xs">Allele origin: {row.Condition['Allele origin'] || 'N/A'}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          <div>{row.Submitter.name || 'N/A'}</div>
+                          <div className="text-xs">Accession: {row.Submitter.Accession || 'N/A'}</div>
+                          <div className="text-xs">First in ClinVar: {row.Submitter['First in ClinVar'] || 'N/A'}</div>
+                          <div className="text-xs">Last updated: {row.Submitter['Last updated'] || 'N/A'}</div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
+                        <div className="h-full overflow-y-auto">
+                          {row['More information'].Comment && (
+                            <div className="mb-1">
+                              <strong>Comment:</strong> {row['More information'].Comment}
                             </div>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {result.assertionList.map((row, rowIndex) => (
-                        <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                          <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                            <div className="h-full overflow-y-auto">
-                              <div>{row.Classification.value || 'N/A'}</div>
-                              <div className="text-xs">{row.Classification.date || 'N/A'}</div>
+                          )}
+                          {Object.keys(row['More information'].Publications).length > 0 && (
+                            <div className="mb-1">
+                              <strong>Publications:</strong> {Object.keys(row['More information'].Publications).join(', ')}
                             </div>
-                          </td>
-                          <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                            <div className="h-full overflow-y-auto">
-                              <div>{row['Review status'].stars || 'N/A'}</div>
-                              <div className="text-xs">{row['Review status']['assertion criteria'] || 'N/A'}</div>
-                              <div className="text-xs">Method: {row['Review status'].method || 'N/A'}</div>
+                          )}
+                          {Object.keys(row['More information']['Other databases']).length > 0 && (
+                            <div className="mb-1">
+                              <strong>Other databases:</strong> {Object.keys(row['More information']['Other databases']).join(', ')}
                             </div>
-                          </td>
-                          <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                            <div className="h-full overflow-y-auto">
-                              <div>{row.Condition.name || 'N/A'}</div>
-                              <div className="text-xs">Affected status: {row.Condition['Affected status'] || 'N/A'}</div>
-                              <div className="text-xs">Allele origin: {row.Condition['Allele origin'] || 'N/A'}</div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                            <div className="h-full overflow-y-auto">
-                              <div>{row.Submitter.name || 'N/A'}</div>
-                              <div className="text-xs">Accession: {row.Submitter.Accession || 'N/A'}</div>
-                              <div className="text-xs">First in ClinVar: {row.Submitter['First in ClinVar'] || 'N/A'}</div>
-                              <div className="text-xs">Last updated: {row.Submitter['Last updated'] || 'N/A'}</div>
-                            </div>
-                          </td>
-                          <td className="px-4 py-2 text-sm text-gray-900 h-20 overflow-hidden">
-                            <div className="h-full overflow-y-auto">
-                              {row['More information'].Comment && (
-                                <div className="mb-1">
-                                  <strong>Comment:</strong> {row['More information'].Comment}
-                                </div>
-                              )}
-                              {Object.keys(row['More information'].Publications).length > 0 && (
-                                <div className="mb-1">
-                                  <strong>Publications:</strong> {Object.keys(row['More information'].Publications).join(', ')}
-                                </div>
-                              )}
-                              {Object.keys(row['More information']['Other databases']).length > 0 && (
-                                <div className="mb-1">
-                                  <strong>Other databases:</strong> {Object.keys(row['More information']['Other databases']).join(', ')}
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-          ) : (
-            <p>No data available for this result.</p>
-            )}
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ))}
       </div>
@@ -348,7 +324,7 @@ const ResultsPreview = ({ results, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className={`${themeConstants.sectionBackgroundColor} p-6 rounded-lg shadow-xl w-11/12 h-5/6 flex flex-col`}>
-        <div className="flex justify-between items-center mb-4">
+      <div className="flex justify-between items-center mb-4">
           <h2 className={`text-2xl font-bold ${themeConstants.headingTextColor}`}>Query Results Preview</h2>
           <button
             onClick={onClose}
@@ -359,10 +335,10 @@ const ResultsPreview = ({ results, onClose }) => {
         </div>
         <div className="flex justify-center mb-4 space-x-4">
           <button
-            onClick={() => setActiveView('json')}
-            className={`px-4 py-2 rounded ${activeView === 'json' ? themeConstants.buttonBackgroundColor : themeConstants.secondaryButtonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
+            onClick={() => setActiveView('view')}
+            className={`px-4 py-2 rounded ${activeView === 'view' ? themeConstants.buttonBackgroundColor : themeConstants.secondaryButtonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
           >
-            JSON
+            Default View
           </button>
           <button
             onClick={() => setActiveView('table')}
@@ -371,10 +347,10 @@ const ResultsPreview = ({ results, onClose }) => {
             Table View
           </button>
           <button
-            onClick={() => setActiveView('view')}
-            className={`px-4 py-2 rounded ${activeView === 'view' ? themeConstants.buttonBackgroundColor : themeConstants.secondaryButtonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
+            onClick={() => setActiveView('json')}
+            className={`px-4 py-2 rounded ${activeView === 'json' ? themeConstants.buttonBackgroundColor : themeConstants.secondaryButtonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
           >
-            Default View
+            JSON
           </button>
         </div>
         <div className={`flex-grow overflow-auto ${themeConstants.mainTextColor}`}>

@@ -1,8 +1,19 @@
+/**
+ * Database migration script
+ * Sets up and maintains database schema
+ * Creates necessary tables if they don't exist
+ */
+
 const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
 
+// Load environment variables
 dotenv.config();
 
+/**
+ * Database connection pool configuration
+ * Uses environment variables for secure configuration
+ */
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -13,7 +24,13 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
+/**
+ * Array of migration queries
+ * Each query creates a table if it doesn't exist
+ * Maintains referential integrity with foreign keys
+ */
 const migrations = [
+  // Users table
   `CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(255) UNIQUE NOT NULL,
@@ -21,6 +38,7 @@ const migrations = [
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`,
 
+  // Query history table
   `CREATE TABLE IF NOT EXISTS query_history (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
@@ -29,6 +47,7 @@ const migrations = [
     FOREIGN KEY (user_id) REFERENCES users(id)
   )`,
 
+  // User preferences table
   `CREATE TABLE IF NOT EXISTS user_preferences (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
@@ -38,6 +57,12 @@ const migrations = [
   )`
 ];
 
+/**
+ * Runs all migration queries in sequence
+ * Logs success or failure for each migration
+ * 
+ * @returns {Promise<void>}
+ */
 async function runMigrations() {
   for (const migration of migrations) {
     try {
@@ -50,6 +75,7 @@ async function runMigrations() {
   }
 }
 
+// Execute migrations and handle completion
 runMigrations().then(() => {
   console.log('All migrations completed');
   process.exit(0);

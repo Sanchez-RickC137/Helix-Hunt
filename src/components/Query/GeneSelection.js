@@ -1,14 +1,27 @@
+/**
+ * Gene selection component with autocomplete
+ * Handles gene search and selection with suggestions
+ * 
+ * @param {Object} props
+ * @param {string} props.selectedGene - Currently selected gene
+ * @param {Function} props.setSelectedGene - Function to update selected gene
+ */
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 import debounce from 'lodash/debounce';
-import { Plus } from 'lucide-react';
+import { Plus, Minus } from 'lucide-react';
 
 const GeneSelection = ({ selectedGene, setSelectedGene }) => {
+  // State management
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [allGenes, setAllGenes] = useState([]);
   const themeConstants = useThemeConstants();
 
+  /**
+   * Fetches gene data on component mount
+   */
   useEffect(() => {
     const fetchGenes = async () => {
       try {
@@ -23,10 +36,12 @@ const GeneSelection = ({ selectedGene, setSelectedGene }) => {
         console.error('Error loading gene symbols:', error);
       }
     };
-
     fetchGenes();
   }, []);
 
+  /**
+   * Debounced function to update suggestions based on search term
+   */
   const debouncedSuggestions = useCallback(
     debounce((searchTerm) => {
       if (searchTerm.length > 0) {
@@ -41,35 +56,58 @@ const GeneSelection = ({ selectedGene, setSelectedGene }) => {
     [allGenes]
   );
 
+  /**
+   * Updates suggestions when search term changes
+   */
   useEffect(() => {
     debouncedSuggestions(searchTerm);
   }, [searchTerm, debouncedSuggestions]);
 
-  const handleSelectGene = (gene) => {
+  /**
+   * Handles selection of gene from suggestions
+   */
+  const handleSelectGene = useCallback((gene) => {
     setSelectedGene(gene);
     setSearchTerm('');
     setSuggestions([]);
-  };
+  }, [setSelectedGene]);
+
+  /**
+   * Handles add/remove button click
+   */
+  const handleButtonClick = useCallback(() => {
+    if (selectedGene) {
+      setSelectedGene('');
+      setSearchTerm('');
+    } else if (searchTerm) {
+      handleSelectGene(searchTerm);
+    }
+  }, [selectedGene, searchTerm, setSelectedGene, handleSelectGene]);
 
   return (
     <div className="w-full mb-4">
-      <h3 className="text-lg font-semibold mb-2">Transcipt & Gene OR Full Name</h3>
+      <h3 className="text-lg font-semibold mb-2">Transcript & Gene OR Full Name</h3>
       <div className="flex mb-2">
         <input
           type="text"
           placeholder="Search or enter gene..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          value={selectedGene || searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            if (selectedGene) setSelectedGene('');
+          }}
           className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50`}
         />
         <button
-          onClick={() => handleSelectGene(searchTerm)}
-          className={`px-4 py-2 rounded-r ${themeConstants.primaryButtonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
+          onClick={handleButtonClick}
+          className={`px-4 py-2 rounded-r ${selectedGene ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'} text-white transition-colors duration-200`}
         >
-          <Plus size={20}/>
+          {selectedGene ? <Minus size={20}/> : <Plus size={20}/>}
         </button>
       </div>
-      {suggestions.length > 0 && (
+
+      {/* Suggestions dropdown */}
+      {suggestions.length > 0 && !selectedGene && (
         <ul className={`${themeConstants.sectionBackgroundColor} border border-gray-300 rounded mt-1`}>
           {suggestions.map((suggestion, index) => (
             <li
@@ -81,21 +119,6 @@ const GeneSelection = ({ selectedGene, setSelectedGene }) => {
             </li>
           ))}
         </ul>
-      )}
-      {selectedGene && (
-        <div className="mt-2">
-          <span
-            className={`inline-block ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}
-          >
-            {selectedGene}
-            <button
-              onClick={() => setSelectedGene('')}
-              className="ml-2 font-bold"
-            >
-              &times;
-            </button>
-          </span>
-        </div>
       )}
     </div>
   );

@@ -50,7 +50,7 @@ const ParticlesComponent = (props) => {
           }
         },
         number: {
-          value: 50,
+          value: 24,
           density: {
             enable: true,
             area: 800
@@ -101,7 +101,7 @@ const ParticlesComponent = (props) => {
                 height: 10, // Adjust to picture
                 particles: {
                   size: {
-                    value: 75
+                    value: 75*1.5
                   }
                 }
               },
@@ -111,7 +111,7 @@ const ParticlesComponent = (props) => {
                 height: 16, // Adjust to picture
                 particles: {
                   size: {
-                    value: 75
+                    value: 75*1.5
                   }
                 }
               },
@@ -121,7 +121,7 @@ const ParticlesComponent = (props) => {
                 height: 32, // Adjust to picture
                 particles: {
                   size: {
-                    value: 35
+                    value: 35*1.5
                   }
                 }
               },

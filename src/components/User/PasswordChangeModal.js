@@ -1,21 +1,40 @@
+/**
+ * Password change modal component
+ * Allows users to securely update their password
+ * Includes validation and success/error feedback
+ * 
+ * @param {Object} props
+ * @param {boolean} props.isOpen - Controls modal visibility
+ * @param {Function} props.onClose - Function to close the modal
+ * @param {string} props.username - Current user's username
+ */
+
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 import axiosInstance from '../../utils/axiosInstance';
 
 const PasswordChangeModal = ({ isOpen, onClose, username }) => {
+  // State management
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  
   const themeConstants = useThemeConstants();
 
+  /**
+   * Handles password change form submission
+   * Validates passwords and sends update request
+   * @param {Event} e - Form submission event
+   */
   const handlePasswordChange = async (e) => {
     e.preventDefault();
     setMessage('');
     setError('');
 
+    // Validate password match
     if (newPassword !== confirmPassword) {
       setError("New passwords don't match");
       return;
@@ -28,11 +47,15 @@ const PasswordChangeModal = ({ isOpen, onClose, username }) => {
         newPassword
       });
       console.log('Password change response:', response);
+      
+      // Show success message and reset form
       setMessage(response.data.message || 'Password updated successfully');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setTimeout(() => onClose(), 2000); // Close modal after 2 seconds
+      
+      // Close modal after delay
+      setTimeout(() => onClose(), 2000);
     } catch (err) {
       console.error('Password change error:', err);
       setError(err.response?.data?.error || 'Failed to update password. Please try again.');

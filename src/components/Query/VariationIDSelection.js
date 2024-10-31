@@ -1,10 +1,23 @@
+/**
+ * Variation ID selection component
+ * Handles input and validation of ClinVar variation IDs
+ * 
+ * @param {Object} props
+ * @param {Function} props.onAddVariationID - Callback function to add a new variation ID
+ */
+
 import React, { useState } from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 
 const VariationIDSelection = ({ onAddVariationID }) => {
+  // State for input field
   const [inputValue, setInputValue] = useState('');
   const themeConstants = useThemeConstants();
 
+  /**
+   * Handles adding a new variation ID
+   * Validates and trims input before adding
+   */
   const handleAddVariationID = () => {
     if (inputValue.trim()) {
       onAddVariationID(inputValue.trim());

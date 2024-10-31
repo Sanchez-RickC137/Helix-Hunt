@@ -4,11 +4,14 @@ const cheerio = require('cheerio');
 const cors = require('cors');
 // const crypto = require('crypto');
 const dotenv = require('dotenv');
+const express = require('express');
 const jwt = require('jsonwebtoken');
 const mysql = require('mysql2/promise');
-const express = require('express');
+const { Parser } = require('json2csv');
+const xml2js = require('xml2js');
 const { parseVariantDetails, refinedClinvarHtmlTableToJson } = require('./utils/clinvarUtils');
 const { body, validationResult } = require('express-validator');
+
 const auth = require('./middleware/auth');
 const validate = require('./middleware/validate');
 
@@ -196,18 +199,6 @@ app.post('/api/reset-password', async (req, res) => {
   }
 });
 
-// Check email route
-app.post('/api/check-email', async (req, res) => {
-  const { email } = req.body;
-  try {
-    const [users] = await pool.execute('SELECT id FROM users WHERE email = ?', [email]);
-    res.json({ exists: users.length > 0 });
-  } catch (error) {
-    console.error('Email check error:', error);
-    res.status(500).json({ error: 'An error occurred while checking the email.' });
-  }
-});
-
 // Get user preferences
 app.get('/api/user-preferences', auth, async (req, res, next) => {
   console.log('User preferences route called');
@@ -279,15 +270,15 @@ app.put('/api/user-preferences', auth, async (req, res, next) => {
 app.post('/api/save-query', auth, async (req, res, next) => {
   try {
     console.log('Saving query for user:', req.userId);
-    const { fullNames, variationIDs, clinicalSignificance, outputFormat, startDate, endDate } = req.body;
+    const { fullNames, variationIDs, clinicalSignificance, startDate, endDate } = req.body;
     
     // Convert empty string dates to null
     const formattedStartDate = startDate || null;
     const formattedEndDate = endDate || null;
 
     await pool.execute(
-      'INSERT INTO query_history (user_id, full_names, variation_ids, clinical_significance, output_format, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [req.userId, JSON.stringify(fullNames), JSON.stringify(variationIDs), JSON.stringify(clinicalSignificance), outputFormat, formattedStartDate, formattedEndDate]
+      'INSERT INTO query_history (user_id, full_names, variation_ids, clinical_significance, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?)',
+      [req.userId, JSON.stringify(fullNames), JSON.stringify(variationIDs), JSON.stringify(clinicalSignificance), formattedStartDate, formattedEndDate]
     );
     console.log('Query saved successfully');
     res.json({ message: 'Query saved to history successfully' });
@@ -300,14 +291,13 @@ app.post('/api/save-query', auth, async (req, res, next) => {
 // Get query history
 app.get('/api/query-history', auth, async (req, res, next) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM query_history WHERE user_id = ? ORDER BY timestamp DESC', [req.userId]);
+    const [rows] = await pool.query('SELECT * FROM query_history WHERE user_id = ? ORDER BY timestamp DESC LIMIT 5', [req.userId]);
     
     const processedRows = rows.map(row => ({
       id: row.id,
       fullNames: row.full_names || [],
       variationIDs: row.variation_ids || [],
       clinicalSignificance: row.clinical_significance || [],
-      outputFormat: row.output_format,
       startDate: row.start_date,
       endDate: row.end_date,
       timestamp: row.timestamp
@@ -325,7 +315,6 @@ app.post('/api/clinvar', [
   body('fullNames').optional().isArray(),
   body('variationIDs').optional().isArray(),
   body('clinicalSignificance').optional().isArray(),
-  body('outputFormat').optional().isString(),
   body('startDate').optional().isString(),
   body('endDate').optional().isString(),
   validate
@@ -333,36 +322,22 @@ app.post('/api/clinvar', [
   console.log('Received request:', JSON.stringify(req.body, null, 2));
   
   try {
-    const { fullNames, variationIDs, clinicalSignificance, outputFormat, startDate, endDate } = req.body;
+    const { fullNames, variationIDs, clinicalSignificance, startDate, endDate } = req.body;
     
     if ((!fullNames || fullNames.length === 0) && (!variationIDs || variationIDs.length === 0)) {
       return res.status(400).json({ error: 'Either full name or variant ID is required' });
     }
-
     const results = [];
-
     // Process full names
     for (const fullName of fullNames || []) {
-      try {
-        const result = await processClinVarQuery(fullName, null, clinicalSignificance, outputFormat, startDate, endDate);
-        results.push(result);
-      } catch (error) {
-        console.error(`Error processing full name query for ${fullName}:`, error);
-        results.push({ error: `Failed to process query for ${fullName}`, details: error.message });
-      }
+      const result = await processClinVarQuery(fullName, null, clinicalSignificance, startDate, endDate);
+      results.push(result);
     }
-
     // Process variation IDs
     for (const variantId of variationIDs || []) {
-      try {
-        const result = await processClinVarQuery(null, variantId, clinicalSignificance, outputFormat, startDate, endDate);
-        results.push(result);
-      } catch (error) {
-        console.error(`Error processing variant ID query for ${variantId}:`, error);
-        results.push({ error: `Failed to process query for ${variantId}`, details: error.message });
-      }
+      const result = await processClinVarQuery(null, variantId, clinicalSignificance, startDate, endDate);
+      results.push(result);
     }
-
     res.json(results);
   } catch (error) {
     console.error('Error processing ClinVar queries:', error);
@@ -370,7 +345,38 @@ app.post('/api/clinvar', [
   }
 });
 
-async function processClinVarQuery(fullName, variantId, clinicalSignificance, outputFormat, startDate, endDate) {
+// Download route
+app.post('/api/download', (req, res) => {
+  try {
+    const { results, format } = req.body;
+    const content = generateDownloadContent(results, format);
+    
+    let contentType;
+    switch (format) {
+      case 'csv':
+        contentType = 'text/csv';
+        break;
+      case 'tsv':
+        contentType = 'text/tab-separated-values';
+        break;
+      case 'xml':
+        contentType = 'application/xml';
+        break;
+      default:
+        throw new Error('Unsupported format');
+    }
+    
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename=clinvar_results.${format}`);
+    
+    res.send(content);
+  } catch (error) {
+    console.error('Error generating download:', error);
+    res.status(500).json({ error: 'Failed to generate download' });
+  }
+});
+
+async function processClinVarQuery(fullName, variantId, clinicalSignificance, startDate, endDate) {
   let url;
   let searchTerm;
   if (variantId) {
@@ -384,14 +390,19 @@ async function processClinVarQuery(fullName, variantId, clinicalSignificance, ou
   } else {
     throw new Error('Either full name or variant ID is required');
   }
-    
+   
   console.log(`Fetching data from URL: ${url}`);
-
   try {
     const response = await axios.get(url, { timeout: 10000 }); // 10 second timeout
     console.log('Response received, status:', response.status);
-    
+   
     let $ = cheerio.load(response.data);
+
+    // Check for "No items found" in title
+    if ($('title').text().includes('No items found')) {
+      console.log("No results found for this query.");
+      return { error: "No items found", details: "The provided variation ID or name was not found in ClinVar.", searchTerm };
+    }
 
     if ($('title').text().substring(0, 3) !== "VCV") {
       console.log('On search results page, looking for correct link');
@@ -410,11 +421,10 @@ async function processClinVarQuery(fullName, variantId, clinicalSignificance, ou
           i++;
         }
       }
-      
+     
       if (!isFound) {
-        throw new Error('Target variation not found');
+        return { error: "Target variation not found", details: "The specific variation was not found in the search results.", searchTerm };
       }
-
       console.log('Fetching target page:', nextPage);
       const targetResponse = await axios.get(nextPage, { timeout: 10000 });
       console.log('Target page received, status:', targetResponse.status);
@@ -422,20 +432,15 @@ async function processClinVarQuery(fullName, variantId, clinicalSignificance, ou
     } else {
       console.log('Already on target page');
     }
-
     const variantDetailsHtml = $('#id_first').html();
     const assertionListTable = $('#assertion-list').prop('outerHTML');
-
     if (!variantDetailsHtml || !assertionListTable) {
-      throw new Error('Required data not found in the HTML');
+      return { error: "Data not found", details: "Required data not found in the HTML", searchTerm };
     }
-
     console.log('Data extracted successfully');
-
     // Process the data using the utility functions
     const variantDetails = parseVariantDetails(variantDetailsHtml);
     const assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
-
     // Prepare the processed data to send to the frontend
     return {
       searchTerm,
@@ -443,11 +448,118 @@ async function processClinVarQuery(fullName, variantId, clinicalSignificance, ou
       assertionList
     };
   } catch (error) {
-    if (error.response && error.response.status === 502) {
-      throw new Error('ClinVar server is currently unavailable. Please try again later.');
+    console.error('Error in processClinVarQuery:', error.message);
+    if (error.response) {
+      // The request was made and the server responded with a status code that falls out of the range of 2xx
+      if (error.response.status === 404) {
+        return { error: "Not found", details: "The requested variation was not found.", searchTerm };
+      } else if (error.response.status === 502) {
+        return { error: "Server unavailable", details: "ClinVar server is currently unavailable. Please try again later.", searchTerm };
+      }
+    } else if (error.request) {
+      // The request was made but no response was received
+      return { error: "No response", details: "No response received from ClinVar server.", searchTerm };
     }
-    throw error;
+    // Something happened in setting up the request that triggered an Error
+    return { error: "Unexpected error", details: error.message, searchTerm };
   }
+}
+
+function generateDownloadContent(results, format) {
+  const fields = [
+    "Transcript ID",
+    "Gene Symbol",
+    "DNA Change",
+    "Protein Change",
+    "Gene Name",
+    "Variation ID",
+    "Accession ID",
+    "Classification",
+    "Last Evaluated",
+    "Assertion Criteria",
+    "Method",
+    "Condition",
+    "Affected Status",
+    "Allele Origin",
+    "Submitter",
+    "Submitter Accession",
+    "First in ClinVar",
+    "Last Updated",
+    "Comment"
+  ];
+
+  const data = results.flatMap(result => 
+    result.assertionList.map(row => ({
+      "Transcript ID": result.variantDetails.transcriptID,
+      "Gene Symbol": result.variantDetails.geneSymbol,
+      "DNA Change": result.variantDetails.dnaChange,
+      "Protein Change": result.variantDetails.proteinChange,
+      "Gene Name": result.variantDetails.fullName,
+      "Variation ID": result.variantDetails.variationID,
+      "Accession ID": result.variantDetails.accessionID,
+      "Classification": `${row.Classification.value || 'N/A'} (${row.Classification.date || 'N/A'})`,
+      "Last Evaluated": row.Classification.date,
+      "Assertion Criteria": row['Review status']['assertion criteria'],
+      "Method": row['Review status'].method,
+      "Condition": row.Condition.name,
+      "Affected Status": row.Condition['Affected status'],
+      "Allele Origin": row.Condition['Allele origin'],
+      "Submitter": row.Submitter.name,
+      "Submitter Accession": row.Submitter.Accession,
+      "First in ClinVar": row.Submitter['First in ClinVar'],
+      "Last Updated": row.Submitter['Last updated'],
+      "Comment": row['More information'].Comment
+    }))
+  );
+
+  if (format === 'csv') {
+    const json2csvParser = new Parser({ fields });
+    return json2csvParser.parse(data);
+  } else if (format === 'tsv') {
+    const json2csvParser = new Parser({ fields, delimiter: '\t' });
+    return json2csvParser.parse(data);
+  } else if (format === 'xml') {
+    const builder = new xml2js.Builder({
+      rootName: 'ClinVarResults',
+      xmldec: { version: '1.0', encoding: 'UTF-8' }
+    });
+    const xmlObj = {
+      Result: data.map(item => ({
+        VariantDetails: {
+          TranscriptID: item['Transcript ID'],
+          GeneSymbol: item['Gene Symbol'],
+          DNAChange: item['DNA Change'],
+          ProteinChange: item['Protein Change'],
+          GeneName: item['Gene Name'],
+          VariationID: item['Variation ID'],
+          AccessionID: item['Accession ID']
+        },
+        Classification: {
+          Value: item['Classification'].split(' (')[0],
+          Date: item['Last Evaluated']
+        },
+        ReviewStatus: {
+          AssertionCriteria: item['Assertion Criteria'],
+          Method: item['Method']
+        },
+        Condition: {
+          Name: item['Condition'],
+          AffectedStatus: item['Affected Status'],
+          AlleleOrigin: item['Allele Origin']
+        },
+        Submitter: {
+          Name: item['Submitter'],
+          Accession: item['Submitter Accession'],
+          FirstInClinVar: item['First in ClinVar'],
+          LastUpdated: item['Last Updated']
+        },
+        Comment: item['Comment']
+      }))
+    };
+    return builder.buildObject(xmlObj);
+  }
+
+  throw new Error('Unsupported format');
 }
 
 // Error handling middleware

@@ -1,25 +1,37 @@
+/**
+ * Full name preferences management component
+ * Allows users to add and remove preferred full names
+ * 
+ * @param {Object} props
+ * @param {string[]} props.preferences - Array of saved full name preferences
+ * @param {Function} props.onUpdatePreferences - Callback to update preferences
+ */
+
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 
-const FullNamePreferences = ({ userId, initialPreferences, onUpdatePreferences }) => {
-  const [preferences, setPreferences] = useState(initialPreferences);
+const FullNamePreferences = ({ preferences, onUpdatePreferences }) => {
   const [newPreference, setNewPreference] = useState('');
   const themeConstants = useThemeConstants();
 
+  /**
+   * Handles adding a new preference
+   * Validates for duplicates before adding
+   */
   const handleAddPreference = () => {
     if (newPreference && !preferences.includes(newPreference)) {
-      const updatedPreferences = [...preferences, newPreference];
-      setPreferences(updatedPreferences);
-      onUpdatePreferences(updatedPreferences);
+      onUpdatePreferences([...preferences, newPreference]);
       setNewPreference('');
     }
   };
 
+  /**
+   * Removes a preference from the list
+   * @param {string} pref - Preference to remove
+   */
   const handleRemovePreference = (pref) => {
-    const updatedPreferences = preferences.filter(p => p !== pref);
-    setPreferences(updatedPreferences);
-    onUpdatePreferences(updatedPreferences);
+    onUpdatePreferences(preferences.filter(p => p !== pref));
   };
 
   return (
@@ -39,6 +51,8 @@ const FullNamePreferences = ({ userId, initialPreferences, onUpdatePreferences }
           Add Preference
         </button>
       </div>
+
+      {/* Display existing preferences */}
       <div className="grid grid-cols-2 gap-4 mt-4">
         {preferences.map((pref, index) => (
           <div key={index} className={`${themeConstants.unselectedItemBackgroundColor} rounded-lg p-4 flex flex-col relative`}>
