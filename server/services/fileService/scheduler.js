@@ -17,9 +17,9 @@ const DIRECTORIES = {
 
 // File processing schedule (minutes after 10:00 PM)
 const FILE_SCHEDULE = [
-  { file: 'variant_summary.txt.gz', minute: 0 },
-  { file: 'submission_summary.txt.gz', minute: 15 },
-  { file: 'summary_of_conflicting_interpretations.txt', minute: 30 },
+  { file: 'variant_summary.txt.gz', minute: 12 },
+  { file: 'submission_summary.txt.gz', minute: 25 },
+  { file: 'summary_of_conflicting_interpretations.txt', minute: 35 },
   { file: 'hgvs4variation.txt.gz', minute: 45 }
 ];
 
@@ -102,145 +102,6 @@ ${result.skipReason ? `  Skipped: ${result.skipReason}` : ''}
   }
 }
 
-// Table schemas with correct names
-const TABLE_SCHEMAS = {
-  variant_summary: `
-    CREATE TABLE IF NOT EXISTS variant_summary (
-      AlleleID VARCHAR(255),
-      Type VARCHAR(255),
-      Name TEXT,
-      GeneID VARCHAR(255),
-      GeneSymbol VARCHAR(255),
-      HGNC_ID VARCHAR(255),
-      ClinicalSignificance TEXT,
-      ClinSigSimple VARCHAR(255),
-      LastEvaluated VARCHAR(255),
-      \`RS#_dbSNP\` VARCHAR(255),
-      nsv_esv_dbVar VARCHAR(255),
-      RCVaccession TEXT,
-      PhenotypeIDS TEXT,
-      PhenotypeList TEXT,
-      Origin TEXT,
-      OriginSimple VARCHAR(255),
-      Assembly VARCHAR(255),
-      ChromosomeAccession VARCHAR(255),
-      Chromosome VARCHAR(255),
-      Start VARCHAR(255),
-      Stop VARCHAR(255),
-      ReferenceAllele TEXT,
-      AlternateAllele TEXT,
-      Cytogenetic VARCHAR(255),
-      ReviewStatus VARCHAR(255),
-      NumberSubmitters VARCHAR(255),
-      Guidelines TEXT,
-      TestedInGTR VARCHAR(255),
-      OtherIDs TEXT,
-      SubmitterCategories TEXT,
-      VariationID VARCHAR(255),
-      PositionVCF VARCHAR(255),
-      ReferenceAlleleVCF TEXT,
-      AlternateAlleleVCF TEXT,
-      INDEX idx_gene_symbol (GeneSymbol),
-      INDEX idx_variation_id (VariationID)
-    ) ENGINE=InnoDB`,
-
-  submission_summary: `
-    CREATE TABLE IF NOT EXISTS submission_summary (
-      VariationID VARCHAR(255),
-      ClinicalSignificance TEXT,
-      DateLastEvaluated VARCHAR(255),
-      Description TEXT,
-      SubmittedPhenotypeInfo TEXT,
-      ReportedPhenotypeInfo TEXT,
-      ReviewStatus VARCHAR(255),
-      CollectionMethod VARCHAR(255),
-      OriginCounts TEXT,
-      Submitter TEXT,
-      SCV VARCHAR(255),
-      SubmittedGeneSymbol VARCHAR(255),
-      INDEX idx_variation_id (VariationID)
-    ) ENGINE=InnoDB`,
-
-  summary_of_conflicting_interpretations: `
-    CREATE TABLE IF NOT EXISTS summary_of_conflicting_interpretations (
-      Gene_Symbol VARCHAR(255),
-      NCBI_Variation_ID VARCHAR(255),
-      ClinVar_Preferred TEXT,
-      Submitter1 TEXT,
-      Submitter1_SCV VARCHAR(255),
-      Submitter1_ClinSig TEXT,
-      Submitter1_LastEval VARCHAR(255),
-      Submitter1_ReviewStatus TEXT,
-      Submitter1_Sub_Condition TEXT,
-      Submitter1_Description TEXT,
-      Submitter2 TEXT,
-      Submitter2_SCV VARCHAR(255),
-      Submitter2_ClinSig TEXT,
-      Submitter2_LastEval VARCHAR(255),
-      Submitter2_ReviewStatus TEXT,
-      Submitter2_Sub_Condition TEXT,
-      Submitter2_Description TEXT,
-      Rank_diff VARCHAR(255),
-      Conflict_Reported VARCHAR(255),
-      Variant_type VARCHAR(255),
-      Submitter1_Method VARCHAR(255),
-      Submitter2_Method VARCHAR(255),
-      INDEX idx_gene_symbol (Gene_Symbol),
-      INDEX idx_variation_id (NCBI_Variation_ID)
-    ) ENGINE=InnoDB`,
-
-  hgvs4variation: `
-    CREATE TABLE IF NOT EXISTS hgvs4variation (
-      Symbol VARCHAR(255),
-      GeneID VARCHAR(255),
-      VariationID VARCHAR(255),
-      AlleleID VARCHAR(255),
-      Type VARCHAR(255),
-      Assembly VARCHAR(255),
-      NucleotideExpression TEXT,
-      NucleotideChange TEXT,
-      ProteinExpression TEXT,
-      ProteinChange TEXT,
-      UsedForNaming VARCHAR(255),
-      Submitted VARCHAR(255),
-      OnRefSeqGene VARCHAR(255),
-      INDEX idx_symbol (Symbol),
-      INDEX idx_variation_id (VariationID)
-    ) ENGINE=InnoDB`
-};
-
-/**
- * Creates necessary database tables
- * @param {Object} pool - Database connection pool
- * @param {Logger} logger - Logger instance
- */
-async function createTables(pool, logger) {
-  const connection = await pool.getConnection();
-  try {
-    // Create file updates tracking table
-    await connection.query(`
-      CREATE TABLE IF NOT EXISTS file_updates (
-        file_name VARCHAR(255) NOT NULL PRIMARY KEY,
-        last_upload_datetime DATETIME,
-        file_modified_datetime DATETIME,
-        last_check_datetime DATETIME
-      )
-    `);
-    logger.log('Created file_updates table');
-
-    // Create data tables
-    for (const [tableName, schema] of Object.entries(TABLE_SCHEMAS)) {
-      await connection.query(schema);
-      logger.log(`Created ${tableName} table`);
-    }
-  } catch (error) {
-    logger.log(`Error creating tables: ${error.message}`, 'error');
-    throw error;
-  } finally {
-    connection.release();
-  }
-}
-
 /**
  * Process a single file through the pipeline
  * @param {Object} pool - Database connection
@@ -316,9 +177,11 @@ async function processAllFiles(pool) {
       try {
         await downloadFile(fileInfo.url, path.join(DIRECTORIES.download, fileInfo.fileName));
         summary.addDownloadResult(fileInfo.fileName, true);
+        logger.log(`Successfully downloaded ${fileInfo.fileName}`);
       } catch (error) {
         summary.addDownloadResult(fileInfo.fileName, false, error.message);
         summary.addError(`Download failed for ${fileInfo.fileName}: ${error.message}`);
+        logger.log(`Failed to download ${fileInfo.fileName}: ${error.message}`, 'error');
       }
     }
 
@@ -328,12 +191,14 @@ async function processAllFiles(pool) {
         const stats = {}; // Will hold processing statistics
         await processFile(pool, fileInfo, logger, stats);
         summary.addProcessingResult(fileInfo.fileName, stats);
+        logger.log(`Successfully processed ${fileInfo.fileName}`);
       } catch (error) {
         summary.addError(`Processing failed for ${fileInfo.fileName}: ${error.message}`);
+        logger.log(`Failed to process ${fileInfo.fileName}: ${error.message}`, 'error');
       }
     }
 
-    // Send single email with complete summary
+    // Send summary email
     await logger.sendEmail(
       'Weekly ClinVar Update', 
       summary.totalStats.errors.length === 0,
@@ -342,6 +207,7 @@ async function processAllFiles(pool) {
 
   } catch (error) {
     summary.addError(`Fatal error in batch processing: ${error.message}`);
+    logger.log(`Fatal error in batch processing: ${error.message}`, 'error');
     await logger.sendEmail(
       'Weekly ClinVar Update', 
       false,
@@ -351,14 +217,76 @@ async function processAllFiles(pool) {
 }
 
 /**
+ * Creates a scheduled job with error handling and logging
+ * @param {string} cronPattern - Cron pattern for the schedule
+ * @param {Function} task - Task to execute
+ * @param {string} description - Description of the scheduled task
+ * @param {Logger} logger - Logger instance
+ * @returns {Object} Scheduled job object
+ */
+function createScheduledJob(cronPattern, task, description, logger) {
+  try {
+    const job = schedule.scheduleJob(cronPattern, async () => {
+      logger.log(`Starting scheduled task: ${description}`);
+      try {
+        await task();
+        logger.log(`Completed scheduled task: ${description}`);
+      } catch (error) {
+        logger.log(`Error in scheduled task ${description}: ${error.message}`, 'error');
+        await logger.sendEmail(
+          `Scheduled Task Failed: ${description}`,
+          false,
+          `Task failed with error: ${error.message}\n\nStack trace:\n${error.stack}`
+        );
+      }
+    });
+
+    if (job) {
+      logger.log(`Successfully scheduled task: ${description} with pattern: ${cronPattern}`);
+      return job;
+    } else {
+      throw new Error('Failed to create scheduled job');
+    }
+  } catch (error) {
+    logger.log(`Error creating scheduled task ${description}: ${error.message}`, 'error');
+    throw error;
+  }
+}
+
+/**
  * Initializes schedules for file processing
  * @param {Object} pool - Database connection
+ * @param {Logger} logger - Logger instance
  */
-function initializeSchedules(pool) {
-  // Download files at 9:45 PM Friday
-  schedule.scheduleJob('45 21 * * 5', async () => {
+function initializeSchedules(pool, logger) {
+  // Schedule main weekly update for Monday at 10:00 PM
+  createScheduledJob('0 22 * * 1', async () => {
+    logger.log('Starting weekly file batch processing');
     await processAllFiles(pool);
+  }, 'Weekly ClinVar Update', logger);
+
+  // Schedule individual file processing tasks
+  FILE_SCHEDULE.forEach(({ file, minute }) => {
+    const cronPattern = `${minute} 23 * * 1`; // Monday at 10:XX PM
+    createScheduledJob(cronPattern, async () => {
+      logger.log(`Starting scheduled processing for ${file}`);
+      const fileInfo = { fileName: file };
+      const stats = {};
+      await processFile(pool, fileInfo, logger, stats);
+    }, `Process ${file}`, logger);
   });
+
+  // Add a daily health check job
+  createScheduledJob('0 9 * * *', async () => {
+    const schedules = schedule.scheduledJobs;
+    const activeJobs = Object.keys(schedules).length;
+    logger.log(`Health check: ${activeJobs} scheduled jobs active`);
+    
+    // Log next run times for all jobs
+    Object.entries(schedules).forEach(([name, job]) => {
+      logger.log(`Next run for ${name}: ${job.nextInvocation()}`);
+    });
+  }, 'Schedule Health Check', logger);
 }
 
 /**
@@ -372,14 +300,16 @@ async function initializeDataService(pool) {
     await fs.mkdir(DIRECTORIES.download, { recursive: true });
     await fs.mkdir(DIRECTORIES.temp, { recursive: true });
 
-    // Create tables
-    await createTables(pool, logger);
-    logger.log('Database tables created successfully');
-
-    // Initialize schedules
-    initializeSchedules(pool);
+    // Initialize schedules with logger
+    initializeSchedules(pool, logger);
     
     logger.log('Data service initialized successfully');
+
+    // Log next scheduled run times
+    const schedules = schedule.scheduledJobs;
+    Object.entries(schedules).forEach(([name, job]) => {
+      logger.log(`Next scheduled run for ${name}: ${job.nextInvocation()}`);
+    });
   } catch (error) {
     logger.log('Failed to initialize data service: ' + error.message, 'error');
     throw error;
@@ -388,6 +318,7 @@ async function initializeDataService(pool) {
 
 module.exports = { 
   initializeDataService,
-  processAllFiles,  // Export for testing
-  processFile      // Export for testing
+  processAllFiles,
+  processFile,
+  createScheduledJob // Export for testing
 };
