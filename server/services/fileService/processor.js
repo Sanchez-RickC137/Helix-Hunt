@@ -1,96 +1,32 @@
 const fs = require('fs').promises;
-const fsSync = require('fs');
 const path = require('path');
-const readline = require('readline');
-const zlib = require('zlib');
-const { promisify } = require('util');
-const timeOperation = require('./utils/timing');
-const Logger = require('./utils/logger');
-const MD5Verifier = require('./utils/md5Verifier');
+const mysql = require('mysql2/promise');
 
-const pipeline = promisify(require('stream').pipeline);
-
-/**
- * Verifies file exists and is readable
- * @param {string} filePath - Path to check
- * @param {Logger} logger - Logger instance
- * @returns {Promise<boolean>} Whether file exists and is readable
- */
-async function verifyFile(filePath, logger) {
-  try {
-    await fs.access(filePath, fs.constants.R_OK);
-    const stats = await fs.stat(filePath);
-    logger.log(`Verified file ${filePath}:`);
-    logger.log(`  Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
-    logger.log(`  Modified: ${stats.mtime}`);
-    return true;
-  } catch (error) {
-    logger.log(`File verification failed for ${filePath}: ${error.message}`, 'error');
-    return false;
-  }
-}
+const FILE_TABLE_MAP = {
+  'variant_summary.txt.gz': 'variant_summary',
+  'submission_summary.txt.gz': 'submission_summary',
+  'summary_of_conflicting_interpretations.txt': 'conflicting_interpretations',
+  'hgvs4variation.txt.gz': 'hgvs_variation'
+};
 
 /**
- * Gets processed file path
- * @param {string} fileName - Original file name
- * @param {string} stage - Processing stage
- * @param {Object} directories - Directory configuration
- * @returns {string} Processed file path
- */
-function getProcessedFilePath(fileName, stage, directories) {
-  switch (stage) {
-    case 'downloaded':
-      return path.join(directories.download, fileName);
-    case 'decompressed':
-      return path.join(directories.temp, fileName.endsWith('.gz') 
-        ? fileName.replace('.gz', '') 
-        : fileName);
-    case 'filtered':
-      return path.join(directories.temp, fileName.endsWith('.gz')
-        ? fileName.replace('.gz', '.filtered')
-        : `${fileName}.filtered`);
-    default:
-      throw new Error(`Unknown processing stage: ${stage}`);
-  }
-}
-
-/**
- * Decompresses or copies file to temp directory
- * @param {string} inputPath - Input file path
- * @param {string} outputPath - Output file path
- * @param {Logger} logger - Logger instance
- */
-async function decompressFile(inputPath, outputPath, logger) {
-  logger.log(`Processing ${inputPath} to ${outputPath}`);
-
-  if (inputPath.endsWith('.gz')) {
-    await pipeline(
-      fsSync.createReadStream(inputPath),
-      zlib.createGunzip(),
-      fsSync.createWriteStream(outputPath)
-    );
-  } else {
-    await pipeline(
-      fsSync.createReadStream(inputPath),
-      fsSync.createWriteStream(outputPath)
-    );
-  }
-
-  logger.log('File processing complete');
-}
-
-/**
- * Processes single file into database
- * @param {Object} pool - Database connection pool
- * @param {Object} fileInfo - File information
- * @param {Object} directories - Directory paths
+ * Process a single file into the database
  */
 async function processSingleFile(pool, fileInfo, directories, logger) {
-  // Get the filtered file path
-  const filePath = getProcessedFilePath(fileInfo.fileName, 'filtered', directories);
+  const { fileName, processedPath } = fileInfo;
+  
+  // Get the correct table name from the mapping
+  const tableName = FILE_TABLE_MAP[fileName];
+  if (!tableName) {
+    throw new Error(`No table mapping found for file: ${fileName}`);
+  }
 
-  if (!await verifyFile(filePath, logger)) {
-    throw new Error(`File not found or not readable: ${filePath}`);
+  // Log the operation being attempted
+  logger.log(`Attempting to load ${fileName} into table ${tableName}`);
+
+  // Verify the processed file exists
+  if (!processedPath || !(await verifyFile(processedPath, logger))) {
+    throw new Error(`File not found or not readable: ${processedPath}`);
   }
 
   const connection = await pool.getConnection();
@@ -98,15 +34,14 @@ async function processSingleFile(pool, fileInfo, directories, logger) {
     await connection.query('SET foreign_key_checks = 0');
     await connection.query('SET unique_checks = 0');
     await connection.query('SET autocommit = 0');
-    await connection.query('SET GLOBAL local_infile = 1');
 
-    const tableName = fileInfo.fileName
-      .replace('.txt.gz', '')
-      .replace('.txt', '');
+    // Clear existing data from the table
+    logger.log(`Clearing existing data from ${tableName}...`);
+    await connection.query(`TRUNCATE TABLE ${tableName}`);
 
-    logger.log(`Loading ${filePath} into ${tableName}...`);
+    logger.log(`Loading ${processedPath} into ${tableName}...`);
     
-    // Use LOAD DATA INFILE with the correct path
+    // Use LOAD DATA INFILE with the processed file path
     await connection.query(`
       LOAD DATA LOCAL INFILE ?
       INTO TABLE ${tableName}
@@ -114,7 +49,7 @@ async function processSingleFile(pool, fileInfo, directories, logger) {
       ENCLOSED BY ''
       LINES TERMINATED BY '\n'
       IGNORE 1 LINES
-    `, [filePath]);
+    `, [processedPath]);
 
     await connection.query('COMMIT');
 
@@ -127,19 +62,33 @@ async function processSingleFile(pool, fileInfo, directories, logger) {
     await connection.query('SET unique_checks = 1');
     await connection.query('SET autocommit = 1');
 
-    logger.log(`Successfully processed ${fileInfo.fileName}`);
+    logger.log(`Successfully processed ${fileName}`);
 
   } catch (error) {
-    logger.log(`Error loading data into ${fileInfo.fileName}: ${error.message}`, 'error');
+    logger.log(`Error loading data into ${tableName}: ${error.message}`, 'error');
     throw error;
   } finally {
     connection.release();
   }
 }
 
+/**
+ * Verify file exists and is readable
+ */
+async function verifyFile(filePath, logger) {
+  try {
+    await fs.access(filePath, fs.constants.R_OK);
+    const stats = await fs.stat(filePath);
+    logger.log(`Verified file ${filePath}:`);
+    logger.log(`  Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+    return true;
+  } catch (error) {
+    logger.log(`File verification failed for ${filePath}: ${error.message}`, 'error');
+    return false;
+  }
+}
 
 module.exports = {
   processSingleFile,
-  verifyFile,
-  getProcessedFilePath
+  verifyFile
 };

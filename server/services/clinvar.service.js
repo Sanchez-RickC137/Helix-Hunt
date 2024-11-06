@@ -4,6 +4,67 @@ const { Parser } = require('json2csv');
 const xml2js = require('xml2js');
 const { parseVariantDetails, refinedClinvarHtmlTableToJson } = require('../utils/clinvarUtils');
 
+// Configure axios defaults for optimization
+axios.defaults.timeout = 10000;
+axios.defaults.headers.common['Accept-Encoding'] = 'gzip';
+axios.defaults.headers.common['Connection'] = 'keep-alive';
+
+// Request concurrency management
+const MAX_CONCURRENT_REQUESTS = 5;
+const requestQueue = [];
+let activeRequests = 0;
+
+const processNextRequest = async () => {
+  if (activeRequests >= MAX_CONCURRENT_REQUESTS || requestQueue.length === 0) return;
+  
+  activeRequests++;
+  const { config, resolve, reject } = requestQueue.shift();
+  
+  try {
+    const response = await axios(config);
+    resolve(response);
+  } catch (error) {
+    reject(error);
+  } finally {
+    activeRequests--;
+    processNextRequest();
+  }
+};
+
+const queuedRequest = (config) => {
+  return new Promise((resolve, reject) => {
+    requestQueue.push({ config, resolve, reject });
+    processNextRequest();
+  });
+};
+
+// Integrated data processing functions
+const processClinVarData = (data) => {
+  if (!data || typeof data !== 'object') {
+    return { error: 'Invalid data received' };
+  }
+  
+  return {
+    variantInfo: data.variation_set ? data.variation_set[0] : {},
+    clinicalSignificance: data.clinical_significance || {},
+    geneInfo: data.gene_info || {},
+    conditions: data.conditions || [],
+  };
+};
+
+const extractTableData = (data) => {
+  if (!data || typeof data !== 'object') {
+    return [];
+  }
+  
+  return Object.entries(data).map(([key, value]) => {
+    return {
+      field: key,
+      value: typeof value === 'object' ? JSON.stringify(value) : String(value)
+    };
+  });
+};
+
 exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificance, startDate, endDate) => {
   let url;
   let searchTerm;
@@ -19,7 +80,7 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
   }
    
   try {
-    const response = await axios.get(url, { timeout: 10000 });
+    const response = await queuedRequest({ url, method: 'GET' });
     let $ = cheerio.load(response.data);
 
     if ($('title').text().includes('No items found')) {
@@ -53,7 +114,7 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
         };
       }
 
-      const targetResponse = await axios.get(nextPage, { timeout: 10000 });
+      const targetResponse = await queuedRequest({ url: nextPage, method: 'GET' });
       $ = cheerio.load(targetResponse.data);
     }
 
@@ -108,7 +169,7 @@ exports.processGeneralClinVarWebQuery = async (searchQuery, searchGroup, clinica
   const url = `https://www.ncbi.nlm.nih.gov/clinvar?term=${searchQuery}`;
 
   try {
-    const response = await axios.get(url, { timeout: 10000 });
+    const response = await queuedRequest({ url, method: 'GET' });
     let $ = cheerio.load(response.data);
 
     if ($('title').text().includes('No items found')) {
@@ -122,39 +183,50 @@ exports.processGeneralClinVarWebQuery = async (searchQuery, searchGroup, clinica
     const entries = $('.blocklevelaintable');
     const aggregatedResults = [];
 
-    for (let i = 0; i < entries.length; i++) {
-      const entryText = $(entries[i]).text().trim();
-      const entryUrl = $(entries[i]).attr('href');
+    // Process entries in batches
+    const batchSize = 5;
+    for (let i = 0; i < entries.length; i += batchSize) {
+      const batchPromises = [];
       
-      const matchesSearch = Object.values(searchGroup)
-        .filter(Boolean)
-        .every(term => entryText.toLowerCase().includes(term.toLowerCase()));
+      for (let j = i; j < Math.min(i + batchSize, entries.length); j++) {
+        const entryText = $(entries[j]).text().trim();
+        const entryUrl = $(entries[j]).attr('href');
+        
+        const matchesSearch = Object.values(searchGroup)
+          .filter(Boolean)
+          .every(term => entryText.toLowerCase().includes(term.toLowerCase()));
 
-      if (matchesSearch) {
-        try {
+        if (matchesSearch) {
           const variantUrl = `https://www.ncbi.nlm.nih.gov${entryUrl}`;
-          const variantResponse = await axios.get(variantUrl, { timeout: 10000 });
-          const variantPage = cheerio.load(variantResponse.data);
-          
-          const variantDetailsHtml = variantPage('#id_first').html();
-          const assertionListTable = variantPage('#assertion-list').prop('outerHTML');
-          
-          if (!variantDetailsHtml || !assertionListTable) continue;
+          batchPromises.push(
+            queuedRequest({ url: variantUrl, method: 'GET' })
+              .then(variantResponse => {
+                const variantPage = cheerio.load(variantResponse.data);
+                const variantDetailsHtml = variantPage('#id_first').html();
+                const assertionListTable = variantPage('#assertion-list').prop('outerHTML');
+                
+                if (!variantDetailsHtml || !assertionListTable) return null;
 
-          const variantDetails = parseVariantDetails(variantDetailsHtml);
-          const assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
-          
-          aggregatedResults.push({
-            searchTerm: `${Object.values(searchGroup).filter(Boolean).join(' AND ')}`,
-            variantDetails,
-            assertionList,
-            searchGroup
-          });
-        } catch (error) {
-          console.error('Error processing variant page:', error);
-          continue;
+                const variantDetails = parseVariantDetails(variantDetailsHtml);
+                const assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
+                
+                return {
+                  searchTerm: `${Object.values(searchGroup).filter(Boolean).join(' AND ')}`,
+                  variantDetails,
+                  assertionList,
+                  searchGroup
+                };
+              })
+              .catch(error => {
+                console.error('Error processing variant page:', error);
+                return null;
+              })
+          );
         }
       }
+
+      const batchResults = await Promise.all(batchPromises);
+      aggregatedResults.push(...batchResults.filter(Boolean));
     }
 
     if (aggregatedResults.length === 0) {
@@ -260,4 +332,13 @@ exports.generateDownloadContent = (results, format) => {
   }
 
   throw new Error('Unsupported format');
+};
+
+// Export all functionalities
+module.exports = {
+  processClinVarWebQuery: exports.processClinVarWebQuery,
+  processGeneralClinVarWebQuery: exports.processGeneralClinVarWebQuery,
+  generateDownloadContent: exports.generateDownloadContent,
+  processClinVarData,
+  extractTableData
 };
