@@ -3,7 +3,9 @@ const { BASE_QUERY } = require('../constants/queries');
 const {
   processClinVarWebQuery,
   processGeneralClinVarWebQuery,
-  generateDownloadContent
+  generateDownloadContent,
+  processClinVarData, 
+  extractTableData
 } = require('../services/clinvar.service');
 const { processDbResults } = require('../services/database.service');
 

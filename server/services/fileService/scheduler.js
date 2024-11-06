@@ -2,25 +2,24 @@ const schedule = require('node-schedule');
 const path = require('path');
 const fs = require('fs').promises;
 const { downloadFile, scrapeFileList } = require('./downloader');
-const { filterFileWithGeneSymbols } = require('./filter');
-const { processSingleFile, verifyFile, getProcessedFilePath } = require('./processor');
+const { processSingleFile } = require('./processor');
 const Logger = require('./utils/logger');
+const MD5Verifier = require('./utils/md5Verifier');
 const timeOperation = require('./utils/timing');
 
 // Configuration
 const BASE_DIR = path.join(__dirname, '../../');
 const DIRECTORIES = {
   download: path.join(BASE_DIR, 'data/downloads'),
-  temp: path.join(BASE_DIR, 'data/temp'),
-  gene_symbols: path.join(BASE_DIR, '../public/data/Gene_Symbol.txt')
+  temp: path.join(BASE_DIR, 'data/temp')
 };
 
 // File processing schedule (minutes after 10:00 PM)
 const FILE_SCHEDULE = [
-  { file: 'variant_summary.txt.gz', minute: 12 },
-  { file: 'submission_summary.txt.gz', minute: 25 },
-  { file: 'summary_of_conflicting_interpretations.txt', minute: 35 },
-  { file: 'hgvs4variation.txt.gz', minute: 45 }
+  { file: 'variant_summary.txt.gz', minute: 15 },
+  { file: 'submission_summary.txt.gz', minute: 30 },
+  { file: 'summary_of_conflicting_interpretations.txt', minute: 45 },
+  { file: 'hgvs4variation.txt.gz', minute: 59 }
 ];
 
 class ProcessingSummary {
@@ -31,8 +30,6 @@ class ProcessingSummary {
     this.totalStats = {
       filesProcessed: 0,
       totalLinesProcessed: 0,
-      totalMatchedLines: 0,
-      skippedFiles: 0,
       errors: []
     };
   }
@@ -48,7 +45,6 @@ class ProcessingSummary {
     });
     if (stats.totalLines) {
       this.totalStats.totalLinesProcessed += stats.totalLines;
-      this.totalStats.totalMatchedLines += stats.matchedLines;
       this.totalStats.filesProcessed++;
     }
   }
@@ -59,9 +55,9 @@ class ProcessingSummary {
 
   formatSummaryEmail() {
     const endTime = new Date();
-    const duration = (endTime - this.startTime) / 1000; // seconds
+    const duration = (endTime - this.startTime) / 1000;
 
-    let summary = `
+    return `
 ClinVar Update Processing Summary
 --------------------------------
 Start Time: ${this.startTime.toISOString()}
@@ -78,49 +74,63 @@ Processing Summary:
 ------------------
 Files Processed: ${this.totalStats.filesProcessed}
 Total Lines Processed: ${this.totalStats.totalLinesProcessed.toLocaleString()}
-Total Matched Lines: ${this.totalStats.totalMatchedLines.toLocaleString()}
-Overall Reduction: ${((1 - this.totalStats.totalMatchedLines/this.totalStats.totalLinesProcessed) * 100).toFixed(2)}%
 
 Individual File Results:
 ----------------------
 ${this.processingResults.map(result => `
 ${result.fileName}:
   Total Lines: ${result.totalLines?.toLocaleString() || 'N/A'}
-  Matched Lines: ${result.matchedLines?.toLocaleString() || 'N/A'}
   Processing Time: ${result.duration?.toFixed(2) || 'N/A'} seconds
-  Reduction: ${result.reduction?.toFixed(2) || 'N/A'}%
   Database Load Time: ${result.loadTime?.toFixed(2) || 'N/A'} seconds
 ${result.skipReason ? `  Skipped: ${result.skipReason}` : ''}
 `).join('\n')}
-`;
 
-    if (this.totalStats.errors.length > 0) {
-      summary += `\nErrors:\n-------\n${this.totalStats.errors.join('\n')}`;
-    }
-
-    return summary;
+${this.totalStats.errors.length > 0 ? `\nErrors:\n-------\n${this.totalStats.errors.join('\n')}` : ''}`;
   }
 }
 
 /**
- * Process a single file through the pipeline
- * @param {Object} pool - Database connection
- * @param {Object} fileInfo - File information
- * @param {Logger} logger - Logger instance
- * @param {Object} stats - Statistics object to update
+ * Verify file exists and is readable
  */
-async function processFile(pool, fileInfo, logger, stats = {}) {
+async function verifyFile(filePath, logger) {
   try {
+    await fs.access(filePath, fs.constants.R_OK);
+    const stats = await fs.stat(filePath);
+    logger.log(`Verified file ${filePath}:`);
+    logger.log(`  Size: ${(stats.size / 1024 / 1024).toFixed(2)} MB`);
+    logger.log(`  Modified: ${stats.mtime}`);
+    return true;
+  } catch (error) {
+    logger.log(`File verification failed for ${filePath}: ${error.message}`, 'error');
+    return false;
+  }
+}
+
+/**
+ * Process a single ClinVar file
+ */
+async function processFile(pool, fileInfo, logger) {
+  const md5Verifier = new MD5Verifier();
+  const stats = {};
+
+  try {
+    // Download path
+    const downloadPath = path.join(DIRECTORIES.download, fileInfo.fileName);
     logger.log(`Processing ${fileInfo.fileName}...`);
-    
-    // Verify downloaded file
-    const downloadPath = getProcessedFilePath(fileInfo.fileName, 'downloaded', DIRECTORIES);
-    if (!await verifyFile(downloadPath, logger)) {
-      throw new Error(`Downloaded file not found: ${downloadPath}`);
+
+    // Verify MD5
+    const isValid = await md5Verifier.verifyFile(fileInfo.url, downloadPath, logger);
+    if (!isValid) {
+      throw new Error(`MD5 verification failed for ${fileInfo.fileName}`);
     }
 
-    // Process file (decompress)
-    const decompressedPath = getProcessedFilePath(fileInfo.fileName, 'decompressed', DIRECTORIES);
+    // Decompress file
+    const decompressedPath = path.join(DIRECTORIES.temp, 
+      fileInfo.fileName.endsWith('.gz') ? 
+        fileInfo.fileName.replace('.gz', '') : 
+        fileInfo.fileName
+    );
+
     await timeOperation('Decompress/Copy', async () => {
       if (fileInfo.fileName.endsWith('.gz')) {
         const { pipeline } = require('stream/promises');
@@ -136,24 +146,33 @@ async function processFile(pool, fileInfo, logger, stats = {}) {
       logger.log('File decompression complete');
     });
 
-    // Process directly into database
-    const loadStart = process.hrtime.bigint();
-    await processSingleFile(pool, fileInfo, DIRECTORIES, logger);
-    const loadEnd = process.hrtime.bigint();
-    stats.loadTime = Number(loadEnd - loadStart) / 1_000_000_000; // Convert to seconds
+    // Verify decompressed file
+    if (!await verifyFile(decompressedPath, logger)) {
+      throw new Error(`Decompressed file not found or not readable: ${decompressedPath}`);
+    }
 
-    // Get line count for stats
+    // Process into database
+    const loadStart = process.hrtime.bigint();
+    await processSingleFile(pool, { 
+      ...fileInfo, 
+      processedPath: decompressedPath // Pass the decompressed file path
+    }, DIRECTORIES, logger);
+    const loadEnd = process.hrtime.bigint();
+    stats.loadTime = Number(loadEnd - loadStart) / 1_000_000_000;
+
+    // Get stats
     const fileStats = await fs.stat(decompressedPath);
-    stats.totalLines = fileStats.size; // Use file size as a proxy for now
+    stats.totalLines = fileStats.size;
     stats.duration = stats.loadTime;
 
-    // Clean up decompressed file
+    // Cleanup decompressed file
     await timeOperation('Cleanup', async () => {
       await fs.unlink(decompressedPath).catch(error => 
         logger.log(`Error cleaning up decompressed file: ${error.message}`, 'warning')
       );
     });
 
+    return stats;
   } catch (error) {
     logger.log(`Error processing ${fileInfo.fileName}: ${error.message}`, 'error');
     throw error;
@@ -161,8 +180,7 @@ async function processFile(pool, fileInfo, logger, stats = {}) {
 }
 
 /**
- * Downloads and processes all files
- * @param {Object} pool - Database connection
+ * Process all ClinVar files
  */
 async function processAllFiles(pool) {
   const logger = new Logger();
@@ -170,6 +188,10 @@ async function processAllFiles(pool) {
 
   try {
     logger.log('Starting weekly file processing');
+
+    // Ensure directories exist
+    await fs.mkdir(DIRECTORIES.download, { recursive: true });
+    await fs.mkdir(DIRECTORIES.temp, { recursive: true });
 
     // Download files
     const files = await scrapeFileList();
@@ -188,8 +210,7 @@ async function processAllFiles(pool) {
     // Process each file
     for (const fileInfo of files) {
       try {
-        const stats = {}; // Will hold processing statistics
-        await processFile(pool, fileInfo, logger, stats);
+        const stats = await processFile(pool, fileInfo, logger);
         summary.addProcessingResult(fileInfo.fileName, stats);
         logger.log(`Successfully processed ${fileInfo.fileName}`);
       } catch (error) {
@@ -213,112 +234,80 @@ async function processAllFiles(pool) {
       false,
       summary.formatSummaryEmail()
     );
-  }
-}
-
-/**
- * Creates a scheduled job with error handling and logging
- * @param {string} cronPattern - Cron pattern for the schedule
- * @param {Function} task - Task to execute
- * @param {string} description - Description of the scheduled task
- * @param {Logger} logger - Logger instance
- * @returns {Object} Scheduled job object
- */
-function createScheduledJob(cronPattern, task, description, logger) {
-  try {
-    const job = schedule.scheduleJob(cronPattern, async () => {
-      logger.log(`Starting scheduled task: ${description}`);
-      try {
-        await task();
-        logger.log(`Completed scheduled task: ${description}`);
-      } catch (error) {
-        logger.log(`Error in scheduled task ${description}: ${error.message}`, 'error');
-        await logger.sendEmail(
-          `Scheduled Task Failed: ${description}`,
-          false,
-          `Task failed with error: ${error.message}\n\nStack trace:\n${error.stack}`
-        );
-      }
-    });
-
-    if (job) {
-      logger.log(`Successfully scheduled task: ${description} with pattern: ${cronPattern}`);
-      return job;
-    } else {
-      throw new Error('Failed to create scheduled job');
+  } finally {
+    // Cleanup
+    try {
+      await fs.rm(DIRECTORIES.temp, { recursive: true, force: true });
+    } catch (error) {
+      logger.log(`Error cleaning up temp directory: ${error.message}`, 'warning');
     }
-  } catch (error) {
-    logger.log(`Error creating scheduled task ${description}: ${error.message}`, 'error');
-    throw error;
   }
 }
 
 /**
- * Initializes schedules for file processing
- * @param {Object} pool - Database connection
- * @param {Logger} logger - Logger instance
+ * Initialize schedules
  */
 function initializeSchedules(pool, logger) {
   // Schedule main weekly update for Monday at 10:00 PM
-  createScheduledJob('0 22 * * 1', async () => {
+  schedule.scheduleJob('03 20 * * 2', async () => {
     logger.log('Starting weekly file batch processing');
     await processAllFiles(pool);
-  }, 'Weekly ClinVar Update', logger);
-
-  // Schedule individual file processing tasks
-  FILE_SCHEDULE.forEach(({ file, minute }) => {
-    const cronPattern = `${minute} 23 * * 1`; // Monday at 10:XX PM
-    createScheduledJob(cronPattern, async () => {
-      logger.log(`Starting scheduled processing for ${file}`);
-      const fileInfo = { fileName: file };
-      const stats = {};
-      await processFile(pool, fileInfo, logger, stats);
-    }, `Process ${file}`, logger);
   });
 
-  // Add a daily health check job
-  createScheduledJob('0 9 * * *', async () => {
+  // Individual file schedules
+  FILE_SCHEDULE.forEach(({ file, minute }) => {
+    const cronPattern = `${minute} 20 * * 2`; // Monday at 10:XX PM
+    schedule.scheduleJob(cronPattern, async () => {
+      logger.log(`Starting scheduled processing for ${file}`);
+      const fileInfo = { fileName: file };
+      try {
+        await processFile(pool, fileInfo, logger);
+        logger.log(`Successfully processed ${file}`);
+      } catch (error) {
+        logger.log(`Error processing ${file}: ${error.message}`, 'error');
+      }
+    });
+  });
+
+  // Daily health check
+  schedule.scheduleJob('0 9 * * *', () => {
     const schedules = schedule.scheduledJobs;
-    const activeJobs = Object.keys(schedules).length;
-    logger.log(`Health check: ${activeJobs} scheduled jobs active`);
-    
-    // Log next run times for all jobs
+    logger.log(`Health check: ${Object.keys(schedules).length} scheduled jobs active`);
     Object.entries(schedules).forEach(([name, job]) => {
       logger.log(`Next run for ${name}: ${job.nextInvocation()}`);
     });
-  }, 'Schedule Health Check', logger);
+  });
 }
 
 /**
- * Initializes data service
- * @param {Object} pool - Database connection
+ * Initialize the scheduler system
  */
-async function initializeDataService(pool) {
+async function initializeScheduler(pool) {
   const logger = new Logger();
   try {
-    // Ensure directories exist
+    // Create directories
     await fs.mkdir(DIRECTORIES.download, { recursive: true });
     await fs.mkdir(DIRECTORIES.temp, { recursive: true });
 
-    // Initialize schedules with logger
+    // Initialize schedules
     initializeSchedules(pool, logger);
-    
-    logger.log('Data service initialized successfully');
+    logger.log('Scheduler initialized successfully');
 
-    // Log next scheduled run times
+    // Log next scheduled runs
     const schedules = schedule.scheduledJobs;
     Object.entries(schedules).forEach(([name, job]) => {
       logger.log(`Next scheduled run for ${name}: ${job.nextInvocation()}`);
     });
   } catch (error) {
-    logger.log('Failed to initialize data service: ' + error.message, 'error');
+    logger.log('Failed to initialize scheduler: ' + error.message, 'error');
     throw error;
   }
 }
 
 module.exports = { 
-  initializeDataService,
+  initializeScheduler,
   processAllFiles,
   processFile,
-  createScheduledJob // Export for testing
+  DIRECTORIES,
+  FILE_SCHEDULE
 };

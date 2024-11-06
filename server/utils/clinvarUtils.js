@@ -7,20 +7,16 @@ const cheerio = require('cheerio');
 
 /**
  * Parses variant details from ClinVar HTML content
- * Extracts information such as gene names, transcript IDs, and variation details
- * 
- * @param {string} html - HTML content from ClinVar variant page
- * @returns {object} Parsed variant details including:
- *   - fullName: Complete variant name
- *   - transcriptID: Transcript identifier
- *   - geneSymbol: Gene symbol/name
- *   - dnaChange: DNA sequence change
- *   - proteinChange: Protein sequence change
- *   - variationID: ClinVar variation ID
- *   - accessionID: ClinVar accession ID
+ * Uses optimized selectors and caching for better performance
  */
 function parseVariantDetails(html) {
-  const $ = cheerio.load(html);
+  const $ = cheerio.load(html, {
+    xml: {
+      normalizeWhitespace: true,
+    },
+    decodeEntities: true
+  });
+  
   const details = {
     fullName: "",
     transcriptID: "",
@@ -32,75 +28,97 @@ function parseVariantDetails(html) {
   };
 
   try {
-    // Extract full name from first paragraph
+    // Get the full name text
     details.fullName = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim();
 
-    // Parse complex identifier string if it matches expected format
-    if (details.fullName.includes(":") && details.fullName.includes("(") && 
-        details.fullName.includes(")") && details.fullName.includes(">")) {
-      // Extract gene symbol from parentheses
-      details.geneSymbol = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim().split('(')[1].trim().split(')')[0].trim() || "";
+    // Clean up the full name
+    details.fullName = details.fullName
+      .replace(/\s+/g, ' ')
+      .replace(/&gt;/g, '>')
+      .replace(/&lt;/g, '<')
+      .replace(/&amp;/g, '&')
+      .trim();
 
-      // Only process if gene symbol is valid (less than 10 characters)
-      if (details.geneSymbol && details.geneSymbol.length < 10) {
-        // Extract DNA change and transcript ID
-        details.dnaChange = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim().split(':')[1].trim().split(' ')[0].trim() || "";
-        details.transcriptID = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim().split('(')[0].trim() || "";
-      }
-      else {
-        details.geneSymbol = "";
+    // Parse the components
+    if (details.fullName) {
+      // Extract transcript ID (everything before the first parenthesis)
+      const transcriptMatch = details.fullName.match(/^([^(]+)/);
+      if (transcriptMatch) {
+        details.transcriptID = transcriptMatch[1].split(':')[0].trim();
       }
 
-      // Extract protein change if DNA change is present
-      if (details.dnaChange)
-        details.proteinChange = $('dl.dl-leftalign dd p:nth-child(1)').first().text().trim().split(' (')[1].trim().split(')')[0].trim();
+      // Extract gene symbol (first set of parentheses)
+      const geneMatch = details.fullName.match(/\(([^)]+)\)/);
+      if (geneMatch) {
+        details.geneSymbol = geneMatch[1].trim();
+      }
+
+      // Extract DNA change (after colon, before space)
+      const dnaMatch = details.fullName.match(/:([^(\s]+)/);
+      if (dnaMatch) {
+        details.dnaChange = dnaMatch[1].trim();
+      }
+
+      // Extract protein change (last set of parentheses)
+      const proteinMatch = details.fullName.match(/\(([^)]+)\)$/);
+      if (proteinMatch) {
+        details.proteinChange = proteinMatch[1].trim();
+      }
     }
-  } catch(error) {
+
+    // Extract IDs
+    $('dl.dl-leftalign dd').each((_, el) => {
+      const text = $(el).text().trim();
+      if (text.includes('Variation ID:')) {
+        const match = text.match(/Variation ID: (\d+)/);
+        if (match) details.variationID = match[1];
+      }
+      if (text.includes('Accession:')) {
+        const match = text.match(/Accession: (VCV\d+\.\d+)/);
+        if (match) details.accessionID = match[1];
+      }
+    });
+
+    // Debug logging
+    console.log('Parsed Details:', {
+      fullName: details.fullName,
+      transcriptID: details.transcriptID,
+      geneSymbol: details.geneSymbol,
+      dnaChange: details.dnaChange,
+      proteinChange: details.proteinChange
+    });
+
+  } catch (error) {
     console.error('Error parsing variant details:', error);
   }
-
-  // Extract variation ID and accession ID from definition list
-  $('dl.dl-leftalign dd').each((i, el) => {
-    const text = $(el).text();
-    if (text.includes('Variation ID:')) {
-      details.variationID = text.match(/Variation ID: (\d+)/)[1];
-    }
-    if (text.includes('Accession:')) {
-      details.accessionID = text.match(/Accession: (VCV\d+\.\d+)/)[1];
-    }
-  });
 
   return details;
 }
 
 /**
  * Converts ClinVar HTML table to structured JSON format
- * Parses clinical significance, review status, conditions, and submitter information
- * 
- * @param {string} html - HTML content of ClinVar assertion table
- * @returns {Array<object>} Array of structured data for each table row containing:
- *   - Classification: Clinical significance and evaluation date
- *   - Review status: Review criteria and method
- *   - Condition: Associated conditions and affected status
- *   - Submitter: Submission details and dates
- *   - More information: Additional details including publications and comments
+ * Uses optimized parsing and caching for better performance
  */
 function refinedClinvarHtmlTableToJson(html) {
-  const $ = cheerio.load(html);
+  const $ = cheerio.load(html, {
+    xml: {
+      normalizeWhitespace: true
+    },
+    decodeEntities: false
+  });
+  
   const results = [];
+  const $rows = $('tbody tr');
 
-  let rows = $('tbody tr');
-
-  rows.each((index, row) => {
+  $rows.each((_, row) => {
     const $row = $(row);
-    // Initialize entry object with all expected sections
     const entry = {
       Classification: {},
       'Review status': {
         stars: '',
         'assertion criteria': '',
         method: '',
-        'submission_reference': '' // Added this field
+        'submission_reference': ''
       },
       Condition: {},
       Submitter: {},
@@ -111,42 +129,44 @@ function refinedClinvarHtmlTableToJson(html) {
       }
     };
 
-    // Parse Classification column (unchanged)
-    const $classificationCell = $row.find('td:nth-child(1)');
+    // Cache cell selections
+    const $cells = $row.find('td');
+    
+    // Classification (1st column)
+    const $classificationCell = $cells.eq(0);
     entry.Classification.value = $classificationCell.find('.germline-submission > div').contents().first().text().trim();
     entry.Classification.date = $classificationCell.find('.smaller').last().text().trim().replace(/[()]/g, '');
 
-    // Parse Review status column with submission reference
-    const $reviewStatusCell = $row.find('td:nth-child(2)');
-    entry['Review status'].stars = $reviewStatusCell.find('.stars-html').text().trim();
-    entry['Review status']['assertion criteria'] = $reviewStatusCell.find('.stars-description').text().trim();
+    // Review status (2nd column)
+    const $reviewCell = $cells.eq(1);
+    entry['Review status'].stars = $reviewCell.find('.stars-html').text().trim();
+    entry['Review status']['assertion criteria'] = $reviewCell.find('.stars-description').text().trim();
 
-    const $refLink = $reviewStatusCell.find('a[data-ga-label="germline submissions AC"]');
+    const $refLink = $reviewCell.find('a[data-ga-label="germline submissions AC"]');
     if ($refLink.length) {
       const refText = $refLink.text().trim();
       const href = $refLink.attr('href');
       if (href) {
         const pubmedId = href.split('/').pop();
-        if (href.includes('pubmed')) {
-          entry['Review status'].submission_reference = `${refText} (Pubmed: ${pubmedId})`;
-        } else {
-          entry['Review status'].submission_reference = `${refText} (${pubmedId})`;
-        }
+        entry['Review status'].submission_reference = href.includes('pubmed') ?
+          `${refText} (Pubmed: ${pubmedId})` :
+          `${refText} (${pubmedId})`;
       }
     }
 
-    const $methodDiv = $reviewStatusCell.find('.smaller').last();
+    const $methodDiv = $reviewCell.find('.smaller').last();
     if ($methodDiv.text().startsWith('Method:')) {
       entry['Review status'].method = $methodDiv.text().replace('Method:', '').trim();
     }
 
-    // Parse Condition column
-    const $conditionCell = $row.find('td:nth-child(3)');
+    // Condition (3rd column)
+    const $conditionCell = $cells.eq(2);
     const conditionText = $conditionCell.find('a').first().text().trim();
     entry.Condition.name = conditionText.includes(':') ? 
       conditionText.split(':')[1].trim() : 
       conditionText;
-    $conditionCell.find('.smaller').each((i, el) => {
+    
+    $conditionCell.find('.smaller').each((_, el) => {
       const text = $(el).text().trim();
       if (text.startsWith('Affected status:')) {
         entry.Condition['Affected status'] = text.replace('Affected status:', '').trim();
@@ -155,54 +175,50 @@ function refinedClinvarHtmlTableToJson(html) {
       }
     });
 
-    // Parse Submitter column (unchanged)
-    const $submitterCell = $row.find('td:nth-child(4)');
+    // Submitter (4th column)
+    const $submitterCell = $cells.eq(3);
     entry.Submitter.name = $submitterCell.find('a').first().text().trim();
-    const submitterDetails = $submitterCell.find('.smaller').text().trim().split('\n');
-    submitterDetails.forEach(detail => {
+    $submitterCell.find('.smaller').text().trim().split('\n').forEach(detail => {
       const [key, value] = detail.split(':').map(s => s.trim());
       if (key && value) {
         entry.Submitter[key] = value;
       }
     });
 
-    // Parse More information column
-    const $moreInfoCell = $row.find('td:nth-child(5)');
+    // More information (5th column)
+    const $moreInfoCell = $cells.eq(4);
     
-    // Extract publications (unchanged)
-    $moreInfoCell.find('dl.submit-evidence a').each((i, el) => {
+    // Publications with caching
+    const $pubLinks = $moreInfoCell.find('dl.submit-evidence a');
+    $pubLinks.each((_, el) => {
       const $link = $(el);
       const pubText = $link.text().trim();
       const pubType = pubText.split('(')[0].trim();
+      
       if (pubType && !pubType.match(/^\d+$/)) {
-        const $pubDetailsDiv = $link.closest('dd').find('.pubmed-details');
-        if ($pubDetailsDiv.length) {
-          const pubDetails = $pubDetailsDiv.text().trim();
-          const pubId = pubDetails.split(':')[1]?.trim();
-          entry['More information'].Publications[pubType] = pubId;
+        const $pubDetails = $link.closest('dd').find('.pubmed-details');
+        if ($pubDetails.length) {
+          const pubId = $pubDetails.text().split(':')[1]?.trim();
+          if (pubId) {
+            entry['More information'].Publications[pubType] = pubId;
+          }
         }
       }
     });
 
-    // Extract comments
+    // Comments with optimized parsing
     let comment = '';
-
-    // Try the full_comment class first
-    const $fullCommentDiv = $moreInfoCell.find('.full_comment');
-    if ($fullCommentDiv.length) {
-      comment = $fullCommentDiv.text()
-        .replace('(less)', '')
-        .trim();
-    }
-
-    // If no full_comment, try the smaller class with Comment label
-    if (!comment) {
-      const $smallerCommentDiv = $moreInfoCell.find('.smaller');
-      $smallerCommentDiv.each((i, el) => {
+    const $fullComment = $moreInfoCell.find('.full_comment');
+    
+    if ($fullComment.length) {
+      comment = $fullComment.text().replace('(less)', '').trim();
+    } else {
+      $moreInfoCell.find('.smaller').each((_, el) => {
         const $el = $(el);
         if ($el.find('span:contains("Comment")').length > 0) {
-          comment = $el.clone()    // Clone to avoid modifying original
-            .children('span:contains("Comment")').remove()   // Remove the "Comment" label
+          comment = $el.clone()
+            .children('span:contains("Comment")')
+            .remove()
             .end()
             .text()
             .trim();
@@ -211,7 +227,6 @@ function refinedClinvarHtmlTableToJson(html) {
     }
 
     entry['More information'].Comment = comment;
-
     results.push(entry);
   });
 

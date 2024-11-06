@@ -28,13 +28,34 @@ const initializePool = async () => {
     connection.release();
     
     console.log('Successfully connected to the database.');
+    return pool;
   } catch (error) {
     console.error('Error configuring pool:', error);
     throw error;
   }
 };
 
+// Create indexes after tables exist
+const createOptimizedIndexes = async (connection) => {
+  try {
+    // Use CREATE INDEX without IF NOT EXISTS (not supported in older MySQL versions)
+    await connection.query(`
+      CREATE INDEX idx_variant_summary_name ON variant_summary(Name(255))
+    `).catch(err => {
+      // Ignore error if index already exists
+      if (!err.message.includes('Duplicate')) {
+        console.warn('Warning: Could not create variant_summary name index:', err.message);
+      }
+    });
+    
+    console.log('Created/verified database indexes');
+  } catch (error) {
+    console.warn('Warning: Error creating indexes:', error);
+  }
+};
+
 module.exports = {
   pool,
-  initializePool
+  initializePool,
+  createOptimizedIndexes
 };
