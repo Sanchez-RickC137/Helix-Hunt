@@ -1,19 +1,8 @@
-/**
- * Database migration script
- * Sets up and maintains database schema
- * Creates necessary tables if they don't exist
- */
-
 const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
 
-// Load environment variables
 dotenv.config();
 
-/**
- * Database connection pool configuration
- * Uses environment variables for secure configuration
- */
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -24,45 +13,155 @@ const pool = mysql.createPool({
   queueLimit: 0
 });
 
-/**
- * Array of migration queries
- * Each query creates a table if it doesn't exist
- * Maintains referential integrity with foreign keys
- */
 const migrations = [
   // Users table
   `CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(255) UNIQUE NOT NULL,
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
     password VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    email VARCHAR(255) NOT NULL
+  )`,
+
+  // File updates table
+  `CREATE TABLE IF NOT EXISTS file_updates (
+    file_name VARCHAR(255) NOT NULL PRIMARY KEY,
+    last_upload_datetime DATETIME,
+    file_modified_datetime DATETIME,
+    last_check_datetime DATETIME
+  )`,
+
+  // Password reset codes table
+  `CREATE TABLE IF NOT EXISTS password_reset_codes (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    code VARCHAR(6) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    used TINYINT(1) DEFAULT 0
   )`,
 
   // Query history table
   `CREATE TABLE IF NOT EXISTS query_history (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
-    query JSON NOT NULL,
+    full_names JSON,
+    variation_ids JSON,
+    clinical_significance JSON,
+    start_date DATE,
+    end_date DATE,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    search_type ENUM('targeted', 'general') DEFAULT 'targeted',
+    search_groups JSON,
+    query_source ENUM('web', 'database') DEFAULT 'web'
   )`,
 
   // User preferences table
   `CREATE TABLE IF NOT EXISTS user_preferences (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     full_name_preferences JSON,
-    variation_id_preferences JSON,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    variation_id_preferences JSON
+  )`,
+
+  // Variant summary table
+  `CREATE TABLE IF NOT EXISTS variant_summary (
+    AlleleID VARCHAR(255),
+    Type VARCHAR(255),
+    Name TEXT,
+    GeneID VARCHAR(255),
+    GeneSymbol VARCHAR(255),
+    HGNC_ID VARCHAR(255),
+    ClinicalSignificance TEXT,
+    ClinSigSimple VARCHAR(255),
+    LastEvaluated VARCHAR(255),
+    \`RS#_dbSNP\` VARCHAR(255),
+    nsv_esv_dbVar VARCHAR(255),
+    RCVaccession TEXT,
+    PhenotypeIDS TEXT,
+    PhenotypeList TEXT,
+    Origin TEXT,
+    OriginSimple VARCHAR(255),
+    Assembly VARCHAR(255),
+    ChromosomeAccession VARCHAR(255),
+    Chromosome VARCHAR(255),
+    Start VARCHAR(255),
+    Stop VARCHAR(255),
+    ReferenceAllele TEXT,
+    AlternateAllele TEXT,
+    Cytogenetic VARCHAR(255),
+    ReviewStatus VARCHAR(255),
+    NumberSubmitters VARCHAR(255),
+    Guidelines TEXT,
+    TestedInGTR VARCHAR(255),
+    OtherIDs TEXT,
+    SubmitterCategories TEXT,
+    VariationID VARCHAR(255),
+    PositionVCF VARCHAR(255),
+    ReferenceAlleleVCF TEXT,
+    AlternateAlleleVCF TEXT
+  )`,
+
+  // Submission summary table
+  `CREATE TABLE IF NOT EXISTS submission_summary (
+    VariationID VARCHAR(255),
+    ClinicalSignificance TEXT,
+    DateLastEvaluated VARCHAR(255),
+    Description TEXT,
+    SubmittedPhenotypeInfo TEXT,
+    ReportedPhenotypeInfo TEXT,
+    ReviewStatus VARCHAR(255),
+    CollectionMethod VARCHAR(255),
+    OriginCounts TEXT,
+    Submitter TEXT,
+    SCV VARCHAR(255),
+    SubmittedGeneSymbol VARCHAR(255)
+  )`,
+
+  // HGVS variation table
+  `CREATE TABLE IF NOT EXISTS hgvs_variation (
+    Symbol VARCHAR(255),
+    GeneID VARCHAR(255),
+    VariationID VARCHAR(255),
+    AlleleID VARCHAR(255),
+    Type VARCHAR(255),
+    Assembly VARCHAR(255),
+    NucleotideExpression TEXT,
+    NucleotideChange TEXT,
+    ProteinExpression TEXT,
+    ProteinChange TEXT,
+    UsedForNaming VARCHAR(255),
+    Submitted VARCHAR(255),
+    OnRefSeqGene VARCHAR(255)
+  )`,
+
+  // Conflicting interpretations table
+  `CREATE TABLE IF NOT EXISTS conflicting_interpretations (
+    Gene_Symbol VARCHAR(255),
+    NCBI_Variation_ID VARCHAR(255),
+    ClinVar_Preferred TEXT,
+    Submitter1 TEXT,
+    Submitter1_SCV VARCHAR(255),
+    Submitter1_ClinSig TEXT,
+    Submitter1_LastEval VARCHAR(255),
+    Submitter1_ReviewStatus TEXT,
+    Submitter1_Sub_Condition TEXT,
+    Submitter1_Description TEXT,
+    Submitter2 TEXT,
+    Submitter2_SCV VARCHAR(255),
+    Submitter2_ClinSig TEXT,
+    Submitter2_LastEval VARCHAR(255),
+    Submitter2_ReviewStatus TEXT,
+    Submitter2_Sub_Condition TEXT,
+    Submitter2_Description TEXT,
+    Rank_diff VARCHAR(255),
+    Conflict_Reported VARCHAR(255),
+    Variant_type VARCHAR(255),
+    Submitter1_Method VARCHAR(255),
+    Submitter2_Method VARCHAR(255)
   )`
 ];
 
-/**
- * Runs all migration queries in sequence
- * Logs success or failure for each migration
- * 
- * @returns {Promise<void>}
- */
 async function runMigrations() {
   for (const migration of migrations) {
     try {
@@ -75,7 +174,6 @@ async function runMigrations() {
   }
 }
 
-// Execute migrations and handle completion
 runMigrations().then(() => {
   console.log('All migrations completed');
   process.exit(0);
