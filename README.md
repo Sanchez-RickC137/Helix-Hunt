@@ -409,7 +409,3 @@ For support:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
-For any additional questions or concerns, please contact the project maintainers.
