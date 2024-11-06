@@ -1,5 +1,6 @@
 const { pool } = require('../config/database');
 
+// Retrieves user preferences for variation id and full name.
 exports.getUserPreferences = async (req, res, next) => {
   try {
     console.log('Fetching preferences for user:', req.userId);
@@ -9,6 +10,7 @@ exports.getUserPreferences = async (req, res, next) => {
       [req.userId]
     );
     
+    // Set the preferences if they exist
     if (rows.length > 0) {
       const result = {
         fullNamePreferences: Array.isArray(rows[0].full_name_preferences) 
@@ -30,6 +32,7 @@ exports.getUserPreferences = async (req, res, next) => {
   }
 };
 
+// Set the user preferences.
 exports.updateUserPreferences = async (req, res, next) => {
   try {
     if (!req.userId) {

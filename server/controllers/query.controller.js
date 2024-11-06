@@ -9,6 +9,7 @@ const {
 } = require('../services/clinvar.service');
 const { processDbResults } = require('../services/database.service');
 
+// Saves a user query if a user is logged in
 exports.saveQuery = async (req, res, next) => {
   try {
     const {
@@ -44,6 +45,7 @@ exports.saveQuery = async (req, res, next) => {
   }
 };
 
+// Retrieves a user query history if logged in
 exports.getQueryHistory = async (req, res, next) => {
   try {
     const [rows] = await pool.query(
@@ -57,6 +59,7 @@ exports.getQueryHistory = async (req, res, next) => {
   }
 };
 
+// Web based, targeted query
 exports.processClinVarQuery = async (req, res, next) => {
   try {
     const { fullNames, variationIDs, clinicalSignificance, startDate, endDate } = req.body;
@@ -83,6 +86,7 @@ exports.processClinVarQuery = async (req, res, next) => {
   }
 };
 
+// Web based, general query
 exports.processGeneralQuery = async (req, res, next) => {
   try {
     const { searchGroups, clinicalSignificance, startDate, endDate } = req.body;
@@ -117,6 +121,7 @@ exports.processGeneralQuery = async (req, res, next) => {
   }
 };
 
+// Database based, targeted query for variation id
 exports.processVariationIdQuery = async (req, res) => {
   try {
     const query = `${BASE_QUERY}
@@ -144,6 +149,7 @@ exports.processVariationIdQuery = async (req, res) => {
   }
 };
 
+// Database based, targeted query for full name
 exports.processFullNameQuery = async (req, res) => {
   try {
     const query = `${BASE_QUERY}
@@ -171,52 +177,11 @@ exports.processFullNameQuery = async (req, res) => {
   }
 };
 
+// Database based, general query
 exports.processGeneralSearch = async (req, res) => {
   try {
-    if (!req.body.searchGroups || req.body.searchGroups.length === 0) {
-      return res.status(400).json({
-        error: "Invalid request",
-        details: "At least one search group is required"
-      });
-    }
-
-    const results = [];
-    for (const group of req.body.searchGroups) {
-      const conditions = [];
-      const params = [];
-      
-      if (group.geneSymbol) {
-        conditions.push('vs.GeneSymbol LIKE ?');
-        params.push(`%${group.geneSymbol}%`);
-      }
-      if (group.dnaChange) {
-        conditions.push('vs.Name LIKE ?');
-        params.push(`%${group.dnaChange}%`);
-      }
-      if (group.proteinChange) {
-        conditions.push('vs.Name LIKE ?');
-        params.push(`%${group.proteinChange}%`);
-      }
-
-      if (conditions.length > 0) {
-        const query = `${BASE_QUERY}
-          WHERE ${conditions.join(' AND ')}
-          ORDER BY ss.DateLastEvaluated DESC`;
-
-        const [groupResults] = await pool.execute(query, params);
-        results.push(...groupResults);
-      }
-    }
-
-    if (results.length === 0) {
-      return res.status(404).json({
-        error: "Not found",
-        details: "No results found matching the search criteria"
-      });
-    }
-
-    const processedResults = processDbResults(results, 'General Search');
-    res.json(processedResults);
+    const results = await processDbResults(req.body.searchGroups);
+    res.json(results);
   } catch (error) {
     res.status(500).json({
       error: 'Database query failed',
@@ -225,6 +190,7 @@ exports.processGeneralSearch = async (req, res) => {
   }
 };
 
+// Download query Results to file 
 exports.downloadResults = (req, res) => {
   try {
     const { results, format } = req.body;

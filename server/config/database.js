@@ -24,10 +24,10 @@ const initializePool = async () => {
   try {
     const connection = await pool.getConnection();
     await connection.query('SET GLOBAL local_infile = 1');
-    console.log('LOCAL INFILE enabled');
+    // console.log('LOCAL INFILE enabled');
     connection.release();
     
-    console.log('Successfully connected to the database.');
+    console.log('Successfully connected to the database.'); 
     return pool;
   } catch (error) {
     console.error('Error configuring pool:', error);
@@ -35,7 +35,10 @@ const initializePool = async () => {
   }
 };
 
-// Create indexes after tables exist
+/**
+ * Create indexing to optimize database query returns. Indexes are created after tables exist
+ * @param {*} connection 
+ */
 const createOptimizedIndexes = async (connection) => {
   try {
     // Use CREATE INDEX without IF NOT EXISTS (not supported in older MySQL versions)
