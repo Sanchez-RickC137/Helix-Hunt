@@ -4,9 +4,12 @@ const crypto = require('crypto');
 const { pool } = require('../config/database');
 const { sendResetEmail } = require('../services/email.service');
 
+
+// Register a user
 exports.register = async (req, res, next) => {
   try {
     const { username, email, password } = req.body;
+    // Creates a hashed password based off user password
     const hashedPassword = await bcrypt.hash(password, 10);
    
     const [result] = await pool.execute(
@@ -23,26 +26,33 @@ exports.register = async (req, res, next) => {
   }
 };
 
+// User Login
 exports.login = async (req, res, next) => {
   try {
     const { username, password } = req.body;
     
+    // Get the user
     const [users] = await pool.execute(
       'SELECT * FROM users WHERE username = ?',
       [username]
     );
     
+    // If user name exists
     if (users.length === 0) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
+    // Must access like an array
     const user = users[0];
+
+    // Password validation
     const isPasswordValid = await bcrypt.compare(password, user.password);
     
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     
+    // Token creation
     const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
     
     res.json({ token, user: { id: user.id, username: user.username } });
@@ -51,6 +61,7 @@ exports.login = async (req, res, next) => {
   }
 };
 
+// Change user password
 exports.changePassword = async (req, res) => {
   try {
     const { username, currentPassword, newPassword } = req.body;
@@ -85,6 +96,7 @@ exports.changePassword = async (req, res) => {
   }
 };
 
+// Part of the password reset flow. Check email to see if exists and create temporary code
 exports.checkEmail = async (req, res) => {
   const { email } = req.body;
 
@@ -114,6 +126,7 @@ exports.checkEmail = async (req, res) => {
   }
 };
 
+// Verify the temporary code given by the user. Part of the password reset flow.
 exports.verifyResetCode = async (req, res) => {
   const { email, code } = req.body;
 
@@ -134,6 +147,7 @@ exports.verifyResetCode = async (req, res) => {
   }
 };
 
+// Check the email and temporary code for password reset flow
 exports.resetPassword = async (req, res) => {
   const { email, code, newPassword } = req.body;
 
@@ -176,6 +190,7 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
+// Starts the password reset flow
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
 

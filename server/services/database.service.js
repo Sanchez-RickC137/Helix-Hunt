@@ -1,12 +1,6 @@
 const { pool } = require('../config/database');
 
-/**
- * Transforms raw database records into ClinVar-compatible structure
- * 
- * @param {Array} results - Database query results
- * @param {string} searchTerm - Original search term used
- * @returns {Array} Transformed results in ClinVar format
- */
+// Main database query result processing.
 exports.processDbResults = (results, searchTerm) => {
   if (!results || results.length === 0) {
     return [{
@@ -101,12 +95,7 @@ exports.processDbResults = (results, searchTerm) => {
   });
 };
 
-/**
- * Constructs SQL queries for search groups
- * 
- * @param {Array} searchGroups - Array of search criteria groups
- * @returns {Array} Array of query objects with conditions and parameters
- */
+// Database general search data processing
 exports.constructSearchQuery = (searchGroups) => {
   return searchGroups.map(group => {
     const conditions = [];

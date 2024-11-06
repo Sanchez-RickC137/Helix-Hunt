@@ -14,6 +14,7 @@ const MAX_CONCURRENT_REQUESTS = 5;
 const requestQueue = [];
 let activeRequests = 0;
 
+// Starts the next request 
 const processNextRequest = async () => {
   if (activeRequests >= MAX_CONCURRENT_REQUESTS || requestQueue.length === 0) return;
   
@@ -31,6 +32,7 @@ const processNextRequest = async () => {
   }
 };
 
+// Construct a new request
 const queuedRequest = (config) => {
   return new Promise((resolve, reject) => {
     requestQueue.push({ config, resolve, reject });
@@ -52,6 +54,7 @@ const processClinVarData = (data) => {
   };
 };
 
+// Get information from table
 const extractTableData = (data) => {
   if (!data || typeof data !== 'object') {
     return [];
@@ -65,6 +68,7 @@ const extractTableData = (data) => {
   });
 };
 
+// Main Web query parsing for targeted searches. Gets HTML and then parses it. Cheerio used to get html elements
 exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificance, startDate, endDate) => {
   let url;
   let searchTerm;
@@ -129,6 +133,7 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
       };
     }
 
+    // Response response
     const variantDetails = parseVariantDetails(variantDetailsHtml);
     const assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
 
@@ -165,6 +170,7 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
   }
 };
 
+// Main Web query parsing for general searches. Gets HTML and then parses it. Cheerio used to get html elements
 exports.processGeneralClinVarWebQuery = async (searchQuery, searchGroup, clinicalSignificance, startDate, endDate) => {
   const url = `https://www.ncbi.nlm.nih.gov/clinvar?term=${searchQuery}`;
 

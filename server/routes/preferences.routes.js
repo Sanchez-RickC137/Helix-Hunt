@@ -7,6 +7,7 @@ const {
 
 const router = express.Router();
 
+// User preferences flow
 router.get('/user-preferences', auth, getUserPreferences);
 router.put('/user-preferences', auth, updateUserPreferences);
 
