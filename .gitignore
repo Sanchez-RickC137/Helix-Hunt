@@ -13,8 +13,6 @@
 
 /server/data/*
 /server/data
-/public/data/*
-/public/data
 /server/logs/*
 /server/log
 
