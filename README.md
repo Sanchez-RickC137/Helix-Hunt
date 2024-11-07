@@ -66,8 +66,8 @@ Before you begin, ensure you have installed:
 
 1. **Clone the Repository**
 ```bash
-git clone https://github.com/your-username/helixhunt.git
-cd Helix-Hunt
+git clone https://github.com/Sanchez-RickC137/Helix-Hunt.git
+cd helixhunt
 ```
 
 2. **Install Dependencies**
@@ -409,7 +409,3 @@ For support:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
-For any additional questions or concerns, please contact the project maintainers.
