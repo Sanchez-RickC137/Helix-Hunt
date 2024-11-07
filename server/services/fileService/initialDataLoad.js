@@ -6,7 +6,7 @@ const fsSync = require('fs');
 const zlib = require('zlib');
 const { promisify } = require('util');
 const { scrapeFileList, downloadFile } = require('./downloader');
-const { filterFileWithGeneSymbols } = require('./filter');
+const MD5Verifier = require('./utils/md5Verifier');
 const timeOperation = require('./utils/timing');
 
 const pipeline = promisify(require('stream').pipeline);
@@ -15,7 +15,6 @@ const pipeline = promisify(require('stream').pipeline);
 const BASE_DIR = path.join(__dirname, '../../');  // server directory
 const DOWNLOAD_DIR = path.join(BASE_DIR, 'data/downloads');
 const TEMP_DIR = path.join(BASE_DIR, 'data/temp');
-const GENE_SYMBOLS_PATH = path.join(BASE_DIR, '../public/data/Gene_Symbol.txt');
 
 // Table schemas based on your current database
 const TABLE_SCHEMAS = {
@@ -134,8 +133,6 @@ const FILE_TABLE_MAP = {
 
 /**
  * Verifies file exists and is readable
- * @param {string} filePath - Path to check
- * @returns {Promise<boolean>} Whether file exists and is readable
  */
 async function verifyFile(filePath) {
   try {
@@ -153,9 +150,6 @@ async function verifyFile(filePath) {
 
 /**
  * Gets processed file path
- * @param {string} fileName - Original file name
- * @param {string} stage - Processing stage
- * @returns {string} Processed file path
  */
 function getProcessedFilePath(fileName, stage) {
   switch (stage) {
@@ -165,10 +159,6 @@ function getProcessedFilePath(fileName, stage) {
       return path.join(TEMP_DIR, fileName.endsWith('.gz') 
         ? fileName.replace('.gz', '') 
         : fileName);
-    case 'filtered':
-      return path.join(TEMP_DIR, fileName.endsWith('.gz')
-        ? fileName.replace('.gz', '.filtered')
-        : `${fileName}.filtered`);
     default:
       throw new Error(`Unknown processing stage: ${stage}`);
   }
@@ -176,8 +166,6 @@ function getProcessedFilePath(fileName, stage) {
 
 /**
  * Decompress or copy file to temp directory
- * @param {string} inputPath - Path to input file
- * @returns {Promise<string>} Path to processed file
  */
 async function decompressFile(inputPath) {
   const fileName = path.basename(inputPath);
@@ -205,11 +193,12 @@ async function decompressFile(inputPath) {
 /**
  * Main test sequence
  */
-async function runTestSequence() {
+async function runInitialDataLoad() {
   let pool;
   console.log('Starting test sequence...\n');
   
   const overallStart = process.hrtime.bigint();
+  const md5Verifier = new MD5Verifier();
   
   try {
     // Ensure directories exist
@@ -283,84 +272,51 @@ async function runTestSequence() {
     });
     console.log('All tables created successfully\n');
 
-    // Step 3: Download files
-    console.log('Step 3: Downloading files...');
+    // Step 3: Download and verify files
+    console.log('Step 3: Downloading and verifying files...');
     const files = await timeOperation('Get file list', () => scrapeFileList());
     
-    for (const fileInfo of files) {
-      await timeOperation(`Download ${fileInfo.fileName}`, async () => {
-        const downloadPath = path.join(DOWNLOAD_DIR, fileInfo.fileName);
-        await downloadFile(fileInfo.url, downloadPath);
-        console.log(`Downloaded ${fileInfo.fileName} to ${downloadPath}`);
-      });
-    }
-
-    // Step 4: Process files
-    console.log('\nStep 4: Processing files...');
     const processedFiles = [];
-    
     for (const fileInfo of files) {
       try {
-        console.log(`\nProcessing ${fileInfo.fileName}...`);
-        
-        // Verify downloaded file exists
-        const downloadedPath = getProcessedFilePath(fileInfo.fileName, 'downloaded');
-        if (!await verifyFile(downloadedPath)) {
-          console.error(`Downloaded file not found: ${downloadedPath}`);
+        // Download file
+        const downloadPath = path.join(DOWNLOAD_DIR, fileInfo.fileName);
+        await timeOperation(`Download ${fileInfo.fileName}`, async () => {
+          await downloadFile(fileInfo.url, downloadPath);
+          console.log(`Downloaded ${fileInfo.fileName} to ${downloadPath}`);
+        });
+
+        // Verify MD5
+        const isValid = await md5Verifier.verifyFile(fileInfo.url, downloadPath);
+        if (!isValid) {
+          console.error(`MD5 verification failed for ${fileInfo.fileName}`);
           continue;
         }
-        
-        // Process file (decompress or copy to temp)
+        console.log(`MD5 verification passed for ${fileInfo.fileName}`);
+
+        // Process file (decompress if needed)
         const processedPath = await timeOperation(`Process ${fileInfo.fileName}`, async () => {
-          return decompressFile(downloadedPath);
+          return decompressFile(downloadPath);
         });
-        
+
         // Verify processed file
-        if (!await verifyFile(processedPath)) {
-          console.error(`Processing failed for: ${fileInfo.fileName}`);
-          continue;
-        }
-        
-        // Filter the processed file
-        const filteredPath = getProcessedFilePath(fileInfo.fileName, 'filtered');
-        await timeOperation(`Filter ${fileInfo.fileName}`, async () => {
-          const stats = await filterFileWithGeneSymbols(processedPath, GENE_SYMBOLS_PATH, filteredPath);
-          console.log(`Filtered ${fileInfo.fileName}:`);
-          console.log(`  Total lines: ${stats.totalLines}`);
-          console.log(`  Matched lines: ${stats.matchedLines}`);
-          console.log(`  Reduction: ${((1 - stats.matchedLines/stats.totalLines) * 100).toFixed(2)}%`);
-        });
-        
-        // Verify filtered file
-        if (await verifyFile(filteredPath)) {
+        if (await verifyFile(processedPath)) {
           processedFiles.push({
             originalName: fileInfo.fileName,
-            filteredPath: filteredPath
+            processedPath: processedPath
           });
-        }
-
-        // Clean up processed file
-        if (processedPath !== downloadedPath) {
-          await timeOperation('Cleanup processed file', () => 
-            fs.unlink(processedPath)
-          ).catch(console.error);
         }
       } catch (error) {
         console.error(`Error processing ${fileInfo.fileName}:`, error);
       }
     }
 
-    // Step 5: Load into database
-    console.log('\nStep 5: Loading data into database...');
+    // Step 4: Load into database
+    console.log('\nStep 4: Loading data into database...');
     for (const file of processedFiles) {
       const tableName = FILE_TABLE_MAP[file.originalName];
       
       try {
-        if (!await verifyFile(file.filteredPath)) {
-          console.error(`Filtered file not found for loading: ${file.filteredPath}`);
-          continue;
-        }
-
         await timeOperation(`Load ${file.originalName} into database`, async () => {
           const connection = await pool.getConnection();
           try {
@@ -368,7 +324,7 @@ async function runTestSequence() {
             await connection.query('SET unique_checks = 0');
             await connection.query('SET autocommit = 0');
 
-            console.log(`Loading ${file.filteredPath} into ${tableName}...`);
+            console.log(`Loading ${file.processedPath} into ${tableName}...`);
             await connection.query(`
               LOAD DATA LOCAL INFILE ?
               INTO TABLE ${tableName}
@@ -376,7 +332,7 @@ async function runTestSequence() {
               ENCLOSED BY ''
               LINES TERMINATED BY '\n'
               IGNORE 1 LINES
-            `, [file.filteredPath]);
+            `, [file.processedPath]);
 
             await connection.query(`
               INSERT INTO file_updates 
@@ -402,8 +358,8 @@ async function runTestSequence() {
       }
     }
 
-    // Step 6: Verify final data
-    console.log('\nStep 6: Verifying data...');
+    // Step 5: Verify final data
+    console.log('\nStep 5: Verifying data...');
     await timeOperation('Verify data', async () => {
       const connection = await pool.getConnection();
       try {
@@ -443,10 +399,10 @@ async function runTestSequence() {
 
 // Run test if called directly
 if (require.main === module) {
-  runTestSequence().catch(error => {
+	runInitialDataLoad().catch(error => {
     console.error('Test sequence failed:', error);
     process.exit(1);
   });
 }
 
-module.exports = { runTestSequence };
+module.exports = { runInitialDataLoad };

@@ -67,7 +67,7 @@ Before you begin, ensure you have installed:
 1. **Clone the Repository**
 ```bash
 git clone https://github.com/your-username/helixhunt.git
-cd helixhunt
+cd Helix-Hunt
 ```
 
 2. **Install Dependencies**
@@ -149,7 +149,7 @@ node server/config/migrations.js
 5. **Initial Data Load**
 ```bash
 # Run the test sequence to load initial data
-node server/services/fileService/testSequence.js
+node server/services/fileService/initialDataLoad.js
 ```
 
 ## Getting Started with Create React App
