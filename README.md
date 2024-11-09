@@ -66,7 +66,7 @@ Before you begin, ensure you have installed:
 
 1. **Clone the Repository**
 ```bash
-git clone https://github.com/Sanchez-RickC137/Helix-Hunt.git
+git clone https://github.com/csu-cs/CSCI-495-ClinVar-Project-GreenTeam.git
 cd helixhunt
 ```
 
