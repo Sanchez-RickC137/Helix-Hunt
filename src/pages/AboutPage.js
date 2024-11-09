@@ -85,38 +85,6 @@ const AboutPage = () => {
         </div>
       </section>
 
-      {/* Technical Details */}
-      <section className={`mb-16 p-8 rounded-lg ${themeConstants.sectionBackgroundColor}`}>
-        <h2 className={`text-2xl font-semibold mb-4 ${themeConstants.headingTextColor}`}>Technical Implementation</h2>
-        <div className="space-y-4">
-          <p>
-            HelixHunt is built with modern web technologies and follows best practices for performance and reliability:
-          </p>
-          <ul className="list-disc list-inside space-y-2 ml-4">
-            <li>React-based frontend with Tailwind CSS for responsive design</li>
-            <li>Express.js backend with optimized database queries</li>
-            <li>Automated weekly updates from ClinVar's latest releases</li>
-            <li>Secure user authentication and data management</li>
-            <li>Efficient data processing and filtering capabilities</li>
-          </ul>
-        </div>
-      </section>
-
-      {/* Future Development */}
-      <section className="mb-16">
-        <h2 className={`text-2xl font-semibold mb-4 ${themeConstants.headingTextColor}`}>Future Development</h2>
-        <p className="mb-4">
-          We are continuously working to enhance HelixHunt's capabilities. Our development roadmap includes:
-        </p>
-        <ul className="list-disc list-inside space-y-2 ml-4">
-          <li>Integration with additional genomic databases</li>
-          <li>Advanced visualization tools for genetic variation data</li>
-          <li>Collaborative features for research teams</li>
-          <li>Enhanced data export and reporting capabilities</li>
-          <li>Machine learning-powered search recommendations</li>
-        </ul>
-      </section>
-
       {/* Data Attribution */}
       <section className={`p-6 rounded-lg ${themeConstants.sectionBackgroundColor} text-center`}>
         <p className="text-sm">
