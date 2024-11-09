@@ -187,7 +187,7 @@ async function processAllFiles(pool) {
   const summary = new ProcessingSummary();
 
   try {
-    logger.log('Starting weekly file processing');
+    logger.log('Starting file processing');
 
     // Ensure directories exist
     await fs.mkdir(DIRECTORIES.download, { recursive: true });
@@ -197,7 +197,8 @@ async function processAllFiles(pool) {
     const files = await scrapeFileList();
     for (const fileInfo of files) {
       try {
-        await downloadFile(fileInfo.url, path.join(DIRECTORIES.download, fileInfo.fileName));
+        const downloadPath = path.join(DIRECTORIES.download, fileInfo.fileName);
+        await downloadFile(fileInfo.url, downloadPath);
         summary.addDownloadResult(fileInfo.fileName, true);
         logger.log(`Successfully downloaded ${fileInfo.fileName}`);
       } catch (error) {
@@ -210,9 +211,15 @@ async function processAllFiles(pool) {
     // Process each file
     for (const fileInfo of files) {
       try {
+        const downloadPath = path.join(DIRECTORIES.download, fileInfo.fileName);
         const stats = await processFile(pool, fileInfo, logger);
         summary.addProcessingResult(fileInfo.fileName, stats);
         logger.log(`Successfully processed ${fileInfo.fileName}`);
+        
+        // Clean up individual file after processing
+        await fs.unlink(downloadPath).catch(error => 
+          logger.log(`Error removing downloaded file ${fileInfo.fileName}: ${error.message}`, 'warning')
+        );
       } catch (error) {
         summary.addError(`Processing failed for ${fileInfo.fileName}: ${error.message}`);
         logger.log(`Failed to process ${fileInfo.fileName}: ${error.message}`, 'error');
@@ -221,7 +228,7 @@ async function processAllFiles(pool) {
 
     // Send summary email
     await logger.sendEmail(
-      'Weekly ClinVar Update', 
+      'ClinVar Update', 
       summary.totalStats.errors.length === 0,
       summary.formatSummaryEmail()
     );
@@ -230,16 +237,28 @@ async function processAllFiles(pool) {
     summary.addError(`Fatal error in batch processing: ${error.message}`);
     logger.log(`Fatal error in batch processing: ${error.message}`, 'error');
     await logger.sendEmail(
-      'Weekly ClinVar Update', 
+      'ClinVar Update', 
       false,
       summary.formatSummaryEmail()
     );
   } finally {
-    // Cleanup
+    // Complete cleanup of all directories
     try {
-      await fs.rm(DIRECTORIES.temp, { recursive: true, force: true });
+      // Clean temp directory
+      await fs.rm(DIRECTORIES.temp, { recursive: true, force: true })
+        .catch(error => logger.log(`Error cleaning temp directory: ${error.message}`, 'warning'));
+      
+      // Clean downloads directory
+      await fs.rm(DIRECTORIES.download, { recursive: true, force: true })
+        .catch(error => logger.log(`Error cleaning downloads directory: ${error.message}`, 'warning'));
+      
+      // Recreate empty directories for next run
+      await fs.mkdir(DIRECTORIES.download, { recursive: true });
+      await fs.mkdir(DIRECTORIES.temp, { recursive: true });
+      
+      logger.log('Cleanup completed successfully');
     } catch (error) {
-      logger.log(`Error cleaning up temp directory: ${error.message}`, 'warning');
+      logger.log(`Error during cleanup: ${error.message}`, 'error');
     }
   }
 }
