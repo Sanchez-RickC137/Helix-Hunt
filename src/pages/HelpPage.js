@@ -87,7 +87,7 @@ const HelpPage = () => {
               <ul className="list-disc list-inside space-y-2 ml-4">
                 <li>Flexible combination of search criteria</li>
                 <li>Add or remove search groups as needed</li>
-                <li>Preview results before final submission</li>
+                <li>Preview criteria before final submission</li>
               </ul>
             </div>
           </div>
@@ -121,10 +121,6 @@ const HelpPage = () => {
                 <li>Optional - leave empty for all dates</li>
               </ul>
             </div>
-            
-            <p className="text-sm bg-blue-100 dark:bg-blue-900 p-4 rounded-lg">
-              Tip: Using filters can significantly improve the relevance of your search results.
-            </p>
           </div>
         </div>
       </section>
@@ -179,7 +175,7 @@ const HelpPage = () => {
               <h3 className="text-xl font-medium mb-2">Query History</h3>
               <ul className="list-disc list-inside space-y-2 ml-4">
                 <li>View your last 5 queries</li>
-                <li>Rerun previous searches with one click</li>
+                <li>Load previous searches to rerun with one click</li>
                 <li>Modify past queries for new searches</li>
               </ul>
             </div>
@@ -210,7 +206,7 @@ const HelpPage = () => {
       {/* Support Information */}
       <section className={`p-6 rounded-lg ${themeConstants.sectionBackgroundColor} text-center`}>
         <p>
-          Need additional help? Contact our support team at support@helixhunt.com
+          Need additional help? Contact our support team at helixhunt@proton.me
         </p>
       </section>
     </div>
