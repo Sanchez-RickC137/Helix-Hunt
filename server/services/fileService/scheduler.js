@@ -14,11 +14,11 @@ const DIRECTORIES = {
   temp: path.join(BASE_DIR, 'data/temp')
 };
 
-// File processing schedule (minutes after 10:00 PM)
+// File processing schedule (minutes after 00:00 AM)
 const FILE_SCHEDULE = [
-  { file: 'variant_summary.txt.gz', minute: 15 },
-  { file: 'submission_summary.txt.gz', minute: 30 },
-  { file: 'summary_of_conflicting_interpretations.txt', minute: 45 },
+  { file: 'variant_summary.txt.gz', minute: 00 },
+  { file: 'submission_summary.txt.gz', minute: 20 },
+  { file: 'summary_of_conflicting_interpretations.txt', minute: 40 },
   { file: 'hgvs4variation.txt.gz', minute: 59 }
 ];
 
@@ -267,15 +267,15 @@ async function processAllFiles(pool) {
  * Initialize schedules
  */
 function initializeSchedules(pool, logger) {
-  // Schedule main weekly update for Monday at 10:00 PM
-  schedule.scheduleJob('03 20 * * 2', async () => {
+  // Schedule main weekly update for Friday at 23:45 PM
+  schedule.scheduleJob('45 23 * * 5', async () => {
     logger.log('Starting weekly file batch processing');
     await processAllFiles(pool);
   });
 
   // Individual file schedules
   FILE_SCHEDULE.forEach(({ file, minute }) => {
-    const cronPattern = `${minute} 20 * * 2`; // Monday at 10:XX PM
+    const cronPattern = `${minute} 00 * * 6`; // Saturday at 00:XX PM
     schedule.scheduleJob(cronPattern, async () => {
       logger.log(`Starting scheduled processing for ${file}`);
       const fileInfo = { fileName: file };
