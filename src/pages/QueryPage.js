@@ -18,17 +18,52 @@ import QuerySourceToggle from '../components/Search/QuerySourceToggle.js';
 import GeneralSearchInput from '../components/Search/GeneralSearchInput';
 import GeneralQueryParameters from '../components/Search/GeneralQueryParameters';
 
+const FullNameToggle = React.memo(function FullNameToggle({ isFullName, setIsFullName }) {
+  const themeConstants = useThemeConstants();
+  
+  return (
+    <div className="flex items-center justify-center relative mb-4">
+      <div className={`inline-flex rounded-lg p-1 ${themeConstants.sectionBackgroundColor}`}>
+        <button
+          onClick={() => {
+            setIsFullName(false);
+            return;
+          }}
+          className={`px-4 py-2 rounded-md text-lg font-semibold font-medium transition-colors duration-200 flex items-center${
+            !isFullName
+              ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
+              : `${themeConstants.sectionBackgroundColor}`
+          }`}
+        >
+          Transcript ID / Gene Symbol
+        </button>
+        
+        <button
+          onClick={() => {
+            setIsFullName(true);
+            return;
+          }}
+          className={`px-4 py-2 rounded-md text-lg font-semibold font-medium transition-colors duration-200 flex items-center ${
+            isFullName
+              ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
+              : `${themeConstants.sectionBackgroundColor}`
+          }`}
+        >
+          Full Gene Name
+        </button>
+      </div>
+    </div>
+  );
+});
+
 const QueryPage = () => {
-  // User context and theme hooks
   const { user, preferences, queryHistory, saveQuery, fetchQueryHistory } = useUser();
   const themeConstants = useThemeConstants();
 
-  // Modal state management
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showDownloadPrompt, setShowDownloadPrompt] = useState(false);
   const [showResultsPreview, setShowResultsPreview] = useState(false);
 
-  // Query input state
   const [selectedGene, setSelectedGene] = useState('');
   const [selectedDNAChange, setSelectedDNAChange] = useState('');
   const [selectedProteinChange, setSelectedProteinChange] = useState('');
@@ -38,14 +73,13 @@ const QueryPage = () => {
   const [searchType, setSearchType] = useState('targeted');
   const [searchGroups, setSearchGroups] = useState([]);
   const [querySource, setQuerySource] = useState('web');
+  const [isFullName, setIsFullName] = useState(false);
 
-  // Query parameters state
   const [clinicalSignificance, setClinicalSignificance] = useState([]);
   const [outputFormat, setOutputFormat] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Results and status state
   const [queryResults, setQueryResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState([]);
@@ -78,7 +112,6 @@ const QueryPage = () => {
             }`}
           >
             Database Query
-            
           </button>
         </div>
       </div>
@@ -86,19 +119,16 @@ const QueryPage = () => {
     );
   });
   
-  // Fetch query history on user login
   useEffect(() => {
     if (user) {
       fetchQueryHistory();
     }
   }, [user, fetchQueryHistory]);
 
-  /**
-   * Updates full name when gene, DNA change, or protein change selections change
-   * Combines selections into a formatted full name string
-   */
   useEffect(() => {
-    if (selectedGene || selectedDNAChange || selectedProteinChange) {
+    if (isFullName) {
+      setFullName(selectedGene);
+    } else if (selectedGene || selectedDNAChange || selectedProteinChange) {
       let newFullName = selectedGene || '';
       if (selectedDNAChange) newFullName += `:${selectedDNAChange}`;
       if (selectedProteinChange) newFullName += ` (${selectedProteinChange})`;
@@ -106,12 +136,8 @@ const QueryPage = () => {
     } else {
       setFullName('');
     }
-  }, [selectedGene, selectedDNAChange, selectedProteinChange]);
+  }, [selectedGene, selectedDNAChange, selectedProteinChange, isFullName]);
 
-  /**
-   * Adds current full name to query list
-   * Clears selection fields after adding
-   */
   const handleAddFullName = () => {
     if (fullName && !addedFullNames.includes(fullName)) {
       setAddedFullNames([...addedFullNames, fullName]);
@@ -122,33 +148,20 @@ const QueryPage = () => {
     }
   };
 
-  /**
-   * Adds variation ID to query list
-   * @param {string} id - Variation ID to add
-   */
   const handleAddVariationID = (id) => {
     if (id && !addedVariationIDs.includes(id)) {
       setAddedVariationIDs([...addedVariationIDs, id]);
     }
   };
 
-  /**
-   * Add a search group to the query list
-   * @param {Array} group 
-   */
   const handleAddSearchGroup = (group) => {
     setSearchGroups(prev => [...prev, group]);
   };
   
-  /**
-   * Removes a search group to the query list
-   * @param {Array} group 
-   */
   const handleRemoveSearchGroup = (index) => {
     setSearchGroups(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Query list management functions
   const removeFullName = (nameToRemove) => {
     setAddedFullNames(addedFullNames.filter(name => name !== nameToRemove));
   };
@@ -157,17 +170,11 @@ const QueryPage = () => {
     setAddedVariationIDs(addedVariationIDs.filter(id => id !== idToRemove));
   };
 
-  /**
-   * Opens review modal and logs debug info
-   */
   const handleReviewClick = () => {
     setShowReviewModal(true);
     setDebugInfo("Review modal opened");
   };
 
-  /**
-   * Resets all query inputs and parameters
-   */
   const resetQuery = () => {
     if (searchType === 'targeted') {
       setSelectedGene('');
@@ -176,6 +183,7 @@ const QueryPage = () => {
       setFullName('');
       setAddedFullNames([]);
       setAddedVariationIDs([]);
+      setIsFullName(false);
     } else {
       setSearchGroups([]);
     }
@@ -186,10 +194,6 @@ const QueryPage = () => {
     setDebugInfo('Query reset');
   };
 
-  /**
-   * Submits query to backend and processes results
-   * Handles error states and updates query history
-   */
   const handleSubmit = async () => {
     setLoading(true);
     setErrors([]);
@@ -203,7 +207,6 @@ const QueryPage = () => {
       let response;
       
       if (querySource === 'web') {
-        // Web-based queries
         if (searchType === 'targeted') {
           const queryParams = {
             fullNames: addedFullNames,
@@ -223,7 +226,6 @@ const QueryPage = () => {
           response = await axiosInstance.post('/api/clinvar/general', queryParams);
         }
       } else {
-        // Database queries
         if (searchType === 'targeted') {
           if (addedVariationIDs.length > 0) {
             response = await axiosInstance.post('/api/database/variation-id', {
@@ -248,7 +250,7 @@ const QueryPage = () => {
       }
   
       const end = performance.now();
-      const duration = (end - start) / 1000; // Convert to seconds
+      const duration = (end - start) / 1000;
       console.log(`Query ${queryType} completed in ${duration.toFixed(2)} seconds`);
   
       const filteredResults = processAndFilterResults(response.data, {
@@ -292,9 +294,6 @@ const QueryPage = () => {
       setDebugInfo(prev => `${prev}\nQuery completed`);
     }
   };
-  
-  
-
 
   const handleSelectHistoricalQuery = (query) => {
     setAddedFullNames(query.full_names || []);
@@ -333,7 +332,6 @@ const QueryPage = () => {
           Query Builder
         </h1>
         
-        {/* Center SearchTypeToggle */}
         <div className="flex-grow flex justify-center">
           <SearchTypeToggle 
             searchType={searchType}
@@ -341,7 +339,6 @@ const QueryPage = () => {
           />
         </div>
         
-        {/* Right-aligned QuerySourceToggle */}
         <div className="flex items-center">
           <InlineQueryToggle 
             querySource={querySource}
@@ -353,157 +350,169 @@ const QueryPage = () => {
       <div className="flex flex-col md:flex-row gap-8">
         <div className={`w-full md:w-1/3 ${themeConstants.sectionBackgroundColor} rounded-lg shadow-lg p-6`}>
           {searchType === 'targeted' ? (
-          <>
-            <GeneSelection
-              selectedGene={selectedGene}
-              setSelectedGene={setSelectedGene}
-            />
-            <DNAChangeSelection
-              selectedDNAChange={selectedDNAChange}
-              setSelectedDNAChange={setSelectedDNAChange}
-            />
-            <ProteinChangeSelection
-              selectedProteinChange={selectedProteinChange}
-              setSelectedProteinChange={setSelectedProteinChange}
-            />
-            <div className="mt-4">
-              <h3 className="text-lg font-semibold mb-2">Generated Gene Full Name</h3>
-              <div className="flex">
-                <input
-                  type="text"
-                  value={fullName}
-                  readOnly
-                  className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50`}
-                />
-                <button
-                  onClick={handleAddFullName}
-                  className={`px-4 py-2 rounded-r ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
-                >
-                  Add to Query
-                </button>
-              </div>
-            </div>
-            <VariationIDSelection
-              addedVariationIDs={addedVariationIDs}
-              onAddVariationID={handleAddVariationID}
-            />
-            {user && (
-              <div className="flex justify-evenly space-x-4 mb-4">
-                <button
-                  onClick={handleLoadFullNamePreferences}
-                  className={`flex items-center justify-center px-3 py-2 ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white rounded transition-colors duration-200`}
-                >
-                  <span className="ml-2">Load Full Names</span>
-                </button>
-                <button
-                  onClick={handleLoadVariationIDPreferences}
-                  className={`flex items-center justify-center px-3 py-2 ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white rounded transition-colors duration-200`}
-                >
-                  <span className="ml-2">Load Variation IDs</span>
-                </button>
-              </div>
-            )}
-          </>
-        ) : (
-          // General search input
-          <GeneralSearchInput onAddSearchGroup={handleAddSearchGroup} />
-        )}
-      </div>
+            <>
+              <FullNameToggle 
+                isFullName={isFullName}
+                setIsFullName={setIsFullName}
+              />
 
-      <div className={`w-full md:w-2/3 ${themeConstants.sectionBackgroundColor} rounded-lg shadow-lg p-6`}>
-        {searchType === 'targeted' ? (
-          // Original query parameters
-          <QueryParameters
-            clinicalSignificance={clinicalSignificance}
-            setClinicalSignificance={setClinicalSignificance}
-            outputFormat={outputFormat}
-            setOutputFormat={setOutputFormat}
-            startDate={startDate}
-            setStartDate={setStartDate}
-            endDate={endDate}
-            setEndDate={setEndDate}
-            handleReviewClick={handleReviewClick}
-            handleResetClick={resetQuery}
-            addedFullNames={addedFullNames}
-            addedVariationIDs={addedVariationIDs}
-            removeFullName={removeFullName}
-            removeVariationID={removeVariationID}
-          />
-        ) : (
-          // General query parameters
-          <GeneralQueryParameters
-            searchGroups={searchGroups}
-            removeSearchGroup={handleRemoveSearchGroup}
-            clinicalSignificance={clinicalSignificance}
-            setClinicalSignificance={setClinicalSignificance}
-            startDate={startDate}
-            setStartDate={setStartDate}
-            endDate={endDate}
-            setEndDate={setEndDate}
-            handleReviewClick={handleReviewClick}
-            handleResetClick={resetQuery}
-          />
-        )}
-      </div>
-    </div>
+              <GeneSelection
+                selectedGene={selectedGene}
+                setSelectedGene={setSelectedGene}
+                disabled={isFullName}
+              />
 
-    {/* Keep the existing query history section */}
-    {user && queryHistory.length > 0 && (
-      <div className="mt-8">
-        <QueryHistory 
-          queryHistory={queryHistory}
-          onSelectQuery={handleSelectHistoricalQuery}
-        />
-      </div>
-    )}
-      {showReviewModal && (
-        <ReviewModal
-          setShowReviewModal={setShowReviewModal}
-          searchType={searchType}  // Add this line
-          addedFullNames={searchType === 'targeted' ? addedFullNames : []}
-          addedVariationIDs={searchType === 'targeted' ? addedVariationIDs : []}
-          searchGroups={searchType === 'general' ? searchGroups : []}
-          clinicalSignificance={clinicalSignificance}
-          startDate={startDate}
-          endDate={endDate}
-          outputFormat={outputFormat}
-          handleSubmit={handleSubmit}
-        />
-      )}
-      {showDownloadPrompt && (
-        <DownloadPrompt
-          setShowDownloadPrompt={setShowDownloadPrompt}
-          onPreviewResults={handlePreviewResults}
-          themeConstants={themeConstants}
-          results={queryResults}
-        />
-      )}
-      {showResultsPreview && (
-        <ResultsPreview
-          results={queryResults}
-          onClose={handleClosePreview}
-        />
-      )}
-      {loading && <div className="mt-4 text-center">Loading...</div>}
-      {errors.length > 0 && (
-        <div className="mt-4">
-          <h3 className="text-lg font-semibold mb-2">Errors:</h3>
-          <ul className="list-disc list-inside">
-            {errors.map((error, index) => (
-              <li key={index} className="text-red-500">{error}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      
-      {debugInfo && (
-      <div className={`mt-8 p-4 ${themeConstants.sectionBackgroundColor} rounded-lg`}>
-        <h3 className={`text-lg font-semibold mb-2 ${themeConstants.headingTextColor}`}>Debug Information:</h3>
-        <pre className={`whitespace-pre-wrap ${themeConstants.mainTextColor}`}>{debugInfo}</pre>
-      </div>
-    )}
-    </div>
-  );
+              <DNAChangeSelection
+                    selectedDNAChange={selectedDNAChange}
+                    setSelectedDNAChange={setSelectedDNAChange}
+                    disabled={(!selectedGene && !isFullName) || isFullName}
+              />
+              <ProteinChangeSelection
+                selectedProteinChange={selectedProteinChange}
+                setSelectedProteinChange={setSelectedProteinChange}
+                disabled={(!selectedDNAChange && !isFullName) || isFullName}
+              />
+
+              <div className="mt-4">
+                <h3 className="text-lg font-semibold mb-2">Generated Gene Full Name</h3>
+                <div className="flex">
+                  <input
+                    type="text"
+                    value={fullName}
+                    readOnly
+                    className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50`}
+                  />
+                  <button
+                    onClick={handleAddFullName}
+                    className={`px-4 py-2 rounded-r ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
+                  >
+                    Add to Query
+                  </button>
+                </div>
+              </div>
+
+              <VariationIDSelection
+                addedVariationIDs={addedVariationIDs}
+                onAddVariationID={handleAddVariationID}
+              />
+              {user && (
+               <div className="flex justify-evenly space-x-4 mb-4">
+                 <button
+                   onClick={handleLoadFullNamePreferences}
+                   className={`flex items-center justify-center px-3 py-2 ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white rounded transition-colors duration-200`}
+                 >
+                   <span className="ml-2">Load Full Names</span>
+                 </button>
+                 <button
+                   onClick={handleLoadVariationIDPreferences}
+                   className={`flex items-center justify-center px-3 py-2 ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white rounded transition-colors duration-200`}
+                 >
+                   <span className="ml-2">Load Variation IDs</span>
+                 </button>
+               </div>
+             )}
+           </>
+         ) : (
+           <GeneralSearchInput onAddSearchGroup={handleAddSearchGroup} />
+         )}
+       </div>
+
+       <div className={`w-full md:w-2/3 ${themeConstants.sectionBackgroundColor} rounded-lg shadow-lg p-6`}>
+         {searchType === 'targeted' ? (
+           <QueryParameters
+             clinicalSignificance={clinicalSignificance}
+             setClinicalSignificance={setClinicalSignificance}
+             outputFormat={outputFormat}
+             setOutputFormat={setOutputFormat}
+             startDate={startDate}
+             setStartDate={setStartDate}
+             endDate={endDate}
+             setEndDate={setEndDate}
+             handleReviewClick={handleReviewClick}
+             handleResetClick={resetQuery}
+             addedFullNames={addedFullNames}
+             addedVariationIDs={addedVariationIDs}
+             removeFullName={removeFullName}
+             removeVariationID={removeVariationID}
+           />
+         ) : (
+           <GeneralQueryParameters
+             searchGroups={searchGroups}
+             removeSearchGroup={handleRemoveSearchGroup}
+             clinicalSignificance={clinicalSignificance}
+             setClinicalSignificance={setClinicalSignificance}
+             startDate={startDate}
+             setStartDate={setStartDate}
+             endDate={endDate}
+             setEndDate={setEndDate}
+             handleReviewClick={handleReviewClick}
+             handleResetClick={resetQuery}
+           />
+         )}
+       </div>
+     </div>
+
+     {user && queryHistory.length > 0 && (
+       <div className="mt-8">
+         <QueryHistory 
+           queryHistory={queryHistory}
+           onSelectQuery={handleSelectHistoricalQuery}
+         />
+       </div>
+     )}
+
+     {showReviewModal && (
+       <ReviewModal
+         setShowReviewModal={setShowReviewModal}
+         searchType={searchType}
+         addedFullNames={searchType === 'targeted' ? addedFullNames : []}
+         addedVariationIDs={searchType === 'targeted' ? addedVariationIDs : []}
+         searchGroups={searchType === 'general' ? searchGroups : []}
+         clinicalSignificance={clinicalSignificance}
+         startDate={startDate}
+         endDate={endDate}
+         outputFormat={outputFormat}
+         handleSubmit={handleSubmit}
+       />
+     )}
+
+     {showDownloadPrompt && (
+       <DownloadPrompt
+         setShowDownloadPrompt={setShowDownloadPrompt}
+         onPreviewResults={handlePreviewResults}
+         themeConstants={themeConstants}
+         results={queryResults}
+       />
+     )}
+
+     {showResultsPreview && (
+       <ResultsPreview
+         results={queryResults}
+         onClose={handleClosePreview}
+       />
+     )}
+
+     {loading && <div className="mt-4 text-center">Loading...</div>}
+
+     {errors.length > 0 && (
+       <div className="mt-4">
+         <h3 className="text-lg font-semibold mb-2">Errors:</h3>
+         <ul className="list-disc list-inside">
+           {errors.map((error, index) => (
+             <li key={index} className="text-red-500">{error}</li>
+           ))}
+         </ul>
+       </div>
+     )}
+     
+     {debugInfo && (
+       <div className={`mt-8 p-4 ${themeConstants.sectionBackgroundColor} rounded-lg`}>
+         <h3 className={`text-lg font-semibold mb-2 ${themeConstants.headingTextColor}`}>Debug Information:</h3>
+         <pre className={`whitespace-pre-wrap ${themeConstants.mainTextColor}`}>{debugInfo}</pre>
+       </div>
+     )}
+   </div>
+ );
 };
 
 export default QueryPage;

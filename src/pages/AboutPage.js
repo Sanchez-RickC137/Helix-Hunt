@@ -45,23 +45,25 @@ const AboutPage = () => {
         <h1 className={`text-4xl font-bold mb-6 ${themeConstants.headingTextColor}`}>
           About HelixHunt
         </h1>
-        <p className="text-xl mb-8 max-w-3xl mx-auto">
+        <p className="text-xl mb-8 max-w-4xl mx-auto">
           HelixHunt is a modern platform designed to streamline genetic variation research by providing intuitive access to ClinVar data through both web-based and database-driven queries.
         </p>
       </section>
 
       {/* Mission Section */}
-      <section className={`mb-16 p-8 rounded-lg ${themeConstants.sectionBackgroundColor}`}>
+      <section className={`mb-16 rounded-lg ${themeConstants.sectionBackgroundColor}`}>
         <h2 className={`text-2xl font-semibold mb-4 ${themeConstants.headingTextColor}`}>Our Mission</h2>
-        <p className="mb-4">
-          Our mission is to empower researchers, clinicians, and genetic specialists with efficient tools for exploring and analyzing genetic variations. We aim to make complex genomic data more accessible and actionable through:
-        </p>
-        <ul className="list-disc list-inside space-y-2 ml-4">
-          <li>Streamlined access to ClinVar's comprehensive genetic variation database</li>
-          <li>Intelligent search capabilities that support both precise and broad queries</li>
-          <li>User-friendly interfaces that simplify complex data exploration</li>
-          <li>Robust data management tools for organizing and retrieving findings</li>
-        </ul>
+        <div className={`p-6 rounded-lg shadow-lg ${themeConstants.unselectedItemBackgroundColor}`}>
+          <p className="mb-4">
+            Our mission is to empower researchers, clinicians, and genetic specialists with efficient tools for exploring and analyzing genetic variations. We aim to make complex genomic data more accessible and actionable through:
+          </p>
+          <ul className="list-disc list-inside space-y-2 ml-4">
+            <li>Streamlined access to ClinVar's comprehensive genetic variation database</li>
+            <li>Intelligent search capabilities that support both precise and broad queries</li>
+            <li>User-friendly interfaces that simplify complex data exploration</li>
+            <li>Robust data management tools for organizing and retrieving findings</li>
+          </ul>
+        </div>
       </section>
 
       {/* Features Grid */}
@@ -71,7 +73,7 @@ const AboutPage = () => {
           {features.map((feature, index) => (
             <div 
               key={index}
-              className={`p-6 rounded-lg ${themeConstants.unselectedItemBackgroundColor}`}
+              className={`p-6 rounded-lg shadow-lg ${themeConstants.unselectedItemBackgroundColor}`}
             >
               <div className={`${themeConstants.labelAccentColor} mb-4`}>
                 {feature.icon}

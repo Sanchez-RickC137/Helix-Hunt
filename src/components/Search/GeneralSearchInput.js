@@ -62,11 +62,11 @@ const GeneralSearchInput = ({ onAddSearchGroup }) => {
 
   return (
     <div className="space-y-6">
-      <h3 className="text-xl font-semibold mb-4">Create Search Group</h3>
+      <h3 className="text-lg font-semibold mb-2">Create Search Group</h3>
       
       {/* Gene Symbol Input */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium">Gene Symbol</label>
+        <h3 className="text-lg font-semibold mb-2">Gene Symbol</h3>
         <div className="relative">
           <input
             type="text"
@@ -99,7 +99,7 @@ const GeneralSearchInput = ({ onAddSearchGroup }) => {
 
       {/* DNA Change Input */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium">DNA Change</label>
+      <h3 className="text-lg font-semibold mb-2">DNA Change</h3>
         <input
           type="text"
           value={dnaChange}
@@ -111,7 +111,7 @@ const GeneralSearchInput = ({ onAddSearchGroup }) => {
 
       {/* Protein Change Input */}
       <div className="space-y-2">
-        <label className="block text-sm font-medium">Protein Change</label>
+        <h3 className="text-lg font-semibold mb-2">Protein Change</h3>
         <input
           type="text"
           value={proteinChange}

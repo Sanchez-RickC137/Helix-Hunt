@@ -12,7 +12,7 @@ import { useThemeConstants } from '../Page/ThemeConstants';
 import debounce from 'lodash/debounce';
 import { Plus, Minus } from 'lucide-react';
 
-const GeneSelection = ({ selectedGene, setSelectedGene }) => {
+const GeneSelection = ({ selectedGene, setSelectedGene, disabled }) => {
   // State management
   const [searchTerm, setSearchTerm] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -60,7 +60,8 @@ const GeneSelection = ({ selectedGene, setSelectedGene }) => {
    * Updates suggestions when search term changes
    */
   useEffect(() => {
-    debouncedSuggestions(searchTerm);
+    if (!disabled)
+      debouncedSuggestions(searchTerm);
   }, [searchTerm, debouncedSuggestions]);
 
   /**
@@ -86,7 +87,7 @@ const GeneSelection = ({ selectedGene, setSelectedGene }) => {
 
   return (
     <div className="w-full mb-4">
-      <h3 className="text-lg font-semibold mb-2">Transcript & Gene OR Full Name</h3>
+      {/* <h3 className="text-lg font-semibold mb-2">Transcript & Gene OR Full Name</h3> */}
       <div className="flex mb-2">
         <input
           type="text"

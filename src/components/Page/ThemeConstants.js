@@ -41,6 +41,7 @@ export const useThemeConstants = () => {
     
     // Button styling
     buttonBackgroundColor: isDarkMode ? 'bg-indigo-600' : 'bg-indigo-500',
+    buttonBorderColor: isDarkMode ? 'border-white' : 'border-black',
     buttonHoverColor: isDarkMode ? 'hover:bg-indigo-700' : 'hover:bg-indigo-600',
     secondaryButtonBackgroundColor: isDarkMode ? 'bg-gray-600' : 'bg-gray-300',
     secondaryButtonHoverColor: isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-400',
