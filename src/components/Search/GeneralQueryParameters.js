@@ -1,6 +1,7 @@
 import React from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 import { X, RotateCcw } from 'lucide-react';
+import HelpTooltip from '../Help/HelpTooltip';
 
 const GeneralQueryParameters = ({
   searchGroups,
@@ -13,7 +14,10 @@ const GeneralQueryParameters = ({
   setEndDate,
   handleReviewClick,
   handleResetClick,
-  activeGuideSection // Guide highlighting prop
+  activeGuideSection,
+  helpElement,
+  setHelpElement,
+  activeHelp
 }) => {
   const themeConstants = useThemeConstants();
 
@@ -30,6 +34,28 @@ const GeneralQueryParameters = ({
         return [...prevSig, sig];
       }
     });
+  };
+
+  const renderHelpTooltip = (children, content) => {
+    if (activeHelp === 'contextHelp') {
+      return (
+        <div
+          data-help={content}
+          className="relative group"
+          onMouseEnter={(e) => setHelpElement(e.currentTarget)}
+          onMouseLeave={() => setHelpElement(null)}
+        >
+          {children}
+          {helpElement?.dataset.help === content && (
+            <div className="absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded shadow-lg whitespace-nowrap">
+              {content}
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900" />
+            </div>
+          )}
+        </div>
+      );
+    }
+    return children;
   };
 
   return (
@@ -69,53 +95,60 @@ const GeneralQueryParameters = ({
       </div>
 
       {/* Clinical Significance Section - Now wrapped in a div with proper ID */}
-      <div id={getSectionId('clinical-significance')} className="mb-6">
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Clinical Significance</h3>
-          <div className="flex flex-wrap gap-2">
-            {['Pathogenic', 'Likely pathogenic', 'Uncertain significance', 'Likely benign', 'Benign'].map((sig) => (
-              <button
-                key={sig}
-                onClick={() => handleClinicalSignificanceClick(sig)}
-                className={`px-3 py-1 rounded-full cursor-pointer ${
-                  clinicalSignificance.includes(sig)
-                    ? `${themeConstants.tagBackgroundColor} ${themeConstants.selectedItemTextColor}`
-                    : `${themeConstants.unselectedItemBackgroundColor} hover:${themeConstants.unselectedItemHoverColor}`
-                } transition-colors duration-200`}
-              >
-                {sig}
-              </button>
-            ))}
+      {renderHelpTooltip(
+        <div id={getSectionId('clinical-significance')} className="mb-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Clinical Significance</h3>
+            <div className="flex flex-wrap gap-2">
+              {['Pathogenic', 'Likely pathogenic', 'Uncertain significance', 'Likely benign', 'Benign'].map((sig) => (
+                <button
+                  key={sig}
+                  onClick={() => handleClinicalSignificanceClick(sig)}
+                  className={`px-3 py-1 rounded-full cursor-pointer ${
+                    clinicalSignificance.includes(sig)
+                      ? `${themeConstants.tagBackgroundColor} ${themeConstants.selectedItemTextColor}`
+                      : `${themeConstants.unselectedItemBackgroundColor} hover:${themeConstants.unselectedItemHoverColor}`
+                  } transition-colors duration-200`}
+                >
+                  {sig}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      </div>
+        </div>,
+        "Optional filter for query results by clinical signiicance. Mutliple selections can be made."
+      )}
+
 
       {/* Date Range Section - Now wrapped in a div with proper ID */}
-      <div id={getSectionId('date-range')} className="mb-6">
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">Date Range</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Start Date</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border`}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">End Date</label>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border`}
-              />
+      {renderHelpTooltip(
+        <div id={getSectionId('date-range')} className="mb-6">
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Date Range</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Start Date</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border`}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">End Date</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border`}
+                />
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </div>,
+        "Optional filter for query results for date range. Select a start date or an end date or both."
+      )}
 
       {/* Action Buttons - Review query section with proper ID */}
       <div id={getSectionId('review-query')} className="flex items-center space-x-4">

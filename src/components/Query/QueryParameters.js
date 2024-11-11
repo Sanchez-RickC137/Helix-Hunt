@@ -17,9 +17,10 @@
  * @param {Function} props.removeVariationID - Handler to remove a variation ID
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 import { X, RotateCcw } from 'lucide-react';
+import HelpTooltip from '../Help/HelpTooltip';
 
 const QueryParameters = ({
   clinicalSignificance,
@@ -34,7 +35,10 @@ const QueryParameters = ({
   addedVariationIDs,
   removeFullName,
   removeVariationID,
-  activeGuideSection
+  activeGuideSection,
+  helpElement,
+  setHelpElement,
+  activeHelp
 }) => {
   const themeConstants = useThemeConstants();
 
@@ -60,6 +64,28 @@ const QueryParameters = ({
     });
   };
 
+  const renderHelpTooltip = (children, content) => {
+    if (activeHelp === 'contextHelp') {
+      return (
+        <div
+          data-help={content}
+          className="relative group"
+          onMouseEnter={(e) => setHelpElement(e.currentTarget)}
+          onMouseLeave={() => setHelpElement(null)}
+        >
+          {children}
+          {helpElement?.dataset.help === content && (
+            <div className="absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded shadow-lg whitespace-nowrap">
+              {content}
+              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900" />
+            </div>
+          )}
+        </div>
+      );
+    }
+    return children;
+  };
+
   return (
     <div className="space-y-6">
       {/* Query Parameters Section */}
@@ -67,81 +93,93 @@ const QueryParameters = ({
         <h3 className="text-xl font-semibold mb-2">Query Parameters</h3>
         <div className="space-y-2">
           {/* Full Names Display */}
-          <div>
-            <h4 className="text-lg font-semibold">Full Names:</h4>
-            <div className="flex flex-wrap gap-2">
-              {addedFullNames.map((name, index) => (
-                <span key={index} className={`inline-flex items-center ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}>
-                  {name}
-                  <button onClick={() => removeFullName(name)} className="ml-2 focus:outline-none">
-                    <X size={14} />
-                  </button>
-                </span>
-              ))}
-            </div>
-          </div>
+          {renderHelpTooltip(
+            <div>
+              <h4 className="text-lg font-semibold">Full Names:</h4>
+              <div className="flex flex-wrap gap-2">
+                {addedFullNames.map((name, index) => (
+                  <span key={index} className={`inline-flex items-center ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}>
+                    {name}
+                    <button onClick={() => removeFullName(name)} className="ml-2 focus:outline-none">
+                      <X size={14} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>,
+            "Full Gene Names that are currently part of the query"
+          )}
 
           {/* Variation IDs Display */}
-          <div>
-            <h4 className="text-lg font-semibold">Variation IDs:</h4>
-            <div className="flex flex-wrap gap-2">
-              {addedVariationIDs.map((id, index) => (
-                <span key={index} className={`inline-flex items-center ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}>
-                  {id}
-                  <button onClick={() => removeVariationID(id)} className="ml-2 focus:outline-none">
-                    <X size={14} />
-                  </button>
-                </span>
-              ))}
-            </div>
-          </div>
+          {renderHelpTooltip(
+            <div>
+              <h4 className="text-lg font-semibold">Variation IDs:</h4>
+              <div className="flex flex-wrap gap-2">
+                {addedVariationIDs.map((id, index) => (
+                  <span key={index} className={`inline-flex items-center ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}>
+                    {id}
+                    <button onClick={() => removeVariationID(id)} className="ml-2 focus:outline-none">
+                      <X size={14} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>,
+            "Variation IDs that are currently part of the query"
+          )}
         </div>
       </div>
 
       {/* Clinical Significance Section */}
-      <div id={getSectionId('clinical-significance')}>
-        <h3 className="text-lg font-semibold mb-2">Clinical Significance</h3>
-        <div className="flex flex-wrap gap-2">
-          {['Pathogenic', 'Likely pathogenic', 'Uncertain significance', 'Likely benign', 'Benign'].map((sig) => (
-            <button
-              key={sig}
-              onClick={() => handleClinicalSignificanceClick(sig)}
-              className={`px-3 py-1 rounded-full cursor-pointer ${
-                clinicalSignificance.includes(sig) 
-                  ? `${themeConstants.tagBackgroundColor} ${themeConstants.selectedItemTextColor}`
-                  : `${themeConstants.unselectedItemBackgroundColor} hover:${themeConstants.unselectedItemHoverColor}`
-              } transition-colors duration-200`}
-            >
-              {sig}
-            </button>
-          ))}
-        </div>
-      </div>
+      {renderHelpTooltip(
+        <div id={getSectionId('clinical-significance')}>
+          <h3 className="text-lg font-semibold mb-2">Clinical Significance</h3>
+          <div className="flex flex-wrap gap-2">
+            {['Pathogenic', 'Likely pathogenic', 'Uncertain significance', 'Likely benign', 'Benign'].map((sig) => (
+              <button
+                key={sig}
+                onClick={() => handleClinicalSignificanceClick(sig)}
+                className={`px-3 py-1 rounded-full cursor-pointer ${
+                  clinicalSignificance.includes(sig) 
+                    ? `${themeConstants.tagBackgroundColor} ${themeConstants.selectedItemTextColor}`
+                    : `${themeConstants.unselectedItemBackgroundColor} hover:${themeConstants.unselectedItemHoverColor}`
+                } transition-colors duration-200`}
+              >
+                {sig}
+              </button>
+            ))}
+          </div>
+        </div>,
+        "Optional filter for query results by clinical signiicance. Mutliple selections can be made."
+      )}
 
       {/* Date Range Section */}
-      <div id={getSectionId('date-range')} className={`mb-6 pb-6 border-b ${themeConstants.borderColor}`}>
-        <h3 className="text-lg font-semibold mb-2">Date Range</h3>
-        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-          <div className="w-full sm:w-1/2">
-            <label className="block text-sm font-medium mb-1">Start Date</label>
-            <input 
-              type="date" 
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition-colors duration-200`} 
-            />
+      {renderHelpTooltip(
+        <div id={getSectionId('date-range')} className={`mb-6 pb-6 border-b ${themeConstants.borderColor}`}>
+          <h3 className="text-lg font-semibold mb-2">Date Range</h3>
+          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
+            <div className="w-full sm:w-1/2">
+              <label className="block text-sm font-medium mb-1">Start Date</label>
+              <input 
+                type="date" 
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition-colors duration-200`} 
+              />
+            </div>
+            <div className="w-full sm:w-1/2">
+              <label className="block text-sm font-medium mb-1">End Date</label>
+              <input 
+                type="date" 
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition-colors duration-200`} 
+              />
+            </div>
           </div>
-          <div className="w-full sm:w-1/2">
-            <label className="block text-sm font-medium mb-1">End Date</label>
-            <input 
-              type="date" 
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50 transition-colors duration-200`} 
-            />
-          </div>
-        </div>
-      </div>
+        </div>,
+        "Optional filter for query results for date range. Select a start date or an end date or both."
+      )}
 
       {/* Action Buttons */}
       <div id={getSectionId('review-query')} className="flex items-center space-x-4">

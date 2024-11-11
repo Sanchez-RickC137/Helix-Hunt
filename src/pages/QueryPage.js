@@ -543,12 +543,14 @@ const QueryPage = () => {
               )}
             </>
           ) : (
+            
             <div id="search-group">
-              {renderHelpTooltip(
-                <GeneralSearchInput onAddSearchGroup={handleAddSearchGroup} />,
-                "Create search groups with multiple criteria"
-              )}
-            </div>
+            {renderHelpTooltip(
+              <GeneralSearchInput onAddSearchGroup={handleAddSearchGroup} />,
+              "Create search groups with multiple criteria"
+            )}
+          </div>
+              
           )}
         </div>
 
@@ -571,6 +573,9 @@ const QueryPage = () => {
               removeFullName={removeFullName}
               removeVariationID={removeVariationID}
               activeGuideSection={stepToSection[stepGuideState.currentStep]}
+              helpElement={helpElement}
+              setHelpElement={setHelpElement}
+              activeHelp={activeHelp}
             />
           ) : (
             <GeneralQueryParameters
@@ -585,6 +590,9 @@ const QueryPage = () => {
               handleReviewClick={handleReviewClick}
               handleResetClick={resetQuery}
               activeGuideSection={stepToSection[stepGuideState.currentStep]}
+              helpElement={helpElement}
+              setHelpElement={setHelpElement}
+              activeHelp={activeHelp}
             />
           )}
         </div>
