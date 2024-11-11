@@ -101,7 +101,7 @@ const DNAChangeSelection = ({ selectedDNAChange, setSelectedDNAChange, disabled 
             if (selectedDNAChange) setSelectedDNAChange('');
           }}
           disabled={disabled}
-          className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50 ${disabled ? 'bg-gray-200 cursor-not-allowed' : ''}`}
+          className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} focus:ring focus:ring-indigo-500 focus:ring-opacity-50 ${disabled ? 'bg-gray-200 cursor-not-allowed' : ''}`}
         />
         {!disabled && (
           <button

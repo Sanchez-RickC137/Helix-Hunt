@@ -97,7 +97,7 @@ const GeneSelection = ({ selectedGene, setSelectedGene, disabled }) => {
             setSearchTerm(e.target.value);
             if (selectedGene) setSelectedGene('');
           }}
-          className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50`}
+          className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} focus:ring focus:ring-indigo-500 focus:ring-opacity-50`}
         />
         <button
           onClick={handleButtonClick}

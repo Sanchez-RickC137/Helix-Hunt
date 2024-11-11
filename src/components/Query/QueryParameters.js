@@ -33,12 +33,18 @@ const QueryParameters = ({
   addedFullNames,
   addedVariationIDs,
   removeFullName,
-  removeVariationID
+  removeVariationID,
+  activeGuideSection
 }) => {
   const themeConstants = useThemeConstants();
 
   // Validate form has at least one query parameter
   const isFormValid = (addedFullNames.length > 0 || addedVariationIDs.length > 0);
+
+  // Helper to conditionally apply section ID
+  const getSectionId = (section) => {
+    return activeGuideSection === section ? section : undefined;
+  };
 
   /**
    * Toggles clinical significance selection
@@ -67,10 +73,7 @@ const QueryParameters = ({
               {addedFullNames.map((name, index) => (
                 <span key={index} className={`inline-flex items-center ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}>
                   {name}
-                  <button
-                    onClick={() => removeFullName(name)}
-                    className="ml-2 focus:outline-none"
-                  >
+                  <button onClick={() => removeFullName(name)} className="ml-2 focus:outline-none">
                     <X size={14} />
                   </button>
                 </span>
@@ -85,10 +88,7 @@ const QueryParameters = ({
               {addedVariationIDs.map((id, index) => (
                 <span key={index} className={`inline-flex items-center ${themeConstants.tagBackgroundColor} rounded-full px-3 py-1 text-sm font-semibold`}>
                   {id}
-                  <button
-                    onClick={() => removeVariationID(id)}
-                    className="ml-2 focus:outline-none"
-                  >
+                  <button onClick={() => removeVariationID(id)} className="ml-2 focus:outline-none">
                     <X size={14} />
                   </button>
                 </span>
@@ -99,13 +99,12 @@ const QueryParameters = ({
       </div>
 
       {/* Clinical Significance Section */}
-      <div>
+      <div id={getSectionId('clinical-significance')}>
         <h3 className="text-lg font-semibold mb-2">Clinical Significance</h3>
         <div className="flex flex-wrap gap-2">
           {['Pathogenic', 'Likely pathogenic', 'Uncertain significance', 'Likely benign', 'Benign'].map((sig) => (
             <button
               key={sig}
-              type="button"
               onClick={() => handleClinicalSignificanceClick(sig)}
               className={`px-3 py-1 rounded-full cursor-pointer ${
                 clinicalSignificance.includes(sig) 
@@ -120,7 +119,7 @@ const QueryParameters = ({
       </div>
 
       {/* Date Range Section */}
-      <div className={`mb-6 pb-6 border-b ${themeConstants.borderColor}`}>
+      <div id={getSectionId('date-range')} className={`mb-6 pb-6 border-b ${themeConstants.borderColor}`}>
         <h3 className="text-lg font-semibold mb-2">Date Range</h3>
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
           <div className="w-full sm:w-1/2">
@@ -145,9 +144,8 @@ const QueryParameters = ({
       </div>
 
       {/* Action Buttons */}
-      <div className="flex items-center space-x-4">
+      <div id={getSectionId('review-query')} className="flex items-center space-x-4">
         <button 
-          type="button" 
           onClick={handleReviewClick}
           disabled={!isFormValid}
           className={`flex-grow px-6 py-3 rounded-lg flex items-center justify-center text-base ${
@@ -159,7 +157,6 @@ const QueryParameters = ({
           Review Query
         </button>
         <button 
-          type="button" 
           onClick={handleResetClick}
           className="px-6 py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors duration-200 flex items-center justify-center text-base"
         >

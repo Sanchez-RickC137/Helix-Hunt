@@ -12,7 +12,7 @@ const GeneratedFullNameSelection = ({ fullName, onAddFullName }) => {
           type="text"
           value={fullName}
           readOnly
-          className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border focus:ring focus:ring-indigo-500 focus:ring-opacity-50 bg-gray-200 cursor-not-allowed`}
+          className={`flex-grow p-2 rounded-l ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} bg-gray-200 cursor-not-allowed`}
         />
         <button
           onClick={onAddFullName}

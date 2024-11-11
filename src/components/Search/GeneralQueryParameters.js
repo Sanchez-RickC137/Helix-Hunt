@@ -12,9 +12,15 @@ const GeneralQueryParameters = ({
   endDate,
   setEndDate,
   handleReviewClick,
-  handleResetClick
+  handleResetClick,
+  activeGuideSection // Guide highlighting prop
 }) => {
   const themeConstants = useThemeConstants();
+
+  // Helper to conditionally apply section ID
+  const getSectionId = (section) => {
+    return activeGuideSection === section ? section : undefined;
+  };
 
   const handleClinicalSignificanceClick = (sig) => {
     setClinicalSignificance(prevSig => {
@@ -62,53 +68,57 @@ const GeneralQueryParameters = ({
         </div>
       </div>
 
-      {/* Clinical Significance Section */}
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Clinical Significance</h3>
-        <div className="flex flex-wrap gap-2">
-          {['Pathogenic', 'Likely pathogenic', 'Uncertain significance', 'Likely benign', 'Benign'].map((sig) => (
-            <button
-              key={sig}
-              onClick={() => handleClinicalSignificanceClick(sig)}
-              className={`px-3 py-1 rounded-full cursor-pointer ${
-                clinicalSignificance.includes(sig)
-                  ? `${themeConstants.tagBackgroundColor} ${themeConstants.selectedItemTextColor}`
-                  : `${themeConstants.unselectedItemBackgroundColor} hover:${themeConstants.unselectedItemHoverColor}`
-              } transition-colors duration-200`}
-            >
-              {sig}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Date Range Section */}
-      <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Date Range</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Start Date</label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border`}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">End Date</label>
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border`}
-            />
+      {/* Clinical Significance Section - Now wrapped in a div with proper ID */}
+      <div id={getSectionId('clinical-significance')} className="mb-6">
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Clinical Significance</h3>
+          <div className="flex flex-wrap gap-2">
+            {['Pathogenic', 'Likely pathogenic', 'Uncertain significance', 'Likely benign', 'Benign'].map((sig) => (
+              <button
+                key={sig}
+                onClick={() => handleClinicalSignificanceClick(sig)}
+                className={`px-3 py-1 rounded-full cursor-pointer ${
+                  clinicalSignificance.includes(sig)
+                    ? `${themeConstants.tagBackgroundColor} ${themeConstants.selectedItemTextColor}`
+                    : `${themeConstants.unselectedItemBackgroundColor} hover:${themeConstants.unselectedItemHoverColor}`
+                } transition-colors duration-200`}
+              >
+                {sig}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex items-center space-x-4">
+      {/* Date Range Section - Now wrapped in a div with proper ID */}
+      <div id={getSectionId('date-range')} className="mb-6">
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Date Range</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Start Date</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border`}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">End Date</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border`}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Buttons - Review query section with proper ID */}
+      <div id={getSectionId('review-query')} className="flex items-center space-x-4">
         <button
           onClick={handleReviewClick}
           disabled={searchGroups.length === 0}

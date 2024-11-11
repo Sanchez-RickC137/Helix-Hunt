@@ -16,6 +16,7 @@ import HelpPage from './pages/HelpPage';
 import AccountPage from './pages/AccountPage';
 import QueryPage from './pages/QueryPage';
 import { useThemeConstants } from './components/Page/ThemeConstants';
+import { HelpProvider } from './contexts/HelpContext';
 
 /**
  * AppContent component handles the main layout and routing of the application.
@@ -65,9 +66,11 @@ function App() {
   return (
     <ThemeProvider>
       <UserProvider>
-        <Router>
-          <AppContent />
-        </Router>
+        <HelpProvider>
+          <Router>
+            <AppContent />
+          </Router>
+        </HelpProvider>
       </UserProvider>
     </ThemeProvider>
   );
