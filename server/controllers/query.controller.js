@@ -7,7 +7,7 @@ const {
   processClinVarData, 
   extractTableData
 } = require('../services/clinvar.service');
-const { processDbResults } = require('../services/database.service');
+const { processDbResults, constructGeneralSearchQuery } = require('../services/database.service');
 
 // Saves a user query if a user is logged in
 exports.saveQuery = async (req, res, next) => {
@@ -180,13 +180,47 @@ exports.processFullNameQuery = async (req, res) => {
 // Database based, general query
 exports.processGeneralSearch = async (req, res) => {
   try {
-    const results = await processDbResults(req.body.searchGroups);
-    res.json(results);
+    const { searchGroups } = req.body;
+    
+    if (!searchGroups || !Array.isArray(searchGroups) || searchGroups.length === 0) {
+      return res.json([{
+        error: "Invalid search criteria",
+        details: "At least one search group with criteria is required"
+      }]);
+    }
+
+    const { query, params } = constructGeneralSearchQuery(searchGroups);
+    const [results] = await pool.execute(query, params);
+
+    if (!results || results.length === 0) {
+      return res.json([{
+        error: "No results found",
+        details: "No matching variants in database",
+        searchTerms: searchGroups.map(group => 
+          Object.entries(group)
+            .filter(([_, value]) => value)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(', ')
+        )
+      }]);
+    }
+
+    const processedResults = processDbResults(results, 
+      searchGroups.map(group => 
+        Object.entries(group)
+          .filter(([_, value]) => value)
+          .map(([key, value]) => `${key}: ${value}`)
+          .join(', ')
+      ).join(' OR ')
+    );
+
+    res.json(processedResults);
   } catch (error) {
-    res.status(500).json({
+    console.error('Database general search error:', error);
+    res.status(500).json([{
       error: 'Database query failed',
       details: error.message
-    });
+    }]);
   }
 };
 

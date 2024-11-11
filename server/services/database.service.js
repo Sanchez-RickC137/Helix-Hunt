@@ -120,3 +120,61 @@ exports.constructSearchQuery = (searchGroups) => {
     };
   }).filter(query => query.conditions !== null);
 };
+
+/**
+ * Constructs SQL query for general search
+ * @param {Array} searchGroups - Array of search criteria groups
+ * @returns {Object} Object containing SQL query and parameters
+ */
+exports.constructGeneralSearchQuery = (searchGroups) => {
+  const conditions = [];
+  const params = [];
+
+  searchGroups.forEach(group => {
+    const groupConditions = [];
+    
+    if (group.geneSymbol) {
+      groupConditions.push('vs.GeneSymbol = ?');
+      params.push(group.geneSymbol);
+    }
+    if (group.dnaChange) {
+      groupConditions.push('vs.Name LIKE ?');
+      params.push(`%${group.dnaChange}%`);
+    }
+    if (group.proteinChange) {
+      groupConditions.push('vs.Name LIKE ?');
+      params.push(`%${group.proteinChange}%`);
+    }
+
+    if (groupConditions.length > 0) {
+      conditions.push(`(${groupConditions.join(' AND ')})`);
+    }
+  });
+
+  const query = `
+    SELECT DISTINCT
+      vs.VariationID,
+      vs.Name,
+      vs.GeneSymbol,
+      vs.Type,
+      vs.ClinicalSignificance AS OverallClinicalSignificance,
+      vs.LastEvaluated AS OverallLastEvaluated,
+      vs.ReviewStatus AS OverallReviewStatus,
+      vs.RCVaccession AS AccessionID,
+      ss.ClinicalSignificance,
+      ss.DateLastEvaluated,
+      ss.ReviewStatus,
+      ss.CollectionMethod AS Method,
+      ss.ReportedPhenotypeInfo AS ConditionInfo,
+      ss.Submitter,
+      ss.SCV AS SubmitterAccession,
+      ss.Description,
+      ss.OriginCounts AS AlleleOrigin
+    FROM variant_summary vs
+    LEFT JOIN submission_summary ss ON vs.VariationID = ss.VariationID
+    WHERE ${conditions.length > 0 ? conditions.join(' OR ') : '1=1'}
+    ORDER BY vs.LastEvaluated DESC
+  `;
+
+  return { query, params };
+};
