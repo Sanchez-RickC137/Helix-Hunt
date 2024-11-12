@@ -28,6 +28,7 @@ export const useThemeConstants = () => {
     
     // Heading text color
     headingTextColor: isDarkMode ? 'text-white' : 'text-gray-900',
+    headingTextColor2: isDarkMode ? 'white' : 'black', // Without text for icons
     
     // Section background color
     sectionBackgroundColor: isDarkMode ? 'bg-gray-800' : 'bg-white',

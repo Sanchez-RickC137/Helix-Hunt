@@ -72,7 +72,7 @@ const LoginRegisterModal = ({ isOpen, onClose, onForgotPassword }) => {
               {/* Left Section - Title and Register Link */}
               <div className="w-[40%] p-8 flex flex-col relative">
                 <div className="flex items-center justify-center flex-1">
-                  <Dna className="mr-2" size={48} />
+                  <Dna className="mr-2" size={48} color={`${themeConstants.headingTextColor2}`}/>
                   <h2 className={`text-4xl font-bold ${themeConstants.headingTextColor}`}>
                     Login
                   </h2>
@@ -184,7 +184,7 @@ const LoginRegisterModal = ({ isOpen, onClose, onForgotPassword }) => {
               {/* Right Section - Title and Login Link */}
               <div className="w-[40%] p-8 flex flex-col relative">
                 <div className="flex items-center justify-center flex-1">
-                  <Dna className="mr-2" size={48} />
+                  <Dna className="mr-2" size={48} color={`${themeConstants.headingTextColor2}`}/>
                   <h2 className={`text-4xl font-bold ${themeConstants.headingTextColor}`}>
                     Register
                   </h2>

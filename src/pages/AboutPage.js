@@ -50,7 +50,7 @@ const AboutPage = () => {
       </section>
 
       {/* Mission Section */}
-      <section className={`mb-16 rounded-lg ${themeConstants.sectionBackgroundColor}`}>
+      <section className={`mb-16 rounded-lg`}>
         <h2 className={`text-2xl font-semibold mb-4 ${themeConstants.headingTextColor}`}>Our Mission</h2>
         <div className={`p-6 rounded-lg shadow-lg ${themeConstants.unselectedItemBackgroundColor}`}>
           <p className="mb-4">

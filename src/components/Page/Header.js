@@ -81,8 +81,8 @@ const Header = () => {
                 <li><Link to="/about" className="hover:text-indigo-200 transition-colors text-lg">About</Link></li>
                 <li>
                   <Link to="/help" className="hover:text-indigo-200 transition-colors flex items-center text-lg">
-                    <HelpCircle className="mr-1" size={18} />
                     Help/Tutorial
+                    <HelpCircle className="ml-1" size={18} />
                   </Link>
                 </li>
               </ul>
