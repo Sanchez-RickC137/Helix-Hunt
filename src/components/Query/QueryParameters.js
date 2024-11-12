@@ -92,7 +92,7 @@ const QueryParameters = ({
     <div className="space-y-6">
       {/* Query Parameters Section */}
       <div>
-        <h3 className="text-xl font-semibold mb-2">Query Parameters</h3>
+        <h3 className="text-xl text-center font-semibold mb-2">Targeted Search Query Parameters</h3>
         <div className="space-y-2">
           {/* Full Names Display */}
           {renderHelpTooltip(

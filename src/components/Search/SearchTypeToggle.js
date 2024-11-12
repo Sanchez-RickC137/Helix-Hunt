@@ -17,7 +17,7 @@ const SearchTypeToggle = ({ searchType, setSearchType }) => {
         <div className="relative">
           <button
             onClick={() => setSearchType('targeted')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center ${
+            className={`px-4 py-2 rounded-md text-md font-medium font-semibold transition-colors duration-200 flex items-center ${
               searchType === 'targeted'
                 ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
               : `${themeConstants.unselectedItemBackgroundColor}`
@@ -42,7 +42,7 @@ const SearchTypeToggle = ({ searchType, setSearchType }) => {
         <div className="relative">
           <button
             onClick={() => setSearchType('general')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center ${
+            className={`px-4 py-2 rounded-md text-md font-medium font-semibold transition-colors duration-200 flex items-center ${
               searchType === 'general'
                 ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
               : `${themeConstants.unselectedItemBackgroundColor}`

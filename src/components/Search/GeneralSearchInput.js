@@ -62,7 +62,7 @@ const GeneralSearchInput = ({ onAddSearchGroup }) => {
 
   return (
     <div className="space-y-6">
-      <h3 className="text-lg font-semibold mb-2">Create Search Group</h3>
+      <h3 className="text-xl text-center font-semibold mb-2">Create Search Group</h3>
       
       {/* Gene Symbol Input */}
       <div className="space-y-2">

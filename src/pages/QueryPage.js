@@ -35,7 +35,7 @@ const FullNameToggle = React.memo(function FullNameToggle({ isFullName, setIsFul
           onClick={() => {
             setIsFullName(false);
           }}
-          className={`px-3 sm:px-4 py-2 rounded-md text-sm sm:text-lg font-semibold transition-colors duration-200 flex items-center ${
+          className={`px-3 sm:px-4 py-2 rounded-md text-md sm:text-md font-semibold font-medium transition-colors duration-200 flex items-center ${
             !isFullName
               ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
               : `${themeConstants.unselectedItemBackgroundColor}`
@@ -49,7 +49,7 @@ const FullNameToggle = React.memo(function FullNameToggle({ isFullName, setIsFul
           onClick={() => {
             setIsFullName(true);
           }}
-          className={`px-3 sm:px-4 py-2 rounded-md text-sm sm:text-lg font-semibold transition-colors duration-200 flex items-center ${
+          className={`px-3 sm:px-4 py-2 rounded-md text-md sm:text-md font-semibold font-medium transition-colors duration-200 flex items-center ${
             isFullName
               ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
               : `${themeConstants.unselectedItemBackgroundColor}`
@@ -73,7 +73,7 @@ const InlineQueryToggle = React.memo(function InlineQueryToggle({ querySource, s
       <div className="relative">
         <button
           onClick={() => setQuerySource('web')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center ${
+          className={`px-4 py-2 rounded-md text-md font-medium font-semibold transition-colors duration-200 flex items-center ${
             querySource === 'web'
               ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
               : `${themeConstants.unselectedItemBackgroundColor}`
@@ -86,7 +86,7 @@ const InlineQueryToggle = React.memo(function InlineQueryToggle({ querySource, s
       <div className="relative">
         <button
           onClick={() => setQuerySource('database')}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center ${
+          className={`px-4 py-2 rounded-md text-md font-medium font-semibold transition-colors duration-200 flex items-center ${
             querySource === 'database'
               ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
               : `${themeConstants.unselectedItemBackgroundColor}`
