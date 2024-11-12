@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Dna } from 'lucide-react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 import { useUser } from '../../contexts/UserContext';
 import axiosInstance from '../../utils/axiosInstance';
@@ -72,7 +72,8 @@ const LoginRegisterModal = ({ isOpen, onClose, onForgotPassword }) => {
               {/* Left Section - Title and Register Link */}
               <div className="w-[40%] p-8 flex flex-col relative">
                 <div className="flex items-center justify-center flex-1">
-                  <h2 className={`text-3xl font-bold ${themeConstants.headingTextColor}`}>
+                  <Dna className="mr-2" size={48} />
+                  <h2 className={`text-4xl font-bold ${themeConstants.headingTextColor}`}>
                     Login
                   </h2>
                 </div>
@@ -183,7 +184,8 @@ const LoginRegisterModal = ({ isOpen, onClose, onForgotPassword }) => {
               {/* Right Section - Title and Login Link */}
               <div className="w-[40%] p-8 flex flex-col relative">
                 <div className="flex items-center justify-center flex-1">
-                  <h2 className={`text-3xl font-bold ${themeConstants.headingTextColor}`}>
+                  <Dna className="mr-2" size={48} />
+                  <h2 className={`text-4xl font-bold ${themeConstants.headingTextColor}`}>
                     Register
                   </h2>
                 </div>
