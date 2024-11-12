@@ -64,7 +64,7 @@ const QueryParameters = ({
     });
   };
 
-  const renderHelpTooltip = (children, content) => {
+  const renderHelpTooltip = (children, content, maxWidth = 'max-w-xs') => {
     if (activeHelp === 'contextHelp') {
       return (
         <div
@@ -75,9 +75,11 @@ const QueryParameters = ({
         >
           {children}
           {helpElement?.dataset.help === content && (
-            <div className="absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded shadow-lg whitespace-nowrap">
-              {content}
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900" />
+            <div className={`absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-2 ${maxWidth}`}>
+              <div className="px-3 py-2 text-sm text-white bg-gray-900 rounded shadow-lg break-words">
+                {content}
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900" />
+              </div>
             </div>
           )}
         </div>

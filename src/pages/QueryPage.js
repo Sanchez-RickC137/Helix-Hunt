@@ -30,31 +30,29 @@ const FullNameToggle = React.memo(function FullNameToggle({ isFullName, setIsFul
   
   return (
     <div className="flex items-center justify-center relative mb-4">
-      <div className={`inline-flex rounded-lg p-1 ${themeConstants.sectionBackgroundColor}`}>
+      <div className={`inline-flex rounded-lg p-1 ${themeConstants.unselectedItemBackgroundColor}`}>
         <button
           onClick={() => {
             setIsFullName(false);
-            return;
           }}
-          className={`px-3 sm:px-4 py-2 rounded-md text-sm sm:text-lg font-semibold transition-colors duration-200 flex items-center${
+          className={`px-3 sm:px-4 py-2 rounded-md text-sm sm:text-lg font-semibold transition-colors duration-200 flex items-center ${
             !isFullName
               ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
-              : `${themeConstants.sectionBackgroundColor}`
+              : `${themeConstants.unselectedItemBackgroundColor}`
           }`}
         >
           <span className="hidden sm:inline">Transcript ID / Gene Symbol</span>
           <span className="sm:hidden">Transcript ID / Gene Symbol</span>
         </button>
-       
+        
         <button
           onClick={() => {
             setIsFullName(true);
-            return;
           }}
           className={`px-3 sm:px-4 py-2 rounded-md text-sm sm:text-lg font-semibold transition-colors duration-200 flex items-center ${
             isFullName
               ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
-              : `${themeConstants.sectionBackgroundColor}`
+              : `${themeConstants.unselectedItemBackgroundColor}`
           }`}
         >
           <span className="hidden sm:inline">Full Gene Name</span>
@@ -64,6 +62,7 @@ const FullNameToggle = React.memo(function FullNameToggle({ isFullName, setIsFul
     </div>
   );
 });
+
 
 const InlineQueryToggle = React.memo(function InlineQueryToggle({ querySource, setQuerySource }) {
   const themeConstants = useThemeConstants();
@@ -76,8 +75,8 @@ const InlineQueryToggle = React.memo(function InlineQueryToggle({ querySource, s
           onClick={() => setQuerySource('web')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center ${
             querySource === 'web'
-              ? `${themeConstants.buttonBackgroundColor} text-white`
-              : 'text-gray-500 hover:text-gray-700'
+              ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
+              : `${themeConstants.unselectedItemBackgroundColor}`
           }`}
         >
           Web Query
@@ -89,8 +88,8 @@ const InlineQueryToggle = React.memo(function InlineQueryToggle({ querySource, s
           onClick={() => setQuerySource('database')}
           className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center ${
             querySource === 'database'
-              ? `${themeConstants.buttonBackgroundColor} text-white`
-              : 'text-gray-500 hover:text-gray-700'
+              ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
+              : `${themeConstants.unselectedItemBackgroundColor}`
           }`}
         >
           Database Query
@@ -386,7 +385,7 @@ const QueryPage = () => {
     }
   };
 
-  const renderHelpTooltip = (children, content) => {
+  const renderHelpTooltip = (children, content, maxWidth = 'max-w-xs') => {
     if (activeHelp === 'contextHelp') {
       return (
         <div
@@ -397,9 +396,39 @@ const QueryPage = () => {
         >
           {children}
           {helpElement?.dataset.help === content && (
-            <div className="absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded shadow-lg whitespace-nowrap">
-              {content}
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900" />
+            <div className={`absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-2 ${maxWidth}`}>
+              <div className="px-3 py-2 text-sm text-white bg-gray-900 rounded shadow-lg break-words">
+                {content}
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900" />
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+    return children;
+  };
+
+  const renderHelpTooltip2 = (children, content, maxWidth = 'max-w-xs') => {
+    if (activeHelp === 'contextHelp') {
+      return (
+        <div
+          data-help={content}
+          className="relative group"
+          onMouseEnter={(e) => setHelpElement(e.currentTarget)}
+          onMouseLeave={() => setHelpElement(null)}
+        >
+          {children}
+          {helpElement?.dataset.help === content && (
+            <div className="fixed z-50" style={{
+              top: `${helpElement.getBoundingClientRect().top - 10}px`,
+              left: `${helpElement.getBoundingClientRect().left + (helpElement.offsetWidth / 2)}px`,
+              transform: 'translateX(-50%) translateY(-100%)'
+            }}>
+              <div className={`${maxWidth} px-3 py-2 text-sm text-white bg-gray-900 rounded shadow-lg break-words`}>
+                {content}
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900" />
+              </div>
             </div>
           )}
         </div>
@@ -418,22 +447,24 @@ const QueryPage = () => {
         
         <div className="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 w-full md:w-auto">
           <div id="search-type-toggle" className="flex-grow md:flex-grow-0 md:mr-4">
-            {renderHelpTooltip(
+            {renderHelpTooltip2(
               <SearchTypeToggle 
                 searchType={searchType}
                 setSearchType={setSearchType}
               />,
-              "Choose between targeted search for specific variants or general search across multiple criteria"
+              "Choose between targeted search for specific variants or general search across multiple criteria",
+              "max-w-sm"
             )}
           </div>
         
           <div id="query-source-toggle" className="flex-grow md:flex-grow-0">
-            {renderHelpTooltip(
+            {renderHelpTooltip2(
               <InlineQueryToggle 
                 querySource={querySource}
                 setQuerySource={setQuerySource}
               />,
-              "Select between live ClinVar web data or local database query"
+              "Select between live ClinVar web data or local database query",
+              "max-w-sm"
             )}
           </div>
         </div>
@@ -547,7 +578,7 @@ const QueryPage = () => {
             <div id="search-group">
             {renderHelpTooltip(
               <GeneralSearchInput onAddSearchGroup={handleAddSearchGroup} />,
-              "Create search groups with multiple criteria"
+              "Create search groups consisting of any combination gene symbol, dna change, protein change. At least one must be entered to generate a search group"
             )}
           </div>
               
@@ -664,12 +695,12 @@ const QueryPage = () => {
       )}
       
       {/* Debug Information */}
-      {debugInfo && (
+      {/* {debugInfo && (
         <div className={`mt-8 p-4 ${themeConstants.sectionBackgroundColor} rounded-lg`}>
           <h3 className={`text-lg font-semibold mb-2 ${themeConstants.headingTextColor}`}>Debug Information:</h3>
           <pre className={`whitespace-pre-wrap ${themeConstants.mainTextColor}`}>{debugInfo}</pre>
         </div>
-      )}
+      )} */}
 
       {activeHelp === 'stepthrough' && (
         <div className="fixed inset-0 z-40 overflow-hidden flex items-end justify-center">

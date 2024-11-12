@@ -1,7 +1,7 @@
 import React from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 import { X, RotateCcw } from 'lucide-react';
-import HelpTooltip from '../Help/HelpTooltip';
+// import HelpTooltip from '../Help/HelpTooltip';
 
 const GeneralQueryParameters = ({
   searchGroups,
@@ -36,7 +36,7 @@ const GeneralQueryParameters = ({
     });
   };
 
-  const renderHelpTooltip = (children, content) => {
+  const renderHelpTooltip = (children, content, maxWidth = 'max-w-xs') => {
     if (activeHelp === 'contextHelp') {
       return (
         <div
@@ -47,9 +47,11 @@ const GeneralQueryParameters = ({
         >
           {children}
           {helpElement?.dataset.help === content && (
-            <div className="absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 text-sm text-white bg-gray-900 rounded shadow-lg whitespace-nowrap">
-              {content}
-              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900" />
+            <div className={`absolute z-50 bottom-full left-1/2 transform -translate-x-1/2 mb-2 ${maxWidth}`}>
+              <div className="px-3 py-2 text-sm text-white bg-gray-900 rounded shadow-lg break-words">
+                {content}
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900" />
+              </div>
             </div>
           )}
         </div>
@@ -63,35 +65,38 @@ const GeneralQueryParameters = ({
       {/* Search Groups Display */}
       <div>
         <h3 className="text-lg font-semibold mb-2">Search Groups</h3>
-        <div className="space-y-2">
-          {searchGroups.map((group, index) => (
-            <div
-              key={index}
-              className={`${themeConstants.unselectedItemBackgroundColor} p-4 rounded-lg relative`}
-            >
-              <button
-                onClick={() => removeSearchGroup(index)}
-                className="absolute top-2 right-2 text-gray-500 hover:text-red-500"
+        {renderHelpTooltip(
+          <div className="space-y-2">
+            {searchGroups.map((group, index) => (
+              <div
+                key={index}
+                className={`${themeConstants.unselectedItemBackgroundColor} p-4 rounded-lg relative`}
               >
-                <X size={18} />
-              </button>
-              <div className="space-y-1">
-                {group.geneSymbol && (
-                  <p><span className="font-medium">Gene Symbol:</span> {group.geneSymbol}</p>
-                )}
-                {group.dnaChange && (
-                  <p><span className="font-medium">DNA Change:</span> {group.dnaChange}</p>
-                )}
-                {group.proteinChange && (
-                  <p><span className="font-medium">Protein Change:</span> {group.proteinChange}</p>
-                )}
+                <button
+                  onClick={() => removeSearchGroup(index)}
+                  className="absolute top-2 right-2 text-gray-500 hover:text-red-500"
+                >
+                  <X size={18} />
+                </button>
+                <div className="space-y-1">
+                  {group.geneSymbol && (
+                    <p><span className="font-medium">Gene Symbol:</span> {group.geneSymbol}</p>
+                  )}
+                  {group.dnaChange && (
+                    <p><span className="font-medium">DNA Change:</span> {group.dnaChange}</p>
+                  )}
+                  {group.proteinChange && (
+                    <p><span className="font-medium">Protein Change:</span> {group.proteinChange}</p>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-          {searchGroups.length === 0 && (
-            <p className="text-gray-500 italic">No search groups added yet</p>
-          )}
-        </div>
+            ))}
+            {searchGroups.length === 0 && (
+              <p className="text-gray-500 italic">No search groups added yet</p>
+            )}
+          </div>,
+          "Groups of Gene Symbols, DNA Changes, and Protein Changes currently loaded for the query"
+        )}
       </div>
 
       {/* Clinical Significance Section - Now wrapped in a div with proper ID */}
@@ -171,6 +176,12 @@ const GeneralQueryParameters = ({
           Reset
         </button>
       </div>
+
+      {/* Help Text */}
+      <p className={`text-md text-center ${themeConstants.labelTextColor}`}>
+        Please add at least one Search Group for the query. Clinical significance and date ranges are optional filters.
+      </p>
+
     </div>
   );
 };

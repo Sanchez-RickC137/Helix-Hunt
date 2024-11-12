@@ -19,8 +19,8 @@ const SearchTypeToggle = ({ searchType, setSearchType }) => {
             onClick={() => setSearchType('targeted')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center ${
               searchType === 'targeted'
-                ? `${themeConstants.buttonBackgroundColor} text-white`
-                : 'text-gray-500 hover:text-gray-700'
+                ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
+              : `${themeConstants.unselectedItemBackgroundColor}`
             }`}
           >
             Targeted Search
@@ -44,8 +44,8 @@ const SearchTypeToggle = ({ searchType, setSearchType }) => {
             onClick={() => setSearchType('general')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 flex items-center ${
               searchType === 'general'
-                ? `${themeConstants.buttonBackgroundColor} text-white`
-                : 'text-gray-500 hover:text-gray-700'
+                ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
+              : `${themeConstants.unselectedItemBackgroundColor}`
             }`}
           >
             General Search

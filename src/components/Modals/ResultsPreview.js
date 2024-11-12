@@ -56,37 +56,37 @@ const ResultsPreview = ({ results, onClose }) => {
     processResults();
   }, [results]);
 
-  const renderJsonView = () => {
-    const successfulResults = processedResults.filter(result => !result.error);
+  // const renderJsonView = () => {
+  //   const successfulResults = processedResults.filter(result => !result.error);
 
-    if (successfulResults.length === 0) {
-      return <p className={themeConstants.mainTextColor}>No data available for any queries.</p>;
-    }
+  //   if (successfulResults.length === 0) {
+  //     return <p className={themeConstants.mainTextColor}>No data available for any queries.</p>;
+  //   }
 
-    return (
-      <div className="space-y-8">
-        {successfulResults.map((result, index) => (
-          <div key={index} className={`mb-8 p-4 ${themeConstants.unselectedItemBackgroundColor} rounded-lg`}>
-            <h3 className={`text-xl font-semibold mb-4 ${themeConstants.headingTextColor}`}>
-              Result for query: {result.query}
-            </h3>
-            <div className="mb-4">
-              <h4 className={`text-lg font-semibold mb-2 ${themeConstants.headingTextColor}`}>Variant Details</h4>
-              <pre className={`whitespace-pre-wrap overflow-auto max-h-96 ${themeConstants.mainTextColor} p-4 ${themeConstants.sectionBackgroundColor} rounded`}>
-                {JSON.stringify(result.variantDetails, null, 2)}
-              </pre>
-            </div>
-            <div>
-              <h4 className={`text-lg font-semibold mb-2 ${themeConstants.headingTextColor}`}>Assertion List</h4>
-              <pre className={`whitespace-pre-wrap overflow-auto max-h-96 ${themeConstants.mainTextColor} p-4 ${themeConstants.sectionBackgroundColor} rounded`}>
-                {JSON.stringify(result.assertionList, null, 2)}
-              </pre>
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
+  //   return (
+  //     <div className="space-y-8">
+  //       {successfulResults.map((result, index) => (
+  //         <div key={index} className={`mb-8 p-4 ${themeConstants.unselectedItemBackgroundColor} rounded-lg`}>
+  //           <h3 className={`text-xl font-semibold mb-4 ${themeConstants.headingTextColor}`}>
+  //             Result for query: {result.query}
+  //           </h3>
+  //           <div className="mb-4">
+  //             <h4 className={`text-lg font-semibold mb-2 ${themeConstants.headingTextColor}`}>Variant Details</h4>
+  //             <pre className={`whitespace-pre-wrap overflow-auto max-h-96 ${themeConstants.mainTextColor} p-4 ${themeConstants.sectionBackgroundColor} rounded`}>
+  //               {JSON.stringify(result.variantDetails, null, 2)}
+  //             </pre>
+  //           </div>
+  //           <div>
+  //             <h4 className={`text-lg font-semibold mb-2 ${themeConstants.headingTextColor}`}>Assertion List</h4>
+  //             <pre className={`whitespace-pre-wrap overflow-auto max-h-96 ${themeConstants.mainTextColor} p-4 ${themeConstants.sectionBackgroundColor} rounded`}>
+  //               {JSON.stringify(result.assertionList, null, 2)}
+  //             </pre>
+  //           </div>
+  //         </div>
+  //       ))}
+  //     </div>
+  //   );
+  // };
 
   const renderTableView = () => {
     const successfulResults = processedResults.filter(result => !result.error);
@@ -336,8 +336,8 @@ const ResultsPreview = ({ results, onClose }) => {
       return <div className={`text-red-500 ${themeConstants.mainTextColor}`}>{error}</div>;
     }
     switch (activeView) {
-      case 'json':
-        return renderJsonView();
+      // case 'json':
+      //   return renderJsonView();
         case 'table':
           return renderTableView();
         case 'view':
@@ -380,7 +380,7 @@ const ResultsPreview = ({ results, onClose }) => {
             >
               Table View
             </button>
-            <button
+            {/* <button
               onClick={() => setActiveView('json')}
               className={`px-4 py-2 rounded ${
                 activeView === 'json' 
@@ -389,7 +389,7 @@ const ResultsPreview = ({ results, onClose }) => {
               } hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200`}
             >
               JSON
-            </button>
+            </button> */}
           </div>
           
           <div className={`flex-grow overflow-auto ${themeConstants.mainTextColor}`}>
