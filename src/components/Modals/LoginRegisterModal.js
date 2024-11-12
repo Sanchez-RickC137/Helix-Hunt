@@ -1,14 +1,3 @@
-/**
- * Combined login and registration modal component
- * Handles user authentication and new account creation
- * Provides smooth transition between login and registration views
- * 
- * @param {Object} props
- * @param {boolean} props.isOpen - Controls modal visibility
- * @param {Function} props.onClose - Function to close the modal
- * @param {Function} props.onForgotPassword - Handler for forgot password action
- */
-
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { useThemeConstants } from '../Page/ThemeConstants';
@@ -16,7 +5,6 @@ import { useUser } from '../../contexts/UserContext';
 import axiosInstance from '../../utils/axiosInstance';
 
 const LoginRegisterModal = ({ isOpen, onClose, onForgotPassword }) => {
-  // State management
   const [isLoginView, setIsLoginView] = useState(true);
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -26,9 +14,6 @@ const LoginRegisterModal = ({ isOpen, onClose, onForgotPassword }) => {
   const { login } = useUser();
   const themeConstants = useThemeConstants();
 
-  /**
-   * Reset form state when modal closes
-   */
   useEffect(() => {
     if (!isOpen) {
       setUsername('');
@@ -39,22 +24,16 @@ const LoginRegisterModal = ({ isOpen, onClose, onForgotPassword }) => {
     }
   }, [isOpen]);
 
-  /**
-   * Handles form submission for both login and registration
-   * @param {Event} e - Form submission event
-   */
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     try {
       if (isLoginView) {
-        // Handle login
         const response = await axiosInstance.post('/api/login', { username, password });
         await login(response.data.user, response.data.token);
         onClose();
       } else {
-        // Handle registration
         await axiosInstance.post('/api/register', { username, email, password });
         const loginResponse = await axiosInstance.post('/api/login', { username, password });
         await login(loginResponse.data.user, loginResponse.data.token);
@@ -80,75 +59,145 @@ const LoginRegisterModal = ({ isOpen, onClose, onForgotPassword }) => {
         >
           <X size={24} />
         </button>
-        <div className="flex transition-transform duration-300 ease-in-out" style={{ width: '200%', transform: isLoginView ? 'translateX(0)' : 'translateX(-50%)' }}>
-          <div className="w-1/2 flex-shrink-0">
-            <form onSubmit={handleSubmit} className="p-12 space-y-6">
-              <h2 className={`text-3xl font-bold mb-6 ${themeConstants.headingTextColor}`}>
-                {isLoginView ? 'Login' : 'Register'}
-              </h2>
-              <div>
-                <input
-                  type="text"
-                  placeholder="Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor} backdrop-blur-sm`}
-                  required
-                />
-              </div>
-              {!isLoginView && (
-                <div>
-                  <input
-                    type="email"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor} backdrop-blur-sm`}
-                    required
-                  />
+
+        {/* Content container with sliding animation */}
+        <div className="relative w-full h-[360px]">
+          {/* Sliding panels container */}
+          <div 
+            className="flex h-full transition-transform duration-500 ease-in-out"
+            style={{ transform: isLoginView ? 'translateX(0%)' : 'translateX(-100%)' }}
+          >
+            {/* Login Panel */}
+            <div className="min-w-full flex h-full">
+              {/* Left Section - Title and Register Link */}
+              <div className="w-[40%] p-8 flex flex-col relative">
+                <div className="flex items-center justify-center flex-1">
+                  <h2 className={`text-3xl font-bold ${themeConstants.headingTextColor}`}>
+                    Login
+                  </h2>
                 </div>
-              )}
-              <div>
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor} backdrop-blur-sm`}
-                  required
-                />
-              </div>
-              {error && <p className="text-red-500 text-sm">{error}</p>}
-              <button
-                type="submit"
-                className={`w-full ${themeConstants.buttonBackgroundColor} text-white py-3 rounded-lg hover:${themeConstants.buttonHoverColor} transition-colors text-lg font-semibold`}
-              >
-                {isLoginView ? 'Login' : 'Register'}
-              </button>
-              {isLoginView && onForgotPassword && (
-                <div className="text-center">
+                <div className="absolute bottom-8 left-0 w-full px-8">
                   <button 
-                    type="button"
-                    onClick={onForgotPassword}
-                    className={`text-sm ${themeConstants.linkTextColor} ${themeConstants.linkHoverColor} font-semibold`}
+                    onClick={() => { setIsLoginView(false); setError(''); }}
+                    className={`w-full text-sm ${themeConstants.linkTextColor} ${themeConstants.linkHoverColor} font-semibold text-center`}
                   >
-                    Forgot Password?
+                    Don't have an account? Register
                   </button>
                 </div>
-              )}
-            </form>
+              </div>
+
+              {/* Vertical Divider */}
+              <div className="w-px bg-gray-300 dark:bg-gray-600" />
+
+              {/* Right Section - Login Form */}
+              <div className="w-[60%] p-8 flex items-center">
+                <form onSubmit={handleSubmit} className="w-full space-y-6">
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor}`}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor}`}
+                      required
+                    />
+                  </div>
+                  {error && isLoginView && <p className="text-red-500 text-sm">{error}</p>}
+                  <button
+                    type="submit"
+                    className={`w-full ${themeConstants.buttonBackgroundColor} text-white py-3 rounded-lg hover:${themeConstants.buttonHoverColor} transition-colors text-lg font-semibold`}
+                  >
+                    Login
+                  </button>
+                  {onForgotPassword && (
+                    <button 
+                      type="button"
+                      onClick={onForgotPassword}
+                      className={`w-full text-sm ${themeConstants.linkTextColor} ${themeConstants.linkHoverColor} font-semibold text-center`}
+                    >
+                      Forgot Password?
+                    </button>
+                  )}
+                </form>
+              </div>
+            </div>
+
+            {/* Register Panel */}
+            <div className="min-w-full flex h-full">
+              {/* Left Section - Register Form */}
+              <div className="w-[60%] p-8 flex items-center">
+                <form onSubmit={handleSubmit} className="w-full space-y-6">
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor}`}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="email"
+                      placeholder="Email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor}`}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className={`w-full p-3 rounded-lg border ${themeConstants.inputBackgroundColor} ${themeConstants.inputBorderColor} ${themeConstants.inputTextColor} ${themeConstants.inputPlaceholderColor}`}
+                      required
+                    />
+                  </div>
+                  {error && !isLoginView && <p className="text-red-500 text-sm">{error}</p>}
+                  <button
+                    type="submit"
+                    className={`w-full ${themeConstants.buttonBackgroundColor} text-white py-3 rounded-lg hover:${themeConstants.buttonHoverColor} transition-colors text-lg font-semibold`}
+                  >
+                    Register
+                  </button>
+                </form>
+              </div>
+
+              {/* Vertical Divider */}
+              <div className="w-px bg-gray-300 dark:bg-gray-600" />
+
+              {/* Right Section - Title and Login Link */}
+              <div className="w-[40%] p-8 flex flex-col relative">
+                <div className="flex items-center justify-center flex-1">
+                  <h2 className={`text-3xl font-bold ${themeConstants.headingTextColor}`}>
+                    Register
+                  </h2>
+                </div>
+                <div className="absolute bottom-8 left-0 w-full px-8">
+                  <button 
+                    onClick={() => { setIsLoginView(true); setError(''); }}
+                    className={`w-full text-sm ${themeConstants.linkTextColor} ${themeConstants.linkHoverColor} font-semibold text-center`}
+                  >
+                    Already have an account? Login
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="w-1/2 flex-shrink-0">
-            {/* Register form content (if needed) */}
-          </div>
-        </div>
-        <div className="absolute bottom-4 left-0 right-0 text-center">
-          <button 
-            onClick={() => { setIsLoginView(!isLoginView); setError(''); }}
-            className={`text-sm ${themeConstants.linkTextColor} ${themeConstants.linkHoverColor} font-semibold`}
-          >
-            {isLoginView ? "Don't have an account? Register" : "Already have an account? Login"}
-          </button>
         </div>
       </div>
     </div>
