@@ -40,7 +40,6 @@ const AboutPage = () => {
 
   return (
     <div className={`container mx-auto mt-8 p-4 ${themeConstants.mainTextColor}`}>
-      {/* Hero Section */}
       <section className="text-center mb-16">
         <h1 className={`text-4xl font-bold mb-6 ${themeConstants.headingTextColor}`}>
           About HelixHunt
