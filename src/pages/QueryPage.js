@@ -1,108 +1,173 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import axiosInstance from '../utils/axiosInstance';
 import { useUser } from '../contexts/UserContext';
-import { useHelp } from '../contexts/HelpContext';
+// import { useHelp } from '../contexts/HelpContext';
 import { useThemeConstants } from '../components/Page/ThemeConstants';
-import { X, Plus, Eye, FileDown } from 'lucide-react';
 
 // Component Imports
 import StepByStepGuide from '../components/Help/StepByStepGuide';
-import HelpTooltip from '../components/Help/HelpTooltip';
-import { getGuideSteps, getStepToSection } from '../components/Help/stepGuideConfig';
+// import HelpTooltip from '../components/Help/HelpTooltip';
+import { getGuideSteps, getStepToSection } from '../utils/stepGuideConfig';
 import FloatingHelp from '../components/Help/FloatingHelp';
-import SearchTypeToggle from '../components/Search/SearchTypeToggle';
-import QuerySourceToggle from '../components/Search/QuerySourceToggle';
+
+import SearchTypeToggle from '../components/Toggle/SearchTypeToggle';
+import QuerySourceToggle from '../components/Toggle/QuerySourceToggle';
+import FullNameToggle from '../components/Toggle/FullNameToggle';
+
 import GeneSelection from '../components/Query/GeneSelection';
 import DNAChangeSelection from '../components/Query/DNAChangeSelection';
 import ProteinChangeSelection from '../components/Query/ProteinChangeSelection';
 import VariationIDSelection from '../components/Query/VariationIDSelection';
 import QueryParameters from '../components/Query/QueryParameters';
+import GeneralQueryParameters from '../components/Search/GeneralQueryParameters';
+import GeneralSearchInput from '../components/Search/GeneralSearchInput';
+
 import ReviewModal from '../components/Modals/ReviewModal';
 import DownloadPrompt from '../components/Modals/DownloadPrompt';
 import ResultsPreview from '../components/Modals/ResultsPreview';
 import QueryHistory from '../components/Query/QueryHistory';
-import GeneralSearchInput from '../components/Search/GeneralSearchInput';
-import GeneralQueryParameters from '../components/Search/GeneralQueryParameters';
 
 
-const FullNameToggle = React.memo(function FullNameToggle({ isFullName, setIsFullName }) {
-  const themeConstants = useThemeConstants();
+
+
+// const FullNameToggle = React.memo(function FullNameToggle({ isFullName, setIsFullName }) {
+//   const themeConstants = useThemeConstants();
+//   const [showSymbolHelp, setShowSymbolHelp] = useState(false);
+//   const [showFullNameHelp, setShowFullNameHelp] = useState(false);
+
+//   const symbolHelpText = "Build your query using a Transcript ID and Gene Symbol along with DNA change and Protein Change";
+//   const fullNameHelpText = "Build your query using a Full Gene Name. If unsure of formatting use the Transcript ID / Gene Symbol option";
   
-  return (
-    <div className="flex items-center justify-center relative mb-4">
-      <div className={`inline-flex rounded-lg p-1 ${themeConstants.unselectedItemBackgroundColor}`}>
-        <button
-          onClick={() => {
-            setIsFullName(false);
-          }}
-          className={`px-3 sm:px-4 py-2 rounded-md text-md sm:text-md font-semibold font-medium transition-colors duration-200 flex items-center ${
-            !isFullName
-              ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
-              : `${themeConstants.unselectedItemBackgroundColor}`
-          }`}
-        >
-          <span className="hidden sm:inline">Transcript ID / Gene Symbol</span>
-          <span className="sm:hidden">Transcript ID / Gene Symbol</span>
-        </button>
-        
-        <button
-          onClick={() => {
-            setIsFullName(true);
-          }}
-          className={`px-3 sm:px-4 py-2 rounded-md text-md sm:text-md font-semibold font-medium transition-colors duration-200 flex items-center ${
-            isFullName
-              ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
-              : `${themeConstants.unselectedItemBackgroundColor}`
-          }`}
-        >
-          <span className="hidden sm:inline">Full Gene Name</span>
-          <span className="sm:hidden">Full Gene Name</span>
-        </button>
-      </div>
-    </div>
-  );
-});
+//   return (
+//     <div className="flex items-center justify-center relative mb-4">
+//       <div className={`inline-flex rounded-lg p-1 ${themeConstants.unselectedItemBackgroundColor}`}>
+//         <div className="relative">
+//           <button
+//             onClick={() => {
+//               setIsFullName(false);
+//             }}
+//             className={`px-3 sm:px-4 py-2 rounded-md text-md sm:text-md font-semibold font-medium transition-colors duration-200 flex items-center ${
+//               !isFullName
+//                 ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
+//                 : `${themeConstants.unselectedItemBackgroundColor}`
+//             }`}
+//           >
+//             <span className="hidden sm:inline">Transcript ID / Gene Symbol</span>
+//             <span className="sm:hidden">Transcript ID / Gene Symbol</span>
+//             <div 
+//                 className="ml-1 relative"
+//                 onMouseEnter={() => setShowSymbolHelp(true)}
+//                 onMouseLeave={() => setShowSymbolHelp(false)}
+//               >
+//                 <HelpCircle size={16} className="text-current" />
+//             </div>
+//           </button>
+//           {showSymbolHelp && (
+//             <div className="absolute z-50 top-full mt-2 p-2 bg-black text-white text-xs rounded shadow-lg w-64">
+//               {symbolHelpText}
+//             </div>
+//           )}
+//         </div>
+//         <div className="relative">
+//           <button
+//             onClick={() => {
+//               setIsFullName(true);
+//             }}
+//             className={`px-3 sm:px-4 py-2 rounded-md text-md sm:text-md font-semibold font-medium transition-colors duration-200 flex items-center ${
+//               isFullName
+//                 ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
+//                 : `${themeConstants.unselectedItemBackgroundColor}`
+//             }`}
+//           >
+//             <span className="hidden sm:inline">Full Gene Name</span>
+//             <span className="sm:hidden">Full Gene Name</span>
+//             <div 
+//                 className="ml-1 relative"
+//                 onMouseEnter={() => setShowFullNameHelp(true)}
+//                 onMouseLeave={() => setShowFullNameHelp(false)}
+//               >
+//                 <HelpCircle size={16} className="text-current" />
+//             </div>
+//           </button>
+//           {showFullNameHelp && (
+//             <div className="absolute z-50 top-full mt-2 p-2 bg-black text-white text-xs rounded shadow-lg w-64">
+//               {fullNameHelpText}
+//             </div>
+//           )}
+//         </div>
+//       </div>
+//     </div>
+//   );
+// });
 
 
-const InlineQueryToggle = React.memo(function InlineQueryToggle({ querySource, setQuerySource }) {
-  const themeConstants = useThemeConstants();
+// const InlineQueryToggle = React.memo(function InlineQueryToggle({ querySource, setQuerySource }) {
+//   const themeConstants = useThemeConstants();
+//   const [showWebHelp, setShowWebHelp] = useState(false);
+//   const [showDatabaseHelp, setDatabaseHelp] = useState(false);
 
-  return (
-    <div className="flex items-center justify-center relative">
-    <div className={`inline-flex rounded-lg p-1 ${themeConstants.unselectedItemBackgroundColor}`}>
-      <div className="relative">
-        <button
-          onClick={() => setQuerySource('web')}
-          className={`px-4 py-2 rounded-md text-md font-medium font-semibold transition-colors duration-200 flex items-center ${
-            querySource === 'web'
-              ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
-              : `${themeConstants.unselectedItemBackgroundColor}`
-          }`}
-        >
-          Web Query
-        </button>
-      </div>
+//   const webHelpText = "Use the Clinvar website as the query source. Information will be more up to date and comprehensive but may take longer to retrieve.";
+//   const databaseHelpText = "Use the local database as the query source. Information is updated weekly and will be return more quickly.";
+
+//   return (
+//     <div className="flex items-center justify-center relative">
+//       <div className={`inline-flex rounded-lg p-1 ${themeConstants.unselectedItemBackgroundColor}`}>
+//         <div className="relative">
+//           <button
+//             onClick={() => setQuerySource('web')}
+//             className={`px-4 py-2 rounded-md text-md font-medium font-semibold transition-colors duration-200 flex items-center ${
+//               querySource === 'web'
+//                 ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
+//                 : `${themeConstants.unselectedItemBackgroundColor}`
+//             }`}
+//           >
+//             Web Query
+//             <div 
+//               className="ml-1 relative"
+//               onMouseEnter={() => setShowWebHelp(true)}
+//               onMouseLeave={() => setShowWebHelp(false)}
+//             >
+//               <HelpCircle size={16} className="text-current" />
+//             </div>
+//           </button>
+//           {showWebHelp && (
+//             <div className="absolute z-50 top-full mt-2 p-2 bg-black text-white text-xs rounded shadow-lg w-64">
+//               {webHelpText}
+//             </div>
+//           )}
+//         </div>
       
-      <div className="relative">
-        <button
-          onClick={() => setQuerySource('database')}
-          className={`px-4 py-2 rounded-md text-md font-medium font-semibold transition-colors duration-200 flex items-center ${
-            querySource === 'database'
-              ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
-              : `${themeConstants.unselectedItemBackgroundColor}`
-          }`}
-        >
-          Database Query
-        </button>
-      </div>
-    </div>
-  </div>
-  );
-});
+//       <div className="relative">
+//         <button
+//           onClick={() => setQuerySource('database')}
+//           className={`px-4 py-2 rounded-md text-md font-medium font-semibold transition-colors duration-200 flex items-center ${
+//             querySource === 'database'
+//               ? `${themeConstants.sectionBackgroundColor} border ${themeConstants.buttonBorderColor}`
+//               : `${themeConstants.unselectedItemBackgroundColor}`
+//           }`}
+//         >
+//           Database Query
+//           <div 
+//               className="ml-1 relative"
+//               onMouseEnter={() => setDatabaseHelp(true)}
+//               onMouseLeave={() => setDatabaseHelp(false)}
+//             >
+//               <HelpCircle size={16} className="text-current" />
+//             </div>
+//           </button>
+//           {showDatabaseHelp && (
+//             <div className="absolute z-50 top-full mt-2 p-2 bg-black text-white text-xs rounded shadow-lg w-64">
+//               {databaseHelpText}
+//             </div>
+//           )}
+//       </div>
+//     </div>
+//   </div>
+//   );
+// });
 
 const QueryPage = () => {
   const { user, preferences, queryHistory, saveQuery, fetchQueryHistory } = useUser();
-  // const { activeHelp, setActiveHelp } = useHelp();
   const [activeHelp, setActiveHelp] = useState(null);
   const themeConstants = useThemeConstants();
 
@@ -112,7 +177,9 @@ const QueryPage = () => {
   const [showResultsPreview, setShowResultsPreview] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState([]);
-  const [debugInfo, setDebugInfo] = useState('');
+
+  // eslint-disable-next-line
+  const [debugInfo, setDebugInfo] = useState(''); // Disabled eslint while debug is not being used
 
   // Search Configuration State
   const [searchType, setSearchType] = useState('targeted');
@@ -146,13 +213,13 @@ const QueryPage = () => {
   const stepToSection = getStepToSection(steps);
   const [helpElement, setHelpElement] = useState(null);
 
-  // Help Feature Handlers
-  const handleToggleStepthrough = useCallback((active) => {
-    if (active) {
-      resetQuery();
-      setStepGuideState({ currentStep: 0 });
-    }
-  }, []);
+  // // Help Feature Handlers
+  // const handleToggleStepthrough = useCallback((active) => {
+  //   if (active) {
+  //     resetQuery();
+  //     setStepGuideState({ currentStep: 0 });
+  //   }
+  // }, []);
 
   // Fetch user's query history on mount
   useEffect(() => {
@@ -368,22 +435,22 @@ const QueryPage = () => {
     setDebugInfo("Full name preferences loaded");
   };
 
-  const handleHelpSelect = (option) => {
-    setActiveHelp(option);
-    if (option === 'contextHelp') {
-      // Enable hover listeners for help tooltips when contextual help is active
-      document.querySelectorAll('[data-help]').forEach(element => {
-        element.classList.add('help-enabled');
-      });
-    } else if (option?.id === 'stepthrough') {
-      setStepGuideState({ currentStep: 0 });
-    } else {
-      // Disable hover listeners when contextual help is inactive
-      document.querySelectorAll('[data-help]').forEach(element => {
-        element.classList.remove('help-enabled');
-      });
-    }
-  };
+  // const handleHelpSelect = (option) => {
+  //   setActiveHelp(option);
+  //   if (option === 'contextHelp') {
+  //     // Enable hover listeners for help tooltips when contextual help is active
+  //     document.querySelectorAll('[data-help]').forEach(element => {
+  //       element.classList.add('help-enabled');
+  //     });
+  //   } else if (option?.id === 'stepthrough') {
+  //     setStepGuideState({ currentStep: 0 });
+  //   } else {
+  //     // Disable hover listeners when contextual help is inactive
+  //     document.querySelectorAll('[data-help]').forEach(element => {
+  //       element.classList.remove('help-enabled');
+  //     });
+  //   }
+  // };
 
   const renderHelpTooltip = (children, content, maxWidth = 'max-w-xs') => {
     if (activeHelp === 'contextHelp') {
@@ -459,7 +526,7 @@ const QueryPage = () => {
         
           <div id="query-source-toggle" className="flex-grow md:flex-grow-0">
             {renderHelpTooltip2(
-              <InlineQueryToggle 
+              <QuerySourceToggle 
                 querySource={querySource}
                 setQuerySource={setQuerySource}
               />,
@@ -493,7 +560,7 @@ const QueryPage = () => {
                     disabled={isFullName}
                   />
                 </div>,
-                "Enter a gene symbol or transcript ID"
+                "Enter a gene symbol or transcript ID. Matching results will populate to guide your search"
               )}
 
               {renderHelpTooltip(
@@ -504,7 +571,7 @@ const QueryPage = () => {
                     disabled={(!selectedGene && !isFullName) || isFullName}
                   />
                 </div>,
-                "Specify the DNA change associated with this variant"
+                "Specify the DNA change associated with this variant. Matching results will populate to guide your search"
               )}
 
               {renderHelpTooltip(
@@ -515,7 +582,7 @@ const QueryPage = () => {
                     disabled={(!selectedDNAChange && !isFullName) || isFullName}
                   />
                 </div>,
-                "Specify the protein change associated with this variant"
+                "Specify the protein change associated with this variant. Matching results will populate to guide your search"
               )}
 
               {renderHelpTooltip(
@@ -546,7 +613,7 @@ const QueryPage = () => {
                     onAddVariationID={handleAddVariationID}
                   />
                 </div>,
-                "Enter a specific ClinVar variation ID"
+                "Enter a specific ClinVar variation ID - click Add to Query to include in search"
               )}
 
               {/* User preferences buttons */}

@@ -4,7 +4,7 @@
  * Adapts styles based on light/dark mode
  */
 
-import { useTheme } from './ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext';
 
 /**
  * Custom hook to access theme-based styling constants

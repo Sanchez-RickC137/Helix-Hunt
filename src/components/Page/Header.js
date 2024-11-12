@@ -9,7 +9,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { User, HelpCircle, Dna, Sun, Moon, LogOut, Menu, X } from 'lucide-react';
 import LoginRegisterModal from '../Modals/LoginRegisterModal';
 import ForgotPasswordModal from '../User/ForgotPasswordModal';
-import { useTheme } from './ThemeContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { useUser } from '../../contexts/UserContext';
 
 const Header = () => {

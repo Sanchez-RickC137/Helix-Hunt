@@ -39,14 +39,12 @@ const FloatingHelp = ({ activeHelp, setActiveHelp, stepGuideActive }) => {
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (menuRef.current && !menuRef.current.contains(event.target)) {
+      if (menuRef.current && !menuRef.current.contains(event.target))
         setIsOpen(false);
-      }
     };
 
-    if (isOpen) {
+    if (isOpen)
       document.addEventListener('mousedown', handleClickOutside);
-    }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
@@ -56,14 +54,12 @@ const FloatingHelp = ({ activeHelp, setActiveHelp, stepGuideActive }) => {
   // Close menu when pressing escape
   useEffect(() => {
     const handleEscapeKey = (event) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape')
         setIsOpen(false);
-      }
     };
 
-    if (isOpen) {
+    if (isOpen)
       document.addEventListener('keydown', handleEscapeKey);
-    }
 
     return () => {
       document.removeEventListener('keydown', handleEscapeKey);
@@ -72,9 +68,8 @@ const FloatingHelp = ({ activeHelp, setActiveHelp, stepGuideActive }) => {
 
   // Close menu when help option is active
   useEffect(() => {
-    if (activeHelp) {
+    if (activeHelp)
       setIsOpen(false);
-    }
   }, [activeHelp]);
 
   const handleOptionClick = (option) => {

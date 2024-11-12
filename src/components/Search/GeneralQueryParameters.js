@@ -64,7 +64,7 @@ const GeneralQueryParameters = ({
     <div className="space-y-6">
       {/* Search Groups Display */}
       <div>
-      <h3 className="text-xl text-center font-semibold mb-2">General Search Query Parameters</h3>
+        <h3 className="text-xl text-center font-semibold mb-2">General Search Query Parameters</h3>
         <h3 className="text-lg font-semibold mb-2">Search Groups</h3>
         {renderHelpTooltip(
           <div className="space-y-2">

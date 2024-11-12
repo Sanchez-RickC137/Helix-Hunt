@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import { ThemeProvider } from './components/Page/ThemeContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { UserProvider } from './contexts/UserContext';
 import Header from './components/Page/Header';
 import Footer from './components/Page/Footer';
