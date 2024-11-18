@@ -8,26 +8,37 @@ const { processGeneSymbolOnlyQuery } = require('./database.service');
 
 // Rate limiting configuration
 const RATE_LIMIT = {
-  maxRequests: 10,
+  maxRequests: 100,
   perMilliseconds: 1000,
-  queue: [],
-  activeRequests: 0,
-  lastReset: Date.now()
+  availableTokens: 100,
+  lastRefill: Date.now(),
 };
 
 // Batch and retry configuration
-const BATCH_SIZE = 100;
-const CONCURRENT_REQUESTS = 20;
+const BATCH_SIZE = 25;
+const CONCURRENT_REQUESTS = 50;
 const MAX_RETRIES = 10;
 
 // Configure axios defaults
+// const axiosInstance = axios.create({
+//   timeout: 30000,
+//   headers: {
+//     'Accept-Encoding': 'gzip',
+//     'Connection': 'keep-alive',
+//     'User-Agent': 'Mozilla/5.0 (compatible; HelixHunt/1.0; +http://example.com)'
+//   }
+// });
+
 const axiosInstance = axios.create({
+  baseURL: 'https://www.ncbi.nlm.nih.gov/',
   timeout: 30000,
   headers: {
-    'Accept-Encoding': 'gzip',
+    'Accept-Encoding': 'gzip, deflate',
     'Connection': 'keep-alive',
     'User-Agent': 'Mozilla/5.0 (compatible; HelixHunt/1.0; +http://example.com)'
-  }
+  },
+  httpAgent: new (require('http').Agent)({ keepAlive: true }),
+  httpsAgent: new (require('https').Agent)({ keepAlive: true })
 });
 
 // Helper functions
@@ -35,39 +46,35 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 // Rate limited request handler
 const executeRequest = async (config) => {
-  // Wait if too many active requests
-  while (RATE_LIMIT.activeRequests >= RATE_LIMIT.maxRequests) {
-    await new Promise(resolve => setTimeout(resolve, 100));
+  while (RATE_LIMIT.availableTokens <= 0) {
+    const now = Date.now();
+    const elapsed = now - RATE_LIMIT.lastRefill;
+
+    if (elapsed >= RATE_LIMIT.perMilliseconds) {
+      RATE_LIMIT.availableTokens = RATE_LIMIT.maxRequests;
+      RATE_LIMIT.lastRefill = now;
+    } else {
+      await delay(50); // Short sleep to avoid tight loop
+    }
   }
 
-  RATE_LIMIT.activeRequests++;
+  RATE_LIMIT.availableTokens--;
 
   try {
-    const response = await axios({
-      ...config,
-      timeout: 30000,
-      headers: {
-        'Accept-Encoding': 'gzip',
-        'Connection': 'keep-alive',
-        'User-Agent': 'Mozilla/5.0 (compatible; HelixHunt/1.0; +http://example.com)'
-      }
-    });
-
-    RATE_LIMIT.activeRequests--;
-    return response;
+    return await axiosInstance(config);
   } catch (error) {
-    RATE_LIMIT.activeRequests--;
     throw error;
   }
 };
 
-const processUrlBatch = async (urls, searchQuery, searchGroup = null) => {
+const processUrlBatch = async (urls, searchQuery, clinicalSignificance, startDate, endDate) => {
   const results = [];
   
   const promises = urls.map(async (url) => {
     let retryCount = 0;
     while (retryCount < MAX_RETRIES) {
       try {
+        console.log(url);
         const response = await executeRequest({ url, method: 'GET' });
         const variantPage = cheerio.load(response.data);
         
@@ -77,13 +84,30 @@ const processUrlBatch = async (urls, searchQuery, searchGroup = null) => {
         if (!variantDetailsHtml || !assertionListTable) return null;
 
         const variantDetails = parseVariantDetails(variantDetailsHtml);
-        const assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
+        let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
 
-        return {
+        // Apply filters
+        if (clinicalSignificance?.length) {
+          assertionList = assertionList.filter(a => 
+            clinicalSignificance.includes(a.Classification.value)
+          );
+        }
+        if (startDate) {
+          assertionList = assertionList.filter(a => 
+            new Date(a.Classification.date) >= new Date(startDate)
+          );
+        }
+        if (endDate) {
+          assertionList = assertionList.filter(a => 
+            new Date(a.Classification.date) <= new Date(endDate)
+          );
+        }
+
+        return assertionList.length > 0 ? {
           searchTerm: searchQuery,
           variantDetails,
           assertionList
-        };
+        } : null;
       } catch (error) {
         retryCount++;
         if (retryCount === MAX_RETRIES) {
@@ -103,22 +127,71 @@ const processUrlBatch = async (urls, searchQuery, searchGroup = null) => {
 const processAllUrls = async (urls, searchQuery, searchGroup = null) => {
   const allResults = [];
   let processedCount = 0;
+  let dynamicBatchSize = CONCURRENT_REQUESTS; // Start with the default batch size
 
-  for (let i = 0; i < urls.length; i += CONCURRENT_REQUESTS) {
-    const batchUrls = urls.slice(i, i + CONCURRENT_REQUESTS);
-    const { results } = await processUrlBatch(batchUrls, searchQuery, searchGroup);
+  // Function to adjust batch size dynamically
+  const adjustBatchSize = (successRate) => {
+    if (successRate < 0.8 && dynamicBatchSize > 5) {
+      dynamicBatchSize = Math.max(5, Math.floor(dynamicBatchSize * 0.8)); // Decrease batch size
+    } else if (successRate > 0.9 && dynamicBatchSize < 50) {
+      dynamicBatchSize = Math.min(50, Math.floor(dynamicBatchSize * 1.2)); // Increase batch size
+    }
+  };
+
+  for (let i = 0; i < urls.length; i += dynamicBatchSize) {
+    const batchUrls = urls.slice(i, i + dynamicBatchSize);
     
+    // Process a batch of URLs
+    const { results } = await processUrlBatch(batchUrls, searchQuery, searchGroup);
+
+    // Track success rate for the current batch
+    const successRate = results.length / batchUrls.length;
+    adjustBatchSize(successRate);
+
+    // Add batch results to the final collection
     allResults.push(...results);
     processedCount += batchUrls.length;
 
-    // Log progress every 100 processed
-    if (processedCount % 100 === 0 || processedCount === urls.length) {
-      console.log(`Processed ${processedCount}/${urls.length} variants (${allResults.length} successful)`);
+    // Log progress and success rate
+    console.log(
+      `Processed ${processedCount}/${urls.length} variants. ` +
+      `Batch success rate: ${(successRate * 100).toFixed(2)}%. ` +
+      `Dynamic batch size: ${dynamicBatchSize}.`
+    );
+
+    // Add a small delay to avoid overwhelming the server between batches
+    if (i + dynamicBatchSize < urls.length) {
+      await delay(100);
     }
   }
 
+  console.log(
+    `Completed processing ${processedCount} URLs. ` +
+    `Total results: ${allResults.length} successful.`
+  );
+
   return { results: allResults };
 };
+
+// const processAllUrls = async (urls, searchQuery, clinicalSignificance, startDate, endDate) => {
+//   const allResults = [];
+//   let processedCount = 0;
+
+//   for (let i = 0; i < urls.length; i += CONCURRENT_REQUESTS) {
+//     const batchUrls = urls.slice(i, i + CONCURRENT_REQUESTS);
+//     const { results } = await processUrlBatch(batchUrls, searchQuery, clinicalSignificance, startDate, endDate);
+    
+//     allResults.push(...results);
+//     processedCount += batchUrls.length;
+
+//     // Log progress every 100 processed
+//     if (processedCount % 100 === 0 || processedCount === urls.length) {
+//       console.log(`Processed ${processedCount}/${urls.length} variants (${allResults.length} successful)`);
+//     }
+//   }
+
+//   return { results: allResults };
+// };
 
 exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificance, startDate, endDate) => {
   try {
@@ -195,58 +268,6 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
   }
 };
 
-async function processBatchOfUrls(urls, searchTerms, clinicalSignificance, startDate, endDate) {
-  try {
-    const batchResults = await Promise.all(
-      urls.map(async (url) => {
-        try {
-          const variantResponse = await axios.get(url);
-          const variantPage = cheerio.load(variantResponse.data);
-          
-          const variantDetailsHtml = variantPage('#id_first').html();
-          const assertionListTable = variantPage('#assertion-list').prop('outerHTML');
-          
-          if (!variantDetailsHtml || !assertionListTable) return null;
-
-          const variantDetails = parseVariantDetails(variantDetailsHtml);
-          let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
-
-          // Apply filters
-          if (clinicalSignificance?.length) {
-            assertionList = assertionList.filter(a => 
-              clinicalSignificance.includes(a.Classification.value)
-            );
-          }
-          if (startDate) {
-            assertionList = assertionList.filter(a => 
-              new Date(a.Classification.date) >= new Date(startDate)
-            );
-          }
-          if (endDate) {
-            assertionList = assertionList.filter(a => 
-              new Date(a.Classification.date) <= new Date(endDate)
-            );
-          }
-
-          return assertionList.length > 0 ? {
-            searchTerm: searchTerms,
-            variantDetails,
-            assertionList
-          } : null;
-        } catch (error) {
-          console.error('Error processing variant URL:', url, error);
-          return null;
-        }
-      })
-    );
-
-    return batchResults.filter(Boolean);
-  } catch (error) {
-    console.error('Batch processing error:', error);
-    return [];
-  }
-}
-
 exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance, startDate, endDate) => {
   try {
     // Check for gene-symbol-only search
@@ -272,54 +293,18 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
         searchTerms += ' AND ' + searchGroup.proteinChange;
       else
         searchTerms += searchGroup.proteinChange;
-    if(searchGroup.geneSymbol)
+    if (searchGroup.geneSymbol)
       searchTerms += ' AND ' + searchGroup.geneSymbol;
 
     const searchUrl = `https://www.ncbi.nlm.nih.gov/clinvar?term=${encodeURIComponent(searchTerms)}`;
     const response = await axios.get(searchUrl);
     let $ = cheerio.load(response.data);
 
-    // Check if we're already on a VCV page
     if ($('title').text().startsWith('VCV')) {
-      const variantDetailsHtml = $('#id_first').html();
-      const assertionListTable = $('#assertion-list').prop('outerHTML');
-
-      if (!variantDetailsHtml || !assertionListTable) {
-        return [{
-          error: "Invalid response",
-          details: "Could not parse variant details",
-          searchTerms: searchTerms
-        }];
-      }
-
-      const variantDetails = parseVariantDetails(variantDetailsHtml);
-      let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
-
-      // Apply filters
-      if (clinicalSignificance?.length) {
-        assertionList = assertionList.filter(a => 
-          clinicalSignificance.includes(a.Classification.value)
-        );
-      }
-      if (startDate) {
-        assertionList = assertionList.filter(a => 
-          new Date(a.Classification.date) >= new Date(startDate)
-        );
-      }
-      if (endDate) {
-        assertionList = assertionList.filter(a => 
-          new Date(a.Classification.date) <= new Date(endDate)
-        );
-      }
-
-      return [{
-        searchTerms: searchTerms,
-        variantDetails,
-        assertionList
-      }];
+      // Handle direct VCV page
+      return processDirectVcvPage($, searchTerms, clinicalSignificance, startDate, endDate);
     }
 
-    // Handle search results page
     if ($('title').text().includes('No items found')) {
       return [{
         error: "No items found",
@@ -330,18 +315,12 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
 
     // Collect all matching URLs
     const matchingUrls = new Set();
-    const entries = $('.blocklevelaintable');
-    
-    entries.each((_, entry) => {
+    $('.blocklevelaintable').each((_, entry) => {
       const entryText = $(entry).text().trim();
       const variantUrl = $(entry).attr('href');
-      
       const matchesSearch = Object.entries(searchGroup)
         .filter(([_, value]) => value)
-        .every(([key, value]) => {
-          const searchValue = key === 'geneSymbol' ? `(${value})` : value;
-          return entryText.toLowerCase().includes(searchValue.toLowerCase());
-        });
+        .every(([key, value]) => entryText.toLowerCase().includes(value.toLowerCase()));
 
       if (matchesSearch && variantUrl) {
         matchingUrls.add(`https://www.ncbi.nlm.nih.gov${variantUrl}`);
@@ -349,27 +328,7 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
     });
 
     const urlArray = Array.from(matchingUrls);
-    const allResults = [];
-
-    // Process URLs in batches
-    for (let i = 0; i < urlArray.length; i += BATCH_SIZE) {
-      const batch = urlArray.slice(i, i + BATCH_SIZE);
-      const batchResults = await processBatchOfUrls(
-        batch,
-        searchTerms,
-        clinicalSignificance,
-        startDate,
-        endDate
-      );
-      allResults.push(...batchResults);
-
-      // Add a small delay between batches to avoid overwhelming the server
-      if (i + BATCH_SIZE < urlArray.length) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-    }
-
-    if (allResults.length === 0) {
+    if (!urlArray.length) {
       return [{
         error: "No matching variants",
         details: "No variants found matching all criteria",
@@ -377,7 +336,18 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
       }];
     }
 
-    return allResults;
+    // Process URLs using the optimized function
+    const { results } = await processAllUrls(urlArray, searchTerms, clinicalSignificance, startDate, endDate);
+
+    if (!results.length) {
+      return [{
+        error: "No matching variants",
+        details: "No variants found matching all criteria",
+        searchTerm: searchTerms
+      }];
+    }
+
+    return results;
 
   } catch (error) {
     return [{
@@ -475,6 +445,5 @@ exports.generateDownloadContent = (results, format) => {
       throw new Error('Unsupported format');
   }
 };
-
 
 exports.processGeneSymbolOnlyQuery = processGeneSymbolOnlyQuery;
