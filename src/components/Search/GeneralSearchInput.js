@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useThemeConstants } from '../Page/ThemeConstants';
 import debounce from 'lodash/debounce';
 
@@ -99,7 +99,7 @@ const GeneralSearchInput = ({ onAddSearchGroup }) => {
 
       {/* DNA Change Input */}
       <div className="space-y-2">
-      <h3 className="text-lg font-semibold mb-2">DNA Change</h3>
+        <h3 className="text-lg font-semibold mb-2">DNA Change</h3>
         <input
           type="text"
           value={dnaChange}
@@ -124,7 +124,13 @@ const GeneralSearchInput = ({ onAddSearchGroup }) => {
       {/* Add Group Button */}
       <button
         onClick={handleAddGroup}
-        className={`w-full px-4 py-2 rounded ${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white transition-colors duration-200 flex items-center justify-center`}
+        disabled={!geneSymbol && !dnaChange && !proteinChange}
+        className={`w-full px-4 py-2 rounded 
+          ${(!geneSymbol && !dnaChange && !proteinChange)
+            ? 'bg-gray-400 cursor-not-allowed'
+            : `${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor}`
+          } 
+          text-white transition-colors duration-200 flex items-center justify-center`}
       >
         <Plus size={20} className="mr-2" />
         Add Search Group

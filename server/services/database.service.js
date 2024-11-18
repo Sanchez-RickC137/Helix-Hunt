@@ -1,7 +1,22 @@
 const { pool } = require('../config/database');
+const axios = require('axios');  // Add this import
+const cheerio = require('cheerio');
+const { BASE_QUERY } = require('../constants/queries');
+
+const executeRequest = async (config) => {
+  return await axios({
+    ...config,
+    timeout: 30000,
+    headers: {
+      'Accept-Encoding': 'gzip',
+      'Connection': 'keep-alive',
+      'User-Agent': 'Mozilla/5.0 (compatible; HelixHunt/1.0; +http://example.com)'
+    }
+  });
+};
 
 // Main database query result processing.
-exports.processDbResults = (results, searchTerm) => {
+const processDbResults = (results, searchTerm) => {
   if (!results || results.length === 0) {
     return [{
       error: "No results found",
@@ -30,7 +45,7 @@ exports.processDbResults = (results, searchTerm) => {
     let proteinChange = '';
 
     // Parse name components if format matches expected pattern
-    if (fullName.includes(':') && fullName.includes('(') && fullName.includes(')')) {
+    if (fullName.includes(':') && fullName.includes('(') && fullName.includes(')') && fullName.startsWith("NM_")) {
       try {
         const geneParts = fullName.split('(');
         if (geneParts.length > 1) {
@@ -57,7 +72,7 @@ exports.processDbResults = (results, searchTerm) => {
       searchTerm,
       variantDetails: {
         fullName: mainResult.Name || '',
-        geneSymbol: mainResult.GeneSymbol || '',
+        geneSymbol: geneSymbol || '',
         transcriptID: transcriptId,
         dnaChange,
         proteinChange,
@@ -126,7 +141,7 @@ exports.constructSearchQuery = (searchGroups) => {
  * @param {Array} searchGroups - Array of search criteria groups
  * @returns {Object} Object containing SQL query and parameters
  */
-exports.constructGeneralSearchQuery = (searchGroups) => {
+const constructGeneralSearchQuery = (searchGroups, clinicalSignificance, startDate, endDate) => {
   const conditions = [];
   const params = [];
 
@@ -142,6 +157,7 @@ exports.constructGeneralSearchQuery = (searchGroups) => {
       params.push(`%${group.dnaChange}%`);
     }
     if (group.proteinChange) {
+      // Change to look specifically for protein change in the name
       groupConditions.push('vs.Name LIKE ?');
       params.push(`%${group.proteinChange}%`);
     }
@@ -151,7 +167,12 @@ exports.constructGeneralSearchQuery = (searchGroups) => {
     }
   });
 
-  const query = `
+  let query = `
+    WITH filtered_variants AS (
+      SELECT DISTINCT vs.* 
+      FROM variant_summary vs
+      WHERE ${conditions.length > 0 ? conditions.join(' OR ') : '1=1'}
+    )
     SELECT DISTINCT
       vs.VariationID,
       vs.Name,
@@ -170,11 +191,146 @@ exports.constructGeneralSearchQuery = (searchGroups) => {
       ss.SCV AS SubmitterAccession,
       ss.Description,
       ss.OriginCounts AS AlleleOrigin
-    FROM variant_summary vs
+    FROM filtered_variants vs
     LEFT JOIN submission_summary ss ON vs.VariationID = ss.VariationID
-    WHERE ${conditions.length > 0 ? conditions.join(' OR ') : '1=1'}
-    ORDER BY vs.LastEvaluated DESC
   `;
+
+  // Add filters
+  if (clinicalSignificance?.length) {
+    query += ` WHERE FIND_IN_SET(ss.ClinicalSignificance, ?)`;
+    params.push(clinicalSignificance.join(','));
+  }
+
+  const dateConditions = [];
+  if (startDate) {
+    dateConditions.push('ss.DateLastEvaluated >= ?');
+    params.push(startDate);
+  }
+  if (endDate) {
+    dateConditions.push('ss.DateLastEvaluated <= ?');
+    params.push(endDate);
+  }
+
+  if (dateConditions.length > 0) {
+    query += clinicalSignificance?.length ? ' AND ' : ' WHERE ';
+    query += dateConditions.join(' AND ');
+  }
+
+  query += ' ORDER BY ss.DateLastEvaluated DESC';
 
   return { query, params };
 };
+
+const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, startDate, endDate) => {
+  try {
+    console.log('Starting gene symbol query with filters:', {
+      geneSymbol,
+      clinicalSignificance,
+      startDate,
+      endDate
+    });
+
+    const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=clinvar&term=${geneSymbol}[gene]&retmax=20000`;
+    const response = await executeRequest({ url: esearchUrl, method: 'GET' });
+    const $ = cheerio.load(response.data, { xmlMode: true });
+
+    const totalCount = parseInt($('Count').first().text());
+    if (!totalCount) {
+      return [{
+        error: "No results found",
+        details: "No variations found for this gene symbol",
+        searchTerm: geneSymbol
+      }];
+    }
+
+    const variationIds = $('IdList Id').map((_, el) => $(el).text()).get();
+    console.log(`Retrieved ${variationIds.length} variation IDs for ${geneSymbol}`);
+
+    // Process variation IDs in chunks
+    const CHUNK_SIZE = 1000;
+    const allResults = [];
+
+    for (let i = 0; i < variationIds.length; i += CHUNK_SIZE) {
+      const chunk = variationIds.slice(i, i + CHUNK_SIZE);
+      const placeholders = chunk.map(() => "?").join(",");
+      
+      // Start building the query and params array
+      let params = [...chunk];
+      
+      let query = `
+        ${BASE_QUERY}
+        WHERE vs.VariationID IN (${placeholders})
+      `;
+
+      if (clinicalSignificance?.length) {
+        const sigPlaceholders = clinicalSignificance.map(() => "?").join(",");
+        query += ` AND ss.ClinicalSignificance IN (${sigPlaceholders})`;
+        params.push(...clinicalSignificance);
+      }
+
+      if (startDate) {
+        query += ` AND ss.DateLastEvaluated >= ?`;
+        params.push(startDate);
+      }
+
+      if (endDate) {
+        query += ` AND ss.DateLastEvaluated <= ?`;
+        params.push(endDate);
+      }
+
+      query += ` ORDER BY ss.DateLastEvaluated DESC`;
+
+      // Debug logging
+      console.log('Executing query:', query);
+
+      const [results] = await pool.execute(query, params);
+      console.log(`Raw results from database for chunk:`, results.length);
+      
+      if (results.length > 0) {
+        const processedResults = processDbResults(results, geneSymbol);
+        console.log(`Processed results for chunk:`, processedResults.length);
+        if (processedResults.length > 0) {
+          console.log('Sample processed result:', JSON.stringify(processedResults[0], null, 2));
+        }
+        allResults.push(...processedResults);
+      }
+
+      console.log(`Processed ${i + chunk.length}/${variationIds.length} variants from database (Found ${allResults.length} results)`);
+    }
+
+    if (allResults.length === 0) {
+      console.log('No results found after processing all chunks');
+      return [{
+        error: "No results found",
+        details: "No matching variants found in database",
+        searchTerm: geneSymbol
+      }];
+    }
+
+    console.log(`Total results found: ${allResults.length}`);
+    return allResults;
+
+  } catch (error) {
+    console.error('Error in gene symbol query:', error);
+    return [{
+      error: "Query processing failed",
+      details: error.message,
+      searchTerm: geneSymbol
+    }];
+  }
+};
+
+
+/**
+ * Public interface for processing gene-symbol-only queries
+ * Used by the query controller
+ */
+const processGeneSymbolDatabaseQuery = (geneSymbol, clinicalSignificance, startDate, endDate) => {
+  return processGeneSymbolOnlyQuery(geneSymbol, clinicalSignificance, startDate, endDate);
+};
+
+module.exports = {
+  processDbResults,
+  constructGeneralSearchQuery,
+  processGeneSymbolDatabaseQuery
+}

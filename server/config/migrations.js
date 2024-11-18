@@ -159,6 +159,14 @@ const migrations = [
     Variant_type VARCHAR(255),
     Submitter1_Method VARCHAR(255),
     Submitter2_Method VARCHAR(255)
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS gene_variant_counts (
+    gene_symbol VARCHAR(255) PRIMARY KEY,
+    variant_count INT NOT NULL,
+    last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_gene_symbol (gene_symbol),
+    INDEX idx_variant_count (variant_count)
   )`
 ];
 

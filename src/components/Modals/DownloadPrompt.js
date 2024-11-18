@@ -1,35 +1,68 @@
-/**
- * Download prompt modal component
- * Handles result download options and preview functionality
- * Supports multiple download formats (CSV, TSV, XML)
- * 
- * @param {Object} props
- * @param {Function} props.setShowDownloadPrompt - Controls modal visibility
- * @param {Function} props.onPreviewResults - Handler for results preview
- * @param {Array} props.results - Query results data
- * @param {Object} props.themeConstants - Theme styling constants
- */
-
-import React, { useState } from 'react';
-import { FileDown, Eye, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { FileDown, Eye, X, AlertCircle, Database, Clock } from 'lucide-react';
 import axiosInstance from '../../utils/axiosInstance';
 
 const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, themeConstants }) => {
   const [downloadFormat, setDownloadFormat] = useState('csv');
   const [downloadError, setDownloadError] = useState('');
+  
+  // Calculate result stats
+  const resultStats = useMemo(() => {
+    if (!Array.isArray(results)) return { variants: 0, assertions: 0 };
+    
+    return results.reduce((stats, result) => {
+      // Skip error results
+      if (result.error) return stats;
+  
+      // Handle database query results (gene symbol queries)
+      if (Array.isArray(result)) {
+        // Handle nested array results
+        return result.reduce((subStats, item) => ({
+          variants: subStats.variants + 1,
+          assertions: subStats.assertions + (item.assertionList?.length || 0)
+        }), stats);
+      }
+  
+      // Handle single result format (variant ID queries, web queries)
+      if (result.variantDetails && result.assertionList) {
+        return {
+          variants: stats.variants + 1,
+          assertions: stats.assertions + result.assertionList.length
+        };
+      }
+  
+      return stats;
+    }, { variants: 0, assertions: 0 });
+  }, [results]);
 
-  /**
-   * Handles file download in selected format
-   * Creates and triggers download of formatted data
-   */
+  // Constants for size thresholds
+  const PREVIEW_THRESHOLD = 1000;
+  const DOWNLOAD_THRESHOLD = 10000;
+
   const handleDownload = async () => {
     try {
       setDownloadError('');
+      
+      if (resultStats.assertions > DOWNLOAD_THRESHOLD) {
+        if (!window.confirm(
+          `This download contains ${resultStats.assertions.toLocaleString()} assertions ` +
+          `from ${resultStats.variants.toLocaleString()} variants. This may take some time. Continue?`
+        )) {
+          return;
+        }
+      }
+  
+      // Normalize results for download
+      const normalizedResults = Array.isArray(results) ? 
+        results.flatMap(result => Array.isArray(result) ? result : [result]) : 
+        [];
+  
       const response = await axiosInstance.post('/api/download', {
-        results: results,
+        results: normalizedResults,
         format: downloadFormat
       }, {
-        responseType: 'blob'
+        responseType: 'blob',
+        timeout: 300000
       });
       
       // Create and trigger download
@@ -46,19 +79,32 @@ const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, them
       setDownloadError('Failed to download results. Please try again.');
     }
   };
+  
 
-  /**
-   * Processes results to extract error messages
-   * @returns {Array<string>} Array of error messages
-   */
   const processResults = () => {
     if (!results || !Array.isArray(results)) {
       return ['No results available'];
     }
-
+  
     return results.reduce((messages, result) => {
+      // Handle array results
+      if (Array.isArray(result)) {
+        result.forEach(item => {
+          if (item.error) {
+            const message = item.searchTerm 
+              ? `${item.searchTerm}: ${item.details || item.error}`
+              : item.details || item.error;
+            messages.push(message);
+          }
+        });
+        return messages;
+      }
+  
+      // Handle single result errors
       if (result.error) {
-        const message = `${result.searchTerm || 'Query'}: ${result.error}${result.details ? ` - ${result.details}` : ''}`;
+        const message = result.searchTerm 
+          ? `${result.searchTerm}: ${result.details || result.error}`
+          : result.details || result.error;
         messages.push(message);
       }
       return messages;
@@ -67,17 +113,31 @@ const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, them
 
   const errorMessages = processResults();
   const hasValidResults = results && Array.isArray(results) && results.some(r => !r.error);
+  const previewDisabled = !hasValidResults || resultStats.assertions > PREVIEW_THRESHOLD;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40">
-      <div className={`${themeConstants.sectionBackgroundColor} p-6 rounded-lg shadow-xl max-w-md w-full transition-colors duration-200`}>
+      <div className={`${themeConstants.sectionBackgroundColor} p-6 rounded-lg shadow-xl max-w-md w-full`}>
         <h3 className={`text-xl font-semibold mb-4 ${themeConstants.headingTextColor}`}>
           Query Results Ready
         </h3>
         
-        <p className={`mb-6 ${themeConstants.mainTextColor}`}>
-          Your HelixHunt query results are ready. You can download them or preview the results.
-        </p>
+        {/* Results Statistics */}
+        <div className={`mb-6 ${themeConstants.unselectedItemBackgroundColor} p-4 rounded-lg`}>
+          <h4 className="font-semibold mb-2">Results Summary:</h4>
+          <ul className="space-y-1">
+            <li>Total Variants: {resultStats.variants.toLocaleString()}</li>
+            <li>Total Assertions: {resultStats.assertions.toLocaleString()}</li>
+          </ul>
+        </div>
+
+        {/* Size Warnings */}
+        {resultStats.assertions > PREVIEW_THRESHOLD && (
+          <div className="mb-4 p-3 bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100 rounded">
+            Preview disabled for large result sets ({resultStats.assertions.toLocaleString()} assertions).
+            Please download results instead.
+          </div>
+        )}
 
         {/* Error Messages Display */}
         {errorMessages.length > 0 && (
@@ -128,8 +188,8 @@ const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, them
           </button>
           <button
             onClick={onPreviewResults}
-            disabled={!hasValidResults}
-            className={`flex-1 ${hasValidResults
+            disabled={previewDisabled}
+            className={`flex-1 ${!previewDisabled
               ? 'bg-indigo-500 hover:bg-indigo-600'
               : 'bg-gray-400 cursor-not-allowed'
             } text-white px-4 py-2 rounded transition-colors duration-200 flex items-center justify-center`}

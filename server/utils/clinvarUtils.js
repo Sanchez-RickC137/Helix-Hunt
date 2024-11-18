@@ -79,17 +79,8 @@ function parseVariantDetails(html) {
       }
     });
 
-    // Debug logging
-    console.log('Parsed Details:', {
-      fullName: details.fullName,
-      transcriptID: details.transcriptID,
-      geneSymbol: details.geneSymbol,
-      dnaChange: details.dnaChange,
-      proteinChange: details.proteinChange
-    });
-
   } catch (error) {
-    console.error('Error parsing variant details:', error);
+    console.error('Error parsing variant details');
   }
 
   return details;

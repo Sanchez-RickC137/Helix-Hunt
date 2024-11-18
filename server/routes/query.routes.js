@@ -10,7 +10,10 @@ const {
   processVariationIdQuery,
   processFullNameQuery,
   processGeneralSearch,
-  downloadResults
+  downloadResults,
+  checkProcessingStatus,
+  fetchResultsChunk,
+  getGeneCount
 } = require('../controllers/query.controller');
 
 const router = express.Router();
@@ -18,6 +21,9 @@ const router = express.Router();
 // Query history routes
 router.post('/save-query', auth, saveQuery);
 router.get('/query-history', auth, getQueryHistory);
+router.get('/processing-status/:queryId', checkProcessingStatus);
+router.get('/results-chunk', fetchResultsChunk);
+router.get('/gene-counts/:geneSymbol', getGeneCount);
 
 // ClinVar web query routes
 router.post('/clinvar', [
@@ -40,16 +46,25 @@ router.post('/clinvar/general', [
 // Database query routes
 router.post('/database/variation-id', [
   body('variationId').notEmpty().withMessage('Variation ID is required'),
+  body('clinicalSignificance').optional().isArray(),
+  body('startDate').optional().isString(),
+  body('endDate').optional().isString(),
   validate
 ], processVariationIdQuery);
 
 router.post('/database/full-name', [
   body('fullName').notEmpty().withMessage('Full name is required'),
+  body('clinicalSignificance').optional().isArray(),
+  body('startDate').optional().isString(),
+  body('endDate').optional().isString(),
   validate
 ], processFullNameQuery);
 
 router.post('/database/general-search', [
   body('searchGroups').isArray(),
+  body('clinicalSignificance').optional().isArray(),
+  body('startDate').optional().isString(),
+  body('endDate').optional().isString(),
   validate
 ], processGeneralSearch);
 

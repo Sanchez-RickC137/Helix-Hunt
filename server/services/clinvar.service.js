@@ -3,348 +3,402 @@ const cheerio = require('cheerio');
 const { Parser } = require('json2csv');
 const xml2js = require('xml2js');
 const { parseVariantDetails, refinedClinvarHtmlTableToJson } = require('../utils/clinvarUtils');
+const largeResultHandler = require('../utils/largeResultHandler');
+const { processGeneSymbolOnlyQuery } = require('./database.service');
 
-// Configure axios defaults for optimization
-axios.defaults.timeout = 10000;
-axios.defaults.headers.common['Accept-Encoding'] = 'gzip';
-axios.defaults.headers.common['Connection'] = 'keep-alive';
+// Rate limiting configuration
+const RATE_LIMIT = {
+  maxRequests: 10,
+  perMilliseconds: 1000,
+  queue: [],
+  activeRequests: 0,
+  lastReset: Date.now()
+};
 
-// Request concurrency management
-const MAX_CONCURRENT_REQUESTS = 5;
-const requestQueue = [];
-let activeRequests = 0;
+// Batch and retry configuration
+const BATCH_SIZE = 100;
+const CONCURRENT_REQUESTS = 20;
+const MAX_RETRIES = 10;
 
-// Starts the next request 
-const processNextRequest = async () => {
-  if (activeRequests >= MAX_CONCURRENT_REQUESTS || requestQueue.length === 0) return;
-  
-  activeRequests++;
-  const { config, resolve, reject } = requestQueue.shift();
-  
+// Configure axios defaults
+const axiosInstance = axios.create({
+  timeout: 30000,
+  headers: {
+    'Accept-Encoding': 'gzip',
+    'Connection': 'keep-alive',
+    'User-Agent': 'Mozilla/5.0 (compatible; HelixHunt/1.0; +http://example.com)'
+  }
+});
+
+// Helper functions
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+// Rate limited request handler
+const executeRequest = async (config) => {
+  // Wait if too many active requests
+  while (RATE_LIMIT.activeRequests >= RATE_LIMIT.maxRequests) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+
+  RATE_LIMIT.activeRequests++;
+
   try {
-    const response = await axios(config);
-    resolve(response);
+    const response = await axios({
+      ...config,
+      timeout: 30000,
+      headers: {
+        'Accept-Encoding': 'gzip',
+        'Connection': 'keep-alive',
+        'User-Agent': 'Mozilla/5.0 (compatible; HelixHunt/1.0; +http://example.com)'
+      }
+    });
+
+    RATE_LIMIT.activeRequests--;
+    return response;
   } catch (error) {
-    reject(error);
-  } finally {
-    activeRequests--;
-    processNextRequest();
+    RATE_LIMIT.activeRequests--;
+    throw error;
   }
 };
 
-// Construct a new request
-const queuedRequest = (config) => {
-  return new Promise((resolve, reject) => {
-    requestQueue.push({ config, resolve, reject });
-    processNextRequest();
-  });
-};
-
-// Integrated data processing functions
-const processClinVarData = (data) => {
-  if (!data || typeof data !== 'object') {
-    return { error: 'Invalid data received' };
-  }
+const processUrlBatch = async (urls, searchQuery, searchGroup = null) => {
+  const results = [];
   
-  return {
-    variantInfo: data.variation_set ? data.variation_set[0] : {},
-    clinicalSignificance: data.clinical_significance || {},
-    geneInfo: data.gene_info || {},
-    conditions: data.conditions || [],
-  };
-};
+  const promises = urls.map(async (url) => {
+    let retryCount = 0;
+    while (retryCount < MAX_RETRIES) {
+      try {
+        const response = await executeRequest({ url, method: 'GET' });
+        const variantPage = cheerio.load(response.data);
+        
+        const variantDetailsHtml = variantPage('#id_first').html();
+        const assertionListTable = variantPage('#assertion-list').prop('outerHTML');
+        
+        if (!variantDetailsHtml || !assertionListTable) return null;
 
-// Get information from table
-const extractTableData = (data) => {
-  if (!data || typeof data !== 'object') {
-    return [];
-  }
-  
-  return Object.entries(data).map(([key, value]) => {
-    return {
-      field: key,
-      value: typeof value === 'object' ? JSON.stringify(value) : String(value)
-    };
+        const variantDetails = parseVariantDetails(variantDetailsHtml);
+        const assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
+
+        return {
+          searchTerm: searchQuery,
+          variantDetails,
+          assertionList
+        };
+      } catch (error) {
+        retryCount++;
+        if (retryCount === MAX_RETRIES) {
+          return null;
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+      }
+    }
   });
+
+  const batchResults = await Promise.all(promises);
+  results.push(...batchResults.filter(Boolean));
+
+  return { results };
 };
 
-// Main Web query parsing for targeted searches. Gets HTML and then parses it. Cheerio used to get html elements
+const processAllUrls = async (urls, searchQuery, searchGroup = null) => {
+  const allResults = [];
+  let processedCount = 0;
+
+  for (let i = 0; i < urls.length; i += CONCURRENT_REQUESTS) {
+    const batchUrls = urls.slice(i, i + CONCURRENT_REQUESTS);
+    const { results } = await processUrlBatch(batchUrls, searchQuery, searchGroup);
+    
+    allResults.push(...results);
+    processedCount += batchUrls.length;
+
+    // Log progress every 100 processed
+    if (processedCount % 100 === 0 || processedCount === urls.length) {
+      console.log(`Processed ${processedCount}/${urls.length} variants (${allResults.length} successful)`);
+    }
+  }
+
+  return { results: allResults };
+};
+
 exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificance, startDate, endDate) => {
-  let url;
-  let searchTerm;
-  
-  if (variantId) {
-    searchTerm = variantId;
-    url = `https://www.ncbi.nlm.nih.gov/clinvar/variation/${variantId}/`;
-  } else if (fullName) {
-    url = `https://www.ncbi.nlm.nih.gov/clinvar?term=${encodeURIComponent(fullName)}`;
-    searchTerm = fullName;
-  } else {
-    throw new Error('Either full name or variant ID is required');
-  }
-   
   try {
-    const response = await queuedRequest({ url, method: 'GET' });
-    let $ = cheerio.load(response.data);
-
-    if ($('title').text().includes('No items found')) {
-      return { 
-        error: "No items found", 
-        details: "The provided variation ID or name was not found in ClinVar.", 
-        searchTerm 
-      };
+    let searchUrl;
+    if (variantId) {
+      searchUrl = `https://www.ncbi.nlm.nih.gov/clinvar/variation/${variantId}/`;
+    } else if (fullName) {
+      searchUrl = `https://www.ncbi.nlm.nih.gov/clinvar/?term=${encodeURIComponent(fullName)}`;
+    } else {
+      return [{
+        error: "Invalid query",
+        details: "Either full name or variant ID is required",
+        searchTerm: fullName || variantId
+      }];
     }
 
-    if ($('title').text().substring(0, 3) !== "VCV") {
-      const entries = $('.blocklevelaintable');
-      let nextPage = "https://www.ncbi.nlm.nih.gov";
-      let i = 0;
-      let isFound = false;
+    const response = await executeRequest({ url: searchUrl, method: 'GET' });
+    const $ = cheerio.load(response.data);
 
-      while (i < entries.length && !isFound) {
-        const entryText = $(entries[i]).text().trim();
-        if (entryText === searchTerm) {
-          nextPage += $(entries[i]).attr('href');
-          isFound = true;
-        }
-        i++;
-      }
-     
-      if (!isFound) {
-        return { 
-          error: "Target variation not found", 
-          details: "The specific variation was not found in the search results.", 
-          searchTerm 
-        };
-      }
-
-      const targetResponse = await queuedRequest({ url: nextPage, method: 'GET' });
-      $ = cheerio.load(targetResponse.data);
+    if ($('title').text().includes('No items found')) {
+      return [{
+        error: "Not found",
+        details: "No matching variants found",
+        searchTerm: fullName || variantId
+      }];
     }
 
     const variantDetailsHtml = $('#id_first').html();
     const assertionListTable = $('#assertion-list').prop('outerHTML');
 
     if (!variantDetailsHtml || !assertionListTable) {
-      return { 
-        error: "Data not found", 
-        details: "Required data not found in the HTML", 
-        searchTerm 
-      };
+      return [{
+        error: "Invalid response",
+        details: "Could not parse variant details",
+        searchTerm: fullName || variantId
+      }];
     }
 
-    // Response response
     const variantDetails = parseVariantDetails(variantDetailsHtml);
     const assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
 
-    return {
-      searchTerm,
+    // Process results based on filters
+    if (clinicalSignificance?.length) {
+      assertionList = assertionList.filter(a => 
+        clinicalSignificance.includes(a.Classification.value)
+      );
+    }
+
+    if (startDate) {
+      assertionList = assertionList.filter(a => 
+        new Date(a.Classification.date) >= new Date(startDate)
+      );
+    }
+
+    if (endDate) {
+      assertionList = assertionList.filter(a => 
+        new Date(a.Classification.date) <= new Date(endDate)
+      );
+    }
+
+    return [{
+      searchTerm: fullName || variantId,
       variantDetails,
       assertionList
-    };
+    }];
+
   } catch (error) {
-    if (error.response?.status === 404) {
-      return { 
-        error: "Not found", 
-        details: "The requested variation was not found.", 
-        searchTerm 
-      };
-    } else if (error.response?.status === 502) {
-      return { 
-        error: "Server unavailable", 
-        details: "ClinVar server is currently unavailable. Please try again later.", 
-        searchTerm 
-      };
-    } else if (error.request) {
-      return { 
-        error: "No response", 
-        details: "No response received from ClinVar server.", 
-        searchTerm 
-      };
-    }
-    return { 
-      error: "Unexpected error", 
-      details: error.message, 
-      searchTerm 
-    };
+    console.error('Error in web query:', error);
+    return [{
+      error: "Query processing failed",
+      details: error.message,
+      searchTerm: fullName || variantId
+    }];
   }
 };
 
-// Main Web query parsing for general searches. Gets HTML and then parses it. Cheerio used to get html elements
-exports.processGeneralClinVarWebQuery = async (searchQuery, searchGroup, clinicalSignificance, startDate, endDate) => {
-  const url = `https://www.ncbi.nlm.nih.gov/clinvar?term=${searchQuery}`;
 
+exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance, startDate, endDate) => {
   try {
-    const response = await queuedRequest({ url, method: 'GET' });
+    // Check for gene-symbol-only search
+    const isGeneSymbolOnly = searchGroup.geneSymbol && 
+      !searchGroup.dnaChange && 
+      !searchGroup.proteinChange;
+
+    if (isGeneSymbolOnly) {
+      return await processGeneSymbolOnlyQuery(
+        searchGroup.geneSymbol,
+        clinicalSignificance,
+        startDate,
+        endDate
+      );
+    }
+
+    // Construct search query string
+    const searchTerms = Object.entries(searchGroup)
+      .filter(([_, value]) => value)
+      .map(([key, value]) => value)
+      .join(' AND ');
+
+    const searchUrl = `https://www.ncbi.nlm.nih.gov/clinvar?term=${encodeURIComponent(searchTerms)}`;
+    const response = await axios.get(searchUrl);
     let $ = cheerio.load(response.data);
 
     if ($('title').text().includes('No items found')) {
-      return {
+      return [{
         error: "No items found",
         details: "No variants match the search criteria.",
-        searchTerm: `${Object.values(searchGroup).filter(Boolean).join(' AND ')}`
-      };
+        searchTerm: searchTerms
+      }];
     }
 
+    const matchingUrls = new Set();
     const entries = $('.blocklevelaintable');
-    const aggregatedResults = [];
-
-    // Process entries in batches
-    const batchSize = 5;
-    for (let i = 0; i < entries.length; i += batchSize) {
-      const batchPromises = [];
+    
+    entries.each((_, entry) => {
+      const entryText = $(entry).text().trim();
+      const variantUrl = $(entry).attr('href');
       
-      for (let j = i; j < Math.min(i + batchSize, entries.length); j++) {
-        const entryText = $(entries[j]).text().trim();
-        const entryUrl = $(entries[j]).attr('href');
+      const matchesSearch = Object.entries(searchGroup)
+        .filter(([_, value]) => value)
+        .every(([key, value]) => {
+          const searchValue = key === 'geneSymbol' ? `(${value})` : value;
+          return entryText.toLowerCase().includes(searchValue.toLowerCase());
+        });
+
+      if (matchesSearch && variantUrl) {
+        matchingUrls.add(`https://www.ncbi.nlm.nih.gov${variantUrl}`);
+      }
+    });
+
+    const results = [];
+    for (const url of matchingUrls) {
+      try {
+        const variantResponse = await axios.get(url);
+        const variantPage = cheerio.load(variantResponse.data);
         
-        const matchesSearch = Object.values(searchGroup)
-          .filter(Boolean)
-          .every(term => entryText.toLowerCase().includes(term.toLowerCase()));
+        const variantDetailsHtml = variantPage('#id_first').html();
+        const assertionListTable = variantPage('#assertion-list').prop('outerHTML');
+        
+        if (!variantDetailsHtml || !assertionListTable) continue;
 
-        if (matchesSearch) {
-          const variantUrl = `https://www.ncbi.nlm.nih.gov${entryUrl}`;
-          batchPromises.push(
-            queuedRequest({ url: variantUrl, method: 'GET' })
-              .then(variantResponse => {
-                const variantPage = cheerio.load(variantResponse.data);
-                const variantDetailsHtml = variantPage('#id_first').html();
-                const assertionListTable = variantPage('#assertion-list').prop('outerHTML');
-                
-                if (!variantDetailsHtml || !assertionListTable) return null;
+        const variantDetails = parseVariantDetails(variantDetailsHtml);
+        let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
 
-                const variantDetails = parseVariantDetails(variantDetailsHtml);
-                const assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
-                
-                return {
-                  searchTerm: `${Object.values(searchGroup).filter(Boolean).join(' AND ')}`,
-                  variantDetails,
-                  assertionList,
-                  searchGroup
-                };
-              })
-              .catch(error => {
-                console.error('Error processing variant page:', error);
-                return null;
-              })
+        // Apply filters
+        if (clinicalSignificance?.length) {
+          assertionList = assertionList.filter(a => 
+            clinicalSignificance.includes(a.Classification.value)
           );
         }
+
+        if (startDate) {
+          assertionList = assertionList.filter(a => 
+            new Date(a.Classification.date) >= new Date(startDate)
+          );
+        }
+
+        if (endDate) {
+          assertionList = assertionList.filter(a => 
+            new Date(a.Classification.date) <= new Date(endDate)
+          );
+        }
+
+        if (assertionList.length > 0) {
+          results.push({
+            searchTerm: searchTerms,
+            variantDetails,
+            assertionList
+          });
+        }
+      } catch (error) {
+        console.error('Error processing variant URL:', error);
       }
-
-      const batchResults = await Promise.all(batchPromises);
-      aggregatedResults.push(...batchResults.filter(Boolean));
     }
 
-    if (aggregatedResults.length === 0) {
-      return {
+    if (results.length === 0) {
+      return [{
         error: "No matching variants",
-        details: "No variants found matching all search terms.",
-        searchTerm: `${Object.values(searchGroup).filter(Boolean).join(' AND ')}`
-      };
+        details: "No variants found matching all criteria",
+        searchTerm: searchTerms
+      }];
     }
 
-    return aggregatedResults;
+    return results;
   } catch (error) {
-    return {
+    return [{
       error: error.response?.status === 404 ? "Not found" : "Server error",
       details: error.message,
-      searchTerm: `${Object.values(searchGroup).filter(Boolean).join(' AND ')}`
-    };
+      searchTerm: Object.values(searchGroup).filter(Boolean).join(' AND ')
+    }];
   }
+};
+
+/**
+ * Normalizes results data structure for consistent processing
+ * Handles both single results and nested array results
+ */
+const normalizeResults = (results) => {
+  if (!Array.isArray(results)) return [];
+  
+  return results.flatMap(result => {
+    // Skip error results
+    if (result.error) return [];
+
+    // Handle nested array results (from database queries)
+    if (Array.isArray(result)) {
+      return result.flatMap(item => {
+        if (item.error) return [];
+        return processResultItem(item);
+      });
+    }
+
+    // Handle single result (from web queries or variation ID queries)
+    return processResultItem(result);
+  });
+};
+
+/**
+ * Processes individual result items into flat data structure
+ */
+const processResultItem = (result) => {
+  if (!result.variantDetails || !result.assertionList) return [];
+
+  return result.assertionList.map(assertion => ({
+    SearchTerm: result.searchTerm || 'N/A',
+    TranscriptID: result.variantDetails.transcriptID || 'N/A',
+    GeneSymbol: result.variantDetails.geneSymbol || 'N/A',
+    DNAChange: result.variantDetails.dnaChange || 'N/A',
+    ProteinChange: result.variantDetails.proteinChange || 'N/A',
+    GeneName: result.variantDetails.fullName || 'N/A',
+    VariationID: result.variantDetails.variationID || 'N/A',
+    AccessionID: result.variantDetails.accessionID || 'N/A',
+    Classification: `${assertion.Classification?.value || 'N/A'} (${assertion.Classification?.date || 'N/A'})`,
+    LastEvaluated: assertion.Classification?.date || 'N/A',
+    AssertionReference: assertion['Review status']?.submission_reference || 'N/A',
+    AssertionCriteria: assertion['Review status']?.['assertion criteria'] || 'N/A',
+    Method: assertion['Review status']?.method || 'N/A',
+    Condition: assertion.Condition?.name || 'N/A',
+    AffectedStatus: assertion.Condition?.['Affected status'] || 'N/A',
+    AlleleOrigin: assertion.Condition?.['Allele origin'] || 'N/A',
+    Submitter: assertion.Submitter?.name || 'N/A',
+    SubmitterAccession: assertion.Submitter?.Accession || 'N/A',
+    FirstInClinVar: assertion.Submitter?.['First in ClinVar'] || 'N/A',
+    LastUpdated: assertion.Submitter?.['Last updated'] || 'N/A',
+    Comment: assertion['More information']?.Comment || 'N/A'
+  }));
 };
 
 exports.generateDownloadContent = (results, format) => {
-  const fields = [
-    "Transcript ID", "Gene Symbol", "DNA Change", "Protein Change",
-    "Gene Name", "Variation ID", "Accession ID", "Classification",
-    "Last Evaluated", "Assertion Criteria", "Method", "Condition",
-    "Affected Status", "Allele Origin", "Submitter", "Submitter Accession",
-    "First in ClinVar", "Last Updated", "Comment"
-  ];
-
-  const data = results.flatMap(result => 
-    result.assertionList.map(row => ({
-      "Transcript ID": result.variantDetails.transcriptID,
-      "Gene Symbol": result.variantDetails.geneSymbol,
-      "DNA Change": result.variantDetails.dnaChange,
-      "Protein Change": result.variantDetails.proteinChange,
-      "Gene Name": result.variantDetails.fullName,
-      "Variation ID": result.variantDetails.variationID,
-      "Accession ID": result.variantDetails.accessionID,
-      "Classification": `${row.Classification.value || 'N/A'} (${row.Classification.date || 'N/A'})`,
-      "Last Evaluated": row.Classification.date,
-      "Assertion Criteria": row['Review status']['assertion criteria'],
-      "Method": row['Review status'].method,
-      "Condition": row.Condition.name,
-      "Affected Status": row.Condition['Affected status'],
-      "Allele Origin": row.Condition['Allele origin'],
-      "Submitter": row.Submitter.name,
-      "Submitter Accession": row.Submitter.Accession,
-      "First in ClinVar": row.Submitter['First in ClinVar'],
-      "Last Updated": row.Submitter['Last updated'],
-      "Comment": row['More information'].Comment
-    }))
-  );
-
-  if (format === 'csv') {
-    const json2csvParser = new Parser({ fields });
-    return json2csvParser.parse(data);
-  } 
-  else if (format === 'tsv') {
-    const json2csvParser = new Parser({ fields, delimiter: '\t' });
-    return json2csvParser.parse(data);
-  } 
-  else if (format === 'xml') {
-    const builder = new xml2js.Builder({
-      rootName: 'ClinVarResults',
-      xmldec: { version: '1.0', encoding: 'UTF-8' }
-    });
-    
-    const xmlObj = {
-      Result: data.map(item => ({
-        VariantDetails: {
-          TranscriptID: item['Transcript ID'],
-          GeneSymbol: item['Gene Symbol'],
-          DNAChange: item['DNA Change'],
-          ProteinChange: item['Protein Change'],
-          GeneName: item['Gene Name'],
-          VariationID: item['Variation ID'],
-          AccessionID: item['Accession ID']
-        },
-        Classification: {
-          Value: item['Classification'].split(' (')[0],
-          Date: item['Last Evaluated']
-        },
-        ReviewStatus: {
-          AssertionCriteria: item['Assertion Criteria'],
-          Method: item['Method']
-        },
-        Condition: {
-          Name: item['Condition'],
-          AffectedStatus: item['Affected Status'],
-          AlleleOrigin: item['Allele Origin']
-        },
-        Submitter: {
-          Name: item['Submitter'],
-          Accession: item['Submitter Accession'],
-          FirstInClinVar: item['First in ClinVar'],
-          LastUpdated: item['Last Updated']
-        },
-        Comment: item['Comment']
-      }))
-    };
-    
-    return builder.buildObject(xmlObj);
+  const normalizedData = normalizeResults(results);
+  
+  if (normalizedData.length === 0) {
+    throw new Error('No valid data to download');
   }
 
-  throw new Error('Unsupported format');
+  switch (format) {
+    case 'csv':
+      const csvParser = new Parser({ 
+        fields: Object.keys(normalizedData[0])
+      });
+      return csvParser.parse(normalizedData);
+
+    case 'tsv':
+      const tsvParser = new Parser({ 
+        fields: Object.keys(normalizedData[0]),
+        delimiter: '\t'
+      });
+      return tsvParser.parse(normalizedData);
+
+    case 'xml':
+      const builder = new xml2js.Builder({
+        rootName: 'ClinVarResults',
+        xmldec: { version: '1.0', encoding: 'UTF-8' }
+      });
+      return builder.buildObject({ Result: normalizedData });
+
+    default:
+      throw new Error('Unsupported format');
+  }
 };
 
-// Export all functionalities
-module.exports = {
-  processClinVarWebQuery: exports.processClinVarWebQuery,
-  processGeneralClinVarWebQuery: exports.processGeneralClinVarWebQuery,
-  generateDownloadContent: exports.generateDownloadContent,
-  processClinVarData,
-  extractTableData
-};
+
+exports.processGeneSymbolOnlyQuery = processGeneSymbolOnlyQuery;

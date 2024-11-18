@@ -1,7 +1,64 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useThemeConstants } from '../Page/ThemeConstants';
-import { X, RotateCcw } from 'lucide-react';
+import { X, RotateCcw, Database } from 'lucide-react';
+import axiosInstance from '../../utils/axiosInstance';
+
 // import HelpTooltip from '../Help/HelpTooltip';
+
+const SearchGroupEntry = ({ group, onRemove, index }) => {
+  const themeConstants = useThemeConstants();
+  const [variantInfo, setVariantInfo] = useState(null);
+
+  useEffect(() => {
+    // Only fetch for gene-symbol-only searches
+    if (group.geneSymbol && !group.dnaChange && !group.proteinChange) {
+      const fetchVariantCount = async () => {
+        try {
+          const response = await axiosInstance.get(`/api/gene-counts/${group.geneSymbol}`);
+          setVariantInfo({
+            count: response.data.variantCount
+          });
+        } catch (error) {
+          console.error('Error fetching variant count:', error);
+        }
+      };
+      fetchVariantCount();
+    }
+  }, [group]);
+
+  return (
+    <div className={`${themeConstants.unselectedItemBackgroundColor} p-4 rounded-lg relative`}>
+      <button
+        onClick={() => onRemove(index)}
+        className="absolute top-2 right-2 text-gray-500 hover:text-red-500"
+      >
+        <X size={18} />
+      </button>
+      <div className="space-y-1">
+        {group.geneSymbol && (
+          <>
+            <p><span className="font-medium">Gene Symbol:</span> {group.geneSymbol}</p>
+            {/* Variant count info - only show for gene-symbol-only searches */}
+            {variantInfo && !group.dnaChange && !group.proteinChange && (
+              <div className="mt-2 flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+                <Database size={14} />
+                <span>Due to the large number of variants a database query will be used.</span>
+                <span>•</span>
+                <span>{variantInfo.count.toLocaleString()} variants</span>
+              </div>
+            )}
+          </>
+        )}
+        {group.dnaChange && (
+          <p><span className="font-medium">DNA Change:</span> {group.dnaChange}</p>
+        )}
+        {group.proteinChange && (
+          <p><span className="font-medium">Protein Change:</span> {group.proteinChange}</p>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const GeneralQueryParameters = ({
   searchGroups,
@@ -59,6 +116,7 @@ const GeneralQueryParameters = ({
     }
     return children;
   };
+  
 
   return (
     <div className="space-y-6">
@@ -69,28 +127,12 @@ const GeneralQueryParameters = ({
         {renderHelpTooltip(
           <div className="space-y-2">
             {searchGroups.map((group, index) => (
-              <div
+              <SearchGroupEntry
                 key={index}
-                className={`${themeConstants.unselectedItemBackgroundColor} p-4 rounded-lg relative`}
-              >
-                <button
-                  onClick={() => removeSearchGroup(index)}
-                  className="absolute top-2 right-2 text-gray-500 hover:text-red-500"
-                >
-                  <X size={18} />
-                </button>
-                <div className="space-y-1">
-                  {group.geneSymbol && (
-                    <p><span className="font-medium">Gene Symbol:</span> {group.geneSymbol}</p>
-                  )}
-                  {group.dnaChange && (
-                    <p><span className="font-medium">DNA Change:</span> {group.dnaChange}</p>
-                  )}
-                  {group.proteinChange && (
-                    <p><span className="font-medium">Protein Change:</span> {group.proteinChange}</p>
-                  )}
-                </div>
-              </div>
+                group={group}
+                index={index}
+                onRemove={removeSearchGroup}
+              />
             ))}
             {searchGroups.length === 0 && (
               <p className="text-gray-500 italic">No search groups added yet</p>

@@ -285,47 +285,49 @@ const ResultsPreview = ({ results, onClose }) => {
   const renderCellContent = (column, row, result) => {
     switch (column) {
       case "Query":
-        return result.query;
+        return typeof result.searchTerm === 'object' 
+          ? Object.values(result.searchTerm).filter(Boolean).join(' AND ')
+          : result.query;
       case "Transcript ID":
-        return result.variantDetails.transcriptID;
+        return result.variantDetails?.transcriptID || 'N/A';
       case "Gene Symbol":
-        return result.variantDetails.geneSymbol;
+        return result.variantDetails?.geneSymbol || 'N/A';
       case "DNA Change":
-        return result.variantDetails.dnaChange;
+        return result.variantDetails?.dnaChange || 'N/A';
       case "Protein Change":
-        return result.variantDetails.proteinChange;
+        return result.variantDetails?.proteinChange || 'N/A';
       case "Gene Name":
-        return result.variantDetails.fullName;
+        return result.variantDetails?.fullName || 'N/A';
       case "Variation ID":
-        return result.variantDetails.variationID;
+        return result.variantDetails?.variationID || 'N/A';
       case "Accession ID":
-        return result.variantDetails.accessionID;
+        return result.variantDetails?.accessionID || 'N/A';
       case "Classification":
-        return `${row.Classification.value || 'N/A'}\n${row.Classification.date || 'N/A'}`;
+        return `${row.Classification?.value || 'N/A'} (${row.Classification?.date || 'N/A'})`;
       case "Last Evaluated":
-        return row.Classification.date;
+        return row.Classification?.date || 'N/A';
       case "Assertion Reference":
-        return row['Review status']['submission_reference'] || '';
+        return row['Review status']?.submission_reference || 'N/A';
       case "Assertion Criteria":
-        return row['Review status']['assertion criteria'];
+        return row['Review status']?.['assertion criteria'] || 'N/A';
       case "Method":
-        return row['Review status'].method;
+        return row['Review status']?.method || 'N/A';
       case "Condition":
-        return row.Condition.name;
+        return row.Condition?.name || 'N/A';
       case "Affected Status":
-        return row.Condition['Affected status'];
+        return row.Condition?.['Affected status'] || 'N/A';
       case "Allele Origin":
-        return row.Condition['Allele origin'];
+        return row.Condition?.['Allele origin'] || 'N/A';
       case "Submitter":
-        return row.Submitter.name;
+        return row.Submitter?.name || 'N/A';
       case "Submitter Accession":
-        return row.Submitter.Accession;
+        return row.Submitter?.Accession || 'N/A';
       case "First in ClinVar":
-        return row.Submitter['First in ClinVar'];
+        return row.Submitter?.['First in ClinVar'] || 'N/A';
       case "Last Updated":
-        return row.Submitter['Last updated'];
+        return row.Submitter?.['Last updated'] || 'N/A';
       case "Comment":
-        return row['More information'].Comment;
+        return row['More information']?.Comment || 'N/A';
       default:
         return 'N/A';
     }

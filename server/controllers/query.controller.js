@@ -7,7 +7,11 @@ const {
   processClinVarData, 
   extractTableData
 } = require('../services/clinvar.service');
-const { processDbResults, constructGeneralSearchQuery } = require('../services/database.service');
+const {
+  processDbResults,
+  constructGeneralSearchQuery,
+  processGeneSymbolDatabaseQuery
+ } = require('../services/database.service');
 
 // Saves a user query if a user is logged in
 exports.saveQuery = async (req, res, next) => {
@@ -72,14 +76,15 @@ exports.processClinVarQuery = async (req, res, next) => {
     
     for (const fullName of fullNames || []) {
       const result = await processClinVarWebQuery(fullName, null, clinicalSignificance, startDate, endDate);
-      results.push(result);
+      results.push(...result); // Spread the result array instead of pushing the whole array
     }
     
     for (const variantId of variationIDs || []) {
       const result = await processClinVarWebQuery(null, variantId, clinicalSignificance, startDate, endDate);
-      results.push(result);
+      results.push(...result); // Spread the result array instead of pushing the whole array
     }
 
+    console.log('Results from processClinVarQuery:', JSON.stringify(results, null, 2));
     res.json(results);
   } catch (error) {
     next(error);
@@ -95,25 +100,35 @@ exports.processGeneralQuery = async (req, res, next) => {
       return res.status(400).json({ error: 'At least one search group is required' });
     }
 
-    const results = [];
-    
+    // Check if this is a gene-symbol-only search
     for (const group of searchGroups) {
-      const searchTerms = [];
-      if (group.geneSymbol) searchTerms.push(group.geneSymbol);
-      if (group.dnaChange) searchTerms.push(group.dnaChange);
-      if (group.proteinChange) searchTerms.push(group.proteinChange);
+      if (group.geneSymbol && !group.dnaChange && !group.proteinChange) {
+        const [rows] = await pool.execute(
+          'SELECT variant_count FROM gene_variant_counts WHERE gene_symbol = ?',
+          [group.geneSymbol]
+        );
 
-      if (searchTerms.length === 0) continue;
-
-      const searchQuery = searchTerms.map(term => `(${encodeURIComponent(term)})`).join(' AND ');
-      const groupResults = await processGeneralClinVarWebQuery(searchQuery, group, clinicalSignificance, startDate, endDate);
-      
-      if (Array.isArray(groupResults)) {
-        results.push(...groupResults);
-      } else {
-        results.push(groupResults);
+        if (rows.length > 0) {
+          const variantCount = rows[0].variant_count;
+          
+          // All gene symbol only queries now use database
+          return res.json(await processGeneSymbolDatabaseQuery(
+            group.geneSymbol,
+            clinicalSignificance,
+            startDate,
+            endDate
+          ));
+        }
       }
     }
+
+    // Non-gene-symbol-only queries continue with web processing
+    const results = await processGeneralClinVarWebQuery(
+      searchGroups[0],
+      clinicalSignificance,
+      startDate,
+      endDate
+    );
 
     res.json(results);
   } catch (error) {
@@ -180,7 +195,7 @@ exports.processFullNameQuery = async (req, res) => {
 // Database based, general query
 exports.processGeneralSearch = async (req, res) => {
   try {
-    const { searchGroups } = req.body;
+    const { searchGroups, clinicalSignificance, startDate, endDate } = req.body;
     
     if (!searchGroups || !Array.isArray(searchGroups) || searchGroups.length === 0) {
       return res.json([{
@@ -189,32 +204,78 @@ exports.processGeneralSearch = async (req, res) => {
       }]);
     }
 
-    const { query, params } = constructGeneralSearchQuery(searchGroups);
-    const [results] = await pool.execute(query, params);
+    // Check for gene-symbol-only search first
+    for (const group of searchGroups) {
+      if (group.geneSymbol && !group.dnaChange && !group.proteinChange) {
+        const [rows] = await pool.execute(
+          'SELECT variant_count FROM gene_variant_counts WHERE gene_symbol = ?',
+          [group.geneSymbol]
+        );
 
-    if (!results || results.length === 0) {
-      return res.json([{
-        error: "No results found",
-        details: "No matching variants in database",
-        searchTerms: searchGroups.map(group => 
+        if (rows.length > 0) {
+          return res.json(await processGeneSymbolDatabaseQuery(
+            group.geneSymbol,
+            clinicalSignificance,
+            startDate,
+            endDate
+          ));
+        }
+      }
+    }
+
+    // For non-gene-only searches
+    const { query, params } = constructGeneralSearchQuery(searchGroups, clinicalSignificance, startDate, endDate);
+    console.log('Executing query:', query);
+    console.log('With parameters:', params);
+
+    try {
+      const [results] = await pool.execute(query, params);
+      console.log(`Query returned ${results.length} results`);
+
+      if (!results || results.length === 0) {
+        return res.json([{
+          error: "No results found",
+          details: "No matching variants in database",
+          searchTerms: searchGroups.map(group => 
+            Object.entries(group)
+              .filter(([_, value]) => value)
+              .map(([key, value]) => `${key}: ${value}`)
+              .join(', ')
+          )
+        }]);
+      }
+
+      const processedResults = processDbResults(results, 
+        searchGroups.map(group => 
           Object.entries(group)
             .filter(([_, value]) => value)
             .map(([key, value]) => `${key}: ${value}`)
             .join(', ')
-        )
-      }]);
+        ).join(' OR ')
+      );
+
+      res.json(processedResults);
+    } catch (error) {
+      console.error('Database query error:', error);
+      // Set a longer timeout and retry once
+      console.log('Retrying query with longer timeout...');
+      pool.execute(query, params, { timeout: 60000 })
+        .then(([results]) => {
+          const processedResults = processDbResults(results, 
+            searchGroups.map(group => 
+              Object.entries(group)
+                .filter(([_, value]) => value)
+                .map(([key, value]) => `${key}: ${value}`)
+                .join(', ')
+            ).join(' OR ')
+          );
+          res.json(processedResults);
+        })
+        .catch(retryError => {
+          console.error('Retry failed:', retryError);
+          throw retryError;
+        });
     }
-
-    const processedResults = processDbResults(results, 
-      searchGroups.map(group => 
-        Object.entries(group)
-          .filter(([_, value]) => value)
-          .map(([key, value]) => `${key}: ${value}`)
-          .join(', ')
-      ).join(' OR ')
-    );
-
-    res.json(processedResults);
   } catch (error) {
     console.error('Database general search error:', error);
     res.status(500).json([{
@@ -224,31 +285,106 @@ exports.processGeneralSearch = async (req, res) => {
   }
 };
 
+exports.fetchResultsChunk = async (req, res) => {
+  const { fileId, offset, limit } = req.query;
+  
+  try {
+    const results = await clinvarService.fetchResultsChunk(
+      fileId,
+      parseInt(offset) || 0,
+      parseInt(limit) || 100
+    );
+    res.json(results);
+  } catch (error) {
+    console.error('Error fetching results chunk:', error);
+    res.status(500).json({ error: 'Failed to fetch results' });
+  }
+};
+
 // Download query Results to file 
-exports.downloadResults = (req, res) => {
+exports.downloadResults = async (req, res) => {
   try {
     const { results, format } = req.body;
-    const content = generateDownloadContent(results, format);
-    
-    let contentType;
-    switch (format) {
-      case 'csv':
-        contentType = 'text/csv';
-        break;
-      case 'tsv':
-        contentType = 'text/tab-separated-values';
-        break;
-      case 'xml':
-        contentType = 'application/xml';
-        break;
-      default:
-        throw new Error('Unsupported format');
+
+    if (!results || !format) {
+      return res.status(400).json({ error: 'Missing required parameters' });
     }
-    
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `attachment; filename=clinvar_results.${format}`);
+
+    const content = generateDownloadContent(results, format);
+
+    // Set appropriate headers
+    const contentTypes = {
+      csv: 'text/csv',
+      tsv: 'text/tab-separated-values',
+      xml: 'application/xml'
+    };
+
+    res.setHeader('Content-Type', contentTypes[format]);
+    res.setHeader('Content-Disposition', `attachment; filename=clinvar_results_${new Date().toISOString().split('T')[0]}.${format}`);
+
     res.send(content);
+
   } catch (error) {
+    console.error('Download generation error:', error);
     res.status(500).json({ error: 'Failed to generate download' });
+  }
+};
+
+
+exports.checkProcessingStatus = async (req, res) => {
+  const { queryId } = req.params;
+  
+  try {
+    const [rows] = await pool.query(
+      'SELECT status, progress, total_items, error_message FROM processing_status WHERE id = ?',
+      [queryId]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Processing status not found' });
+    }
+
+    res.json(rows[0]);
+  } catch (error) {
+    console.error('Error checking processing status:', error);
+    res.status(500).json({ error: 'Failed to check processing status' });
+  }
+};
+
+const geneCountCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+exports.getGeneCount = async (req, res) => {
+  try {
+    const { geneSymbol } = req.params;
+
+    // Check cache first
+    const cachedData = geneCountCache.get(geneSymbol);
+    if (cachedData && (Date.now() - cachedData.timestamp < CACHE_TTL)) {
+      return res.json(cachedData.data);
+    }
+
+    const [rows] = await pool.execute(
+      'SELECT variant_count FROM gene_variant_counts WHERE gene_symbol = ?',
+      [geneSymbol]
+    );
+
+    const result = rows.length === 0 
+      ? { variantCount: 0, isDatabaseSearch: false }
+      : { 
+          variantCount: rows[0].variant_count,
+          isDatabaseSearch: rows[0].variant_count > 1000
+        };
+
+    // Cache the result
+    geneCountCache.set(geneSymbol, {
+      timestamp: Date.now(),
+      data: result
+    });
+
+    res.json(result);
+
+  } catch (error) {
+    console.error('Error fetching gene count:', error);
+    res.status(500).json({ error: 'Failed to fetch gene count' });
   }
 };

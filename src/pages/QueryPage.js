@@ -340,25 +340,36 @@ const QueryPage = () => {
           response = await axiosInstance.post('/api/clinvar/general', queryParams);
         }
       } else {
+        // Database queries
         if (searchType === 'targeted') {
           if (addedVariationIDs.length > 0) {
             response = await axiosInstance.post('/api/database/variation-id', {
-              variationId: addedVariationIDs[0]
+              variationId: addedVariationIDs[0],
+              clinicalSignificance,
+              startDate,
+              endDate
             });
           } else if (addedFullNames.length > 0) {
             response = await axiosInstance.post('/api/database/full-name', {
-              fullName: addedFullNames[0]
+              fullName: addedFullNames[0],
+              clinicalSignificance,
+              startDate,
+              endDate
             });
           } else {
             throw new Error('No valid search criteria provided');
           }
         } else {
+          // General database search
           response = await axiosInstance.post('/api/database/general-search', {
             searchGroups: searchGroups.map(group => ({
               geneSymbol: group.geneSymbol || null,
               dnaChange: group.dnaChange || null,
               proteinChange: group.proteinChange || null
-            }))
+            })),
+            clinicalSignificance,
+            startDate,
+            endDate
           });
         }
       }
@@ -366,6 +377,12 @@ const QueryPage = () => {
       const end = performance.now();
       const duration = (end - start) / 1000;
       console.log(`Query ${queryType} completed in ${duration.toFixed(2)} seconds`);
+      console.log('Query parameters:', {
+        searchGroups,
+        clinicalSignificance,
+        startDate,
+        endDate
+      });
       
       setQueryResults(response.data);
       setShowReviewModal(false);
