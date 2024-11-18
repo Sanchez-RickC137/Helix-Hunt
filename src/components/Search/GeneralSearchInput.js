@@ -75,7 +75,7 @@ const GeneralSearchInput = ({ onAddSearchGroup }) => {
               setGeneSymbol(e.target.value);
               updateSuggestions(e.target.value);
             }}
-            className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border`}
+            className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor}`}
             placeholder="Enter gene symbol..."
           />
           {geneSuggestions.length > 0 && (
@@ -104,7 +104,7 @@ const GeneralSearchInput = ({ onAddSearchGroup }) => {
           type="text"
           value={dnaChange}
           onChange={(e) => setDNAChange(e.target.value)}
-          className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border`}
+          className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor}`}
           placeholder="Enter DNA change..."
         />
       </div>
@@ -116,7 +116,7 @@ const GeneralSearchInput = ({ onAddSearchGroup }) => {
           type="text"
           value={proteinChange}
           onChange={(e) => setProteinChange(e.target.value)}
-          className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor} border`}
+          className={`w-full p-2 rounded ${themeConstants.inputBackgroundColor} ${themeConstants.inputTextColor}`}
           placeholder="Enter protein change..."
         />
       </div>

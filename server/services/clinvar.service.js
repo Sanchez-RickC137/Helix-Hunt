@@ -195,6 +195,57 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
   }
 };
 
+async function processBatchOfUrls(urls, searchTerms, clinicalSignificance, startDate, endDate) {
+  try {
+    const batchResults = await Promise.all(
+      urls.map(async (url) => {
+        try {
+          const variantResponse = await axios.get(url);
+          const variantPage = cheerio.load(variantResponse.data);
+          
+          const variantDetailsHtml = variantPage('#id_first').html();
+          const assertionListTable = variantPage('#assertion-list').prop('outerHTML');
+          
+          if (!variantDetailsHtml || !assertionListTable) return null;
+
+          const variantDetails = parseVariantDetails(variantDetailsHtml);
+          let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
+
+          // Apply filters
+          if (clinicalSignificance?.length) {
+            assertionList = assertionList.filter(a => 
+              clinicalSignificance.includes(a.Classification.value)
+            );
+          }
+          if (startDate) {
+            assertionList = assertionList.filter(a => 
+              new Date(a.Classification.date) >= new Date(startDate)
+            );
+          }
+          if (endDate) {
+            assertionList = assertionList.filter(a => 
+              new Date(a.Classification.date) <= new Date(endDate)
+            );
+          }
+
+          return assertionList.length > 0 ? {
+            searchTerm: searchTerms,
+            variantDetails,
+            assertionList
+          } : null;
+        } catch (error) {
+          console.error('Error processing variant URL:', url, error);
+          return null;
+        }
+      })
+    );
+
+    return batchResults.filter(Boolean);
+  } catch (error) {
+    console.error('Batch processing error:', error);
+    return [];
+  }
+}
 
 exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance, startDate, endDate) => {
   try {
@@ -213,15 +264,62 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
     }
 
     // Construct search query string
-    const searchTerms = Object.entries(searchGroup)
-      .filter(([_, value]) => value)
-      .map(([key, value]) => value)
-      .join(' AND ');
+    let searchTerms = '';
+    if (searchGroup.dnaChange)
+      searchTerms += searchGroup.dnaChange;
+    if (searchGroup.proteinChange)
+      if (searchGroup.dnaChange)
+        searchTerms += ' AND ' + searchGroup.proteinChange;
+      else
+        searchTerms += searchGroup.proteinChange;
+    if(searchGroup.geneSymbol)
+      searchTerms += ' AND ' + searchGroup.geneSymbol;
 
     const searchUrl = `https://www.ncbi.nlm.nih.gov/clinvar?term=${encodeURIComponent(searchTerms)}`;
     const response = await axios.get(searchUrl);
     let $ = cheerio.load(response.data);
 
+    // Check if we're already on a VCV page
+    if ($('title').text().startsWith('VCV')) {
+      const variantDetailsHtml = $('#id_first').html();
+      const assertionListTable = $('#assertion-list').prop('outerHTML');
+
+      if (!variantDetailsHtml || !assertionListTable) {
+        return [{
+          error: "Invalid response",
+          details: "Could not parse variant details",
+          searchTerms: searchTerms
+        }];
+      }
+
+      const variantDetails = parseVariantDetails(variantDetailsHtml);
+      let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
+
+      // Apply filters
+      if (clinicalSignificance?.length) {
+        assertionList = assertionList.filter(a => 
+          clinicalSignificance.includes(a.Classification.value)
+        );
+      }
+      if (startDate) {
+        assertionList = assertionList.filter(a => 
+          new Date(a.Classification.date) >= new Date(startDate)
+        );
+      }
+      if (endDate) {
+        assertionList = assertionList.filter(a => 
+          new Date(a.Classification.date) <= new Date(endDate)
+        );
+      }
+
+      return [{
+        searchTerms: searchTerms,
+        variantDetails,
+        assertionList
+      }];
+    }
+
+    // Handle search results page
     if ($('title').text().includes('No items found')) {
       return [{
         error: "No items found",
@@ -230,6 +328,7 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
       }];
     }
 
+    // Collect all matching URLs
     const matchingUrls = new Set();
     const entries = $('.blocklevelaintable');
     
@@ -249,52 +348,28 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
       }
     });
 
-    const results = [];
-    for (const url of matchingUrls) {
-      try {
-        const variantResponse = await axios.get(url);
-        const variantPage = cheerio.load(variantResponse.data);
-        
-        const variantDetailsHtml = variantPage('#id_first').html();
-        const assertionListTable = variantPage('#assertion-list').prop('outerHTML');
-        
-        if (!variantDetailsHtml || !assertionListTable) continue;
+    const urlArray = Array.from(matchingUrls);
+    const allResults = [];
 
-        const variantDetails = parseVariantDetails(variantDetailsHtml);
-        let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
+    // Process URLs in batches
+    for (let i = 0; i < urlArray.length; i += BATCH_SIZE) {
+      const batch = urlArray.slice(i, i + BATCH_SIZE);
+      const batchResults = await processBatchOfUrls(
+        batch,
+        searchTerms,
+        clinicalSignificance,
+        startDate,
+        endDate
+      );
+      allResults.push(...batchResults);
 
-        // Apply filters
-        if (clinicalSignificance?.length) {
-          assertionList = assertionList.filter(a => 
-            clinicalSignificance.includes(a.Classification.value)
-          );
-        }
-
-        if (startDate) {
-          assertionList = assertionList.filter(a => 
-            new Date(a.Classification.date) >= new Date(startDate)
-          );
-        }
-
-        if (endDate) {
-          assertionList = assertionList.filter(a => 
-            new Date(a.Classification.date) <= new Date(endDate)
-          );
-        }
-
-        if (assertionList.length > 0) {
-          results.push({
-            searchTerm: searchTerms,
-            variantDetails,
-            assertionList
-          });
-        }
-      } catch (error) {
-        console.error('Error processing variant URL:', error);
+      // Add a small delay between batches to avoid overwhelming the server
+      if (i + BATCH_SIZE < urlArray.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
       }
     }
 
-    if (results.length === 0) {
+    if (allResults.length === 0) {
       return [{
         error: "No matching variants",
         details: "No variants found matching all criteria",
@@ -302,7 +377,8 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
       }];
     }
 
-    return results;
+    return allResults;
+
   } catch (error) {
     return [{
       error: error.response?.status === 404 ? "Not found" : "Server error",

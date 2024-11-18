@@ -167,7 +167,20 @@ const migrations = [
     last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_gene_symbol (gene_symbol),
     INDEX idx_variant_count (variant_count)
-  )`
+  )`,
+
+  `CREATE TABLE IF NOT EXISTS component_parts (
+  variation_id VARCHAR(255) NOT NULL,
+  gene_symbol VARCHAR(255),
+  transcript_id VARCHAR(255),
+  dna_change TEXT,
+  protein_change TEXT,
+  PRIMARY KEY (variation_id),
+  INDEX idx_gene_symbol (gene_symbol),
+  INDEX idx_dna_change (dna_change(255)),
+  INDEX idx_protein_change (protein_change(255))
+  ) ENGINE=InnoDB
+ `
 ];
 
 async function runMigrations() {

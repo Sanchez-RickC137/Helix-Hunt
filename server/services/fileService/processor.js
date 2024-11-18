@@ -9,24 +9,20 @@ const FILE_TABLE_MAP = {
   'hgvs4variation.txt.gz': 'hgvs_variation'
 };
 
+const cleanupQueries = [
+  `DELETE FROM submission_summary WHERE VariationID LIKE '#%'`,
+  `DELETE FROM hgvs_variation WHERE Symbol LIKE '#%'`
+];
+
 /**
  * Process a single file into the database
  */
 async function processSingleFile(pool, fileInfo, directories, logger) {
   const { fileName, processedPath } = fileInfo;
-  
-  // Get the correct table name from the mapping
   const tableName = FILE_TABLE_MAP[fileName];
+
   if (!tableName) {
     throw new Error(`No table mapping found for file: ${fileName}`);
-  }
-
-  // Log the operation being attempted
-  logger.log(`Attempting to load ${fileName} into table ${tableName}`);
-
-  // Verify the processed file exists
-  if (!processedPath || !(await verifyFile(processedPath, logger))) {
-    throw new Error(`File not found or not readable: ${processedPath}`);
   }
 
   const connection = await pool.getConnection();
@@ -35,13 +31,8 @@ async function processSingleFile(pool, fileInfo, directories, logger) {
     await connection.query('SET unique_checks = 0');
     await connection.query('SET autocommit = 0');
 
-    // Clear existing data from the table
-    logger.log(`Clearing existing data from ${tableName}...`);
     await connection.query(`TRUNCATE TABLE ${tableName}`);
 
-    logger.log(`Loading ${processedPath} into ${tableName}...`);
-    
-    // Use LOAD DATA INFILE with the processed file path
     await connection.query(`
       LOAD DATA LOCAL INFILE ?
       INTO TABLE ${tableName}
@@ -51,18 +42,17 @@ async function processSingleFile(pool, fileInfo, directories, logger) {
       IGNORE 1 LINES
     `, [processedPath]);
 
+    // Updated cleanup logic
+    if (tableName === 'submission_summary') {
+      await connection.query(`DELETE FROM ${tableName} WHERE VariationID LIKE '#%'`);
+    } else if (tableName === 'hgvs_variation') {
+      await connection.query(`DELETE FROM ${tableName} WHERE Symbol LIKE '#%'`);
+    }
+
     await connection.query('COMMIT');
-
-    // Verify row count
-    const [countResult] = await connection.query(`SELECT COUNT(*) as count FROM ${tableName}`);
-    logger.log(`Loaded ${countResult[0].count} rows into ${tableName}`);
-
-    // Restore settings
     await connection.query('SET foreign_key_checks = 1');
     await connection.query('SET unique_checks = 1');
     await connection.query('SET autocommit = 1');
-
-    logger.log(`Successfully processed ${fileName}`);
 
   } catch (error) {
     logger.log(`Error loading data into ${tableName}: ${error.message}`, 'error');

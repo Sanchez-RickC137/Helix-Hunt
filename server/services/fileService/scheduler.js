@@ -4,6 +4,7 @@ const fs = require('fs').promises;
 const { downloadFile, scrapeFileList } = require('./downloader');
 const { processSingleFile } = require('./processor');
 const { updateGeneCounts } = require('./geneCount.service');
+const { populateComponentParts } = require('./populateComponentParts');
 const Logger = require('./utils/logger');
 const MD5Verifier = require('./utils/md5Verifier');
 const timeOperation = require('./utils/timing');
@@ -265,6 +266,16 @@ async function processAllFiles(pool) {
       summary.addError(`Gene count update failed: ${error.message}`);
       logger.log(`Failed to update gene counts: ${error.message}`, 'error');
     }
+
+    // Populate component_parts table
+    // try {
+    //   logger.log('Starting population of component_parts table');
+    //   await populateComponentParts();
+    //   logger.log('Successfully populated component_parts table');
+    // } catch (error) {
+    //   summary.addError(`Component parts population failed: ${error.message}`);
+    //   logger.log(`Failed to populate component_parts: ${error.message}`, 'error');
+    // }
 
     // Send summary email
     await logger.sendEmail(

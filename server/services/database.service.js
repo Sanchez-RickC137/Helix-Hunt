@@ -111,29 +111,31 @@ const processDbResults = (results, searchTerm) => {
 };
 
 // Database general search data processing
-exports.constructSearchQuery = (searchGroups) => {
-  return searchGroups.map(group => {
-    const conditions = [];
-    const params = [];
-    
-    if (group.geneSymbol) {
-      conditions.push('vs.GeneSymbol LIKE ?');
-      params.push(`%${group.geneSymbol}%`);
-    }
-    if (group.dnaChange) {
-      conditions.push('vs.Name LIKE ?');
-      params.push(`%${group.dnaChange}%`);
-    }
-    if (group.proteinChange) {
-      conditions.push('vs.Name LIKE ?');
-      params.push(`%${group.proteinChange}%`);
-    }
+const constructSearchQuery = (conditions, clinicalSignificance, startDate, endDate) => {
+  let query = `
+    WITH filtered_variants AS (
+      SELECT DISTINCT vs.* 
+      FROM variant_summary vs
+      WHERE ${conditions.length > 0 ? conditions.join(' OR ') : '1=1'}
+    )
+    ${BASE_QUERY.replace('FROM variant_summary vs', 'FROM filtered_variants vs')}
+  `;
 
-    return {
-      conditions: conditions.length > 0 ? conditions.join(' AND ') : null,
-      params
-    };
-  }).filter(query => query.conditions !== null);
+  if (clinicalSignificance?.length) {
+    query += ` AND ss.ClinicalSignificance IN (${clinicalSignificance.map(() => '?').join(',')})`;
+  }
+
+  if (startDate) {
+    query += ` AND ss.DateLastEvaluated >= ?`;
+  }
+
+  if (endDate) {
+    query += ` AND ss.DateLastEvaluated <= ?`;
+  }
+
+  query += ' ORDER BY ss.DateLastEvaluated DESC';
+
+  return query;
 };
 
 /**
@@ -148,22 +150,27 @@ const constructGeneralSearchQuery = (searchGroups, clinicalSignificance, startDa
   searchGroups.forEach(group => {
     const groupConditions = [];
     
-    if (group.geneSymbol) {
-      groupConditions.push('vs.GeneSymbol = ?');
-      params.push(group.geneSymbol);
-    }
-    if (group.dnaChange) {
-      groupConditions.push('vs.Name LIKE ?');
-      params.push(`%${group.dnaChange}%`);
-    }
-    if (group.proteinChange) {
-      // Change to look specifically for protein change in the name
-      groupConditions.push('vs.Name LIKE ?');
-      params.push(`%${group.proteinChange}%`);
+    if (group.geneSymbol || group.dnaChange || group.proteinChange) {
+      groupConditions.push('EXISTS (SELECT 1 FROM component_parts cp WHERE cp.variation_id = vs.VariationID');
+      
+      if (group.geneSymbol) {
+        groupConditions.push('AND cp.gene_symbol = ?');
+        params.push(group.geneSymbol);
+      }
+      if (group.dnaChange) {
+        groupConditions.push('AND cp.dna_change = ?');
+        params.push(group.dnaChange);
+      }
+      if (group.proteinChange) {
+        groupConditions.push('AND cp.protein_change = ?');
+        params.push(group.proteinChange);
+      }
+      
+      groupConditions.push(')');
     }
 
     if (groupConditions.length > 0) {
-      conditions.push(`(${groupConditions.join(' AND ')})`);
+      conditions.push(`(${groupConditions.join(' ')})`);
     }
   });
 
@@ -195,30 +202,106 @@ const constructGeneralSearchQuery = (searchGroups, clinicalSignificance, startDa
     LEFT JOIN submission_summary ss ON vs.VariationID = ss.VariationID
   `;
 
-  // Add filters
   if (clinicalSignificance?.length) {
     query += ` WHERE FIND_IN_SET(ss.ClinicalSignificance, ?)`;
     params.push(clinicalSignificance.join(','));
   }
 
-  const dateConditions = [];
-  if (startDate) {
-    dateConditions.push('ss.DateLastEvaluated >= ?');
-    params.push(startDate);
-  }
-  if (endDate) {
-    dateConditions.push('ss.DateLastEvaluated <= ?');
-    params.push(endDate);
-  }
-
-  if (dateConditions.length > 0) {
+  if (startDate || endDate) {
     query += clinicalSignificance?.length ? ' AND ' : ' WHERE ';
-    query += dateConditions.join(' AND ');
+    if (startDate) {
+      query += 'ss.DateLastEvaluated >= ? ';
+      params.push(startDate);
+    }
+    if (endDate) {
+      query += startDate ? 'AND ' : '';
+      query += 'ss.DateLastEvaluated <= ?';
+      params.push(endDate);
+    }
   }
 
   query += ' ORDER BY ss.DateLastEvaluated DESC';
 
   return { query, params };
+};
+
+
+
+const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate, endDate) => {
+  const conditions = [];
+  const params = [];
+  
+  if (group.geneSymbol || group.dnaChange || group.proteinChange) {
+    conditions.push('EXISTS (SELECT 1 FROM component_parts cp WHERE cp.variation_id = vs.VariationID');
+    
+    if (group.geneSymbol) {
+      conditions.push('AND cp.gene_symbol = ?');
+      params.push(group.geneSymbol);
+    }
+    if (group.dnaChange) {
+      conditions.push('AND cp.dna_change = ?');
+      params.push(group.dnaChange);
+    }
+    if (group.proteinChange) {
+      conditions.push('AND cp.protein_change = ?');
+      params.push(group.proteinChange);
+    }
+    
+    conditions.push(')');
+  }
+
+  let query = `
+    WITH filtered_variants AS (
+      SELECT DISTINCT vs.* 
+      FROM variant_summary vs
+      WHERE ${conditions.join(' ')}
+    )
+    ${BASE_QUERY.replace('FROM variant_summary vs', 'FROM filtered_variants vs')}
+  `;
+
+  if (clinicalSignificance?.length) {
+    query += ` AND ss.ClinicalSignificance IN (${clinicalSignificance.map(() => '?').join(',')})`;
+    params.push(...clinicalSignificance);
+  }
+
+  if (startDate) {
+    query += ` AND ss.DateLastEvaluated >= ?`;
+    params.push(startDate);
+  }
+
+  if (endDate) {
+    query += ` AND ss.DateLastEvaluated <= ?`;
+    params.push(endDate);
+  }
+
+  query += ' ORDER BY ss.DateLastEvaluated DESC';
+
+  try {
+    console.log('Executing single group query:', {
+      group,
+      conditions,
+      params: params.length
+    });
+
+    const [results] = await pool.execute(query, params, { timeout: 30000 });
+    
+    return processDbResults(results, 
+      Object.entries(group)
+        .filter(([_, value]) => value)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(', ')
+    );
+  } catch (error) {
+    console.error('Database query error for group:', group, error);
+    return [{
+      error: "Query failed",
+      details: error.message,
+      searchTerms: Object.entries(group)
+        .filter(([_, value]) => value)
+        .map(([key, value]) => `${key}: ${value}`)
+        .join(', ')
+    }];
+  }
 };
 
 const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, startDate, endDate) => {
@@ -332,5 +415,6 @@ const processGeneSymbolDatabaseQuery = (geneSymbol, clinicalSignificance, startD
 module.exports = {
   processDbResults,
   constructGeneralSearchQuery,
-  processGeneSymbolDatabaseQuery
+  processGeneSymbolDatabaseQuery,
+  processSingleNonGeneGroup
 }

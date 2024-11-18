@@ -11,14 +11,15 @@ import {
   Navigation2,
   Layout,
   FileText,
-  Mail
+  Mail,
+  AlertCircle
 } from 'lucide-react';
 
-const HelpCard = ({ icon: Icon, title, children }) => {
+const HelpCard = ({ icon: Icon, title, children, fullWidth }) => {
   const themeConstants = useThemeConstants();
   
   return (
-    <div className={`${themeConstants.sectionBackgroundColor} rounded-lg shadow-lg overflow-hidden`}>
+    <div className={`${themeConstants.sectionBackgroundColor} rounded-lg shadow-lg overflow-hidden ${fullWidth ? 'md:col-span-2' : ''}`}>
       <div className={`p-6 ${themeConstants.unselectedItemBackgroundColor}`}>
         <div className="flex items-center">
           <Icon className={`${themeConstants.labelAccentColor} mr-3`} size={24} />
@@ -60,7 +61,6 @@ const HelpPage = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Getting Started */}
         <HelpCard icon={Compass} title="Getting Started">
           <ol className="list-decimal list-inside space-y-4">
             <li>Create an account or log in to access personalized features</li>
@@ -71,7 +71,6 @@ const HelpPage = () => {
           </ol>
         </HelpCard>
 
-        {/* Help Features */}
         <HelpCard icon={HelpCircle} title="Help Options">
           <div className="space-y-4">
             <div>
@@ -85,9 +84,8 @@ const HelpPage = () => {
           </div>
         </HelpCard>
 
-        {/* Search Types */}
         <HelpCard icon={Database} title="Search Types">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="space-y-4">
             <ListSection 
               title="Targeted Search"
               items={[
@@ -108,7 +106,6 @@ const HelpPage = () => {
           </div>
         </HelpCard>
 
-        {/* Query Sources */}
         <HelpCard icon={Layout} title="Query Sources">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <ListSection 
@@ -130,7 +127,6 @@ const HelpPage = () => {
           </div>
         </HelpCard>
 
-        {/* Results and Downloads */}
         <HelpCard icon={Download} title="Working with Results">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <ListSection 
@@ -152,7 +148,6 @@ const HelpPage = () => {
           </div>
         </HelpCard>
 
-        {/* Account Features */}
         <HelpCard icon={Save} title="Account Features">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <ListSection 
@@ -174,7 +169,28 @@ const HelpPage = () => {
           </div>
         </HelpCard>
 
-        {/* Best Practices */}
+        <HelpCard icon={AlertCircle} title="Large Result Handling">
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-medium mb-2">Gene Symbol Only Searches</h3>
+              <p className="mb-2">When searching using only a gene symbol, the system automatically uses a database query for optimal performance. This applies to both search types and provides:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Faster query processing for genes with many variants</li>
+                <li>Automatic variant count detection</li>
+                <li>Weekly synchronized data with ClinVar</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-medium mb-2">Result Size Limitations</h3>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Preview disabled for results with over 1,000 assertions</li>
+                <li>Large downloads (over 10,000 assertions) require confirmation</li>
+                <li>Use filters to reduce result size if needed</li>
+              </ul>
+            </div>
+          </div>
+        </HelpCard>
+
         <HelpCard icon={History} title="Best Practices">
           <ul className="list-disc list-inside space-y-3">
             <li>Use targeted search for known variants</li>
@@ -184,8 +200,7 @@ const HelpPage = () => {
           </ul>
         </HelpCard>
 
-        {/* Support */}
-        <HelpCard icon={Mail} title="Support">
+        <HelpCard icon={Mail} title="Support" fullWidth>
           <div className="text-center">
             <p>Need additional assistance? Contact our support team at:</p>
             <p className={`mt-2 ${themeConstants.labelAccentColor} font-semibold`}>

@@ -10,7 +10,8 @@ const {
 const {
   processDbResults,
   constructGeneralSearchQuery,
-  processGeneSymbolDatabaseQuery
+  processGeneSymbolDatabaseQuery,
+  processSingleNonGeneGroup
  } = require('../services/database.service');
 
 // Saves a user query if a user is logged in
@@ -96,41 +97,67 @@ exports.processGeneralQuery = async (req, res, next) => {
   try {
     const { searchGroups, clinicalSignificance, startDate, endDate } = req.body;
     
-    if (!searchGroups || searchGroups.length === 0) {
+    if (!searchGroups?.length) {
       return res.status(400).json({ error: 'At least one search group is required' });
     }
 
-    // Check if this is a gene-symbol-only search
-    for (const group of searchGroups) {
-      if (group.geneSymbol && !group.dnaChange && !group.proteinChange) {
-        const [rows] = await pool.execute(
-          'SELECT variant_count FROM gene_variant_counts WHERE gene_symbol = ?',
-          [group.geneSymbol]
-        );
-
-        if (rows.length > 0) {
-          const variantCount = rows[0].variant_count;
-          
-          // All gene symbol only queries now use database
-          return res.json(await processGeneSymbolDatabaseQuery(
-            group.geneSymbol,
-            clinicalSignificance,
-            startDate,
-            endDate
-          ));
-        }
-      }
+    if (searchGroups.length > 5) {
+      return res.status(400).json({ 
+        error: 'Too many search groups',
+        details: 'Maximum of 5 search groups allowed per query'
+      });
     }
 
-    // Non-gene-symbol-only queries continue with web processing
-    const results = await processGeneralClinVarWebQuery(
-      searchGroups[0],
-      clinicalSignificance,
-      startDate,
-      endDate
+    // Separate groups by type
+    const geneOnlyGroups = searchGroups.filter(group => 
+      group.geneSymbol && !group.dnaChange && !group.proteinChange
+    );
+    
+    const nonGeneGroups = searchGroups.filter(group => 
+      !(group.geneSymbol && !group.dnaChange && !group.proteinChange)
     );
 
-    res.json(results);
+    // Process all groups in parallel
+    const results = await Promise.all([
+      // Process gene-only groups in parallel
+      ...geneOnlyGroups.map(group => 
+        processGeneSymbolDatabaseQuery(
+          group.geneSymbol,
+          clinicalSignificance,
+          startDate,
+          endDate
+        )
+      ),
+      // Process non-gene groups individually in parallel
+      ...nonGeneGroups.map(group => 
+        processGeneralClinVarWebQuery(
+          group,
+          clinicalSignificance,
+          startDate,
+          endDate
+        )
+      )
+    ]);
+
+    // Flatten results array and remove any error entries
+    const flattenedResults = results
+      .flat()
+      .filter(result => !result.error);
+
+    if (flattenedResults.length === 0) {
+      return res.json([{
+        error: "No results found",
+        details: "No matching variants found for any search criteria",
+        searchTerms: searchGroups.map(group => 
+          Object.entries(group)
+            .filter(([_, value]) => value)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(', ')
+        )
+      }]);
+    }
+
+    res.json(flattenedResults);
   } catch (error) {
     next(error);
   }
@@ -193,49 +220,135 @@ exports.processFullNameQuery = async (req, res) => {
 };
 
 // Database based, general query
+// query.controller.js
+exports.processGeneralQuery = async (req, res, next) => {
+  try {
+    const { searchGroups, clinicalSignificance, startDate, endDate } = req.body;
+    
+    if (!searchGroups?.length) {
+      return res.status(400).json({ error: 'At least one search group is required' });
+    }
+
+    if (searchGroups.length > 5) {
+      return res.status(400).json({ 
+        error: 'Too many search groups',
+        details: 'Maximum of 5 search groups allowed per query'
+      });
+    }
+
+    // Separate groups by type
+    const geneOnlyGroups = searchGroups.filter(group => 
+      group.geneSymbol && !group.dnaChange && !group.proteinChange
+    );
+    
+    const nonGeneGroups = searchGroups.filter(group => 
+      !(group.geneSymbol && !group.dnaChange && !group.proteinChange)
+    );
+
+    // Process all groups in parallel
+    const results = await Promise.all([
+      // Process gene-only groups in parallel
+      ...geneOnlyGroups.map(group => 
+        processGeneSymbolDatabaseQuery(
+          group.geneSymbol,
+          clinicalSignificance,
+          startDate,
+          endDate
+        )
+      ),
+      // Process non-gene groups individually in parallel
+      ...nonGeneGroups.map(group => 
+        processGeneralClinVarWebQuery(
+          group,
+          clinicalSignificance,
+          startDate,
+          endDate
+        )
+      )
+    ]);
+
+    // Flatten results array and remove any error entries
+    const flattenedResults = results
+      .flat()
+      .filter(result => !result.error);
+
+    if (flattenedResults.length === 0) {
+      return res.json([{
+        error: "No results found",
+        details: "No matching variants found for any search criteria",
+        searchTerms: searchGroups.map(group => 
+          Object.entries(group)
+            .filter(([_, value]) => value)
+            .map(([key, value]) => `${key}: ${value}`)
+            .join(', ')
+        )
+      }]);
+    }
+
+    res.json(flattenedResults);
+  } catch (error) {
+    next(error);
+  }
+};
+
 exports.processGeneralSearch = async (req, res) => {
   try {
     const { searchGroups, clinicalSignificance, startDate, endDate } = req.body;
     
-    if (!searchGroups || !Array.isArray(searchGroups) || searchGroups.length === 0) {
+    if (!searchGroups?.length) {
       return res.json([{
         error: "Invalid search criteria",
         details: "At least one search group with criteria is required"
       }]);
     }
 
-    // Check for gene-symbol-only search first
-    for (const group of searchGroups) {
-      if (group.geneSymbol && !group.dnaChange && !group.proteinChange) {
-        const [rows] = await pool.execute(
-          'SELECT variant_count FROM gene_variant_counts WHERE gene_symbol = ?',
-          [group.geneSymbol]
-        );
+    if (searchGroups.length > 5) {
+      return res.status(400).json({ 
+        error: 'Too many search groups',
+        details: 'Maximum of 5 search groups allowed per query'
+      });
+    }
 
-        if (rows.length > 0) {
-          return res.json(await processGeneSymbolDatabaseQuery(
+    // Separate groups by type
+    const geneOnlyGroups = searchGroups.filter(group => 
+      group.geneSymbol && !group.dnaChange && !group.proteinChange
+    );
+    
+    const nonGeneGroups = searchGroups.filter(group => 
+      !(group.geneSymbol && !group.dnaChange && !group.proteinChange)
+    );
+
+    // Process all groups in parallel with individual queries
+    try {
+      const results = await Promise.all([
+        // Process gene-only groups in parallel
+        ...geneOnlyGroups.map(group => 
+          processGeneSymbolDatabaseQuery(
             group.geneSymbol,
             clinicalSignificance,
             startDate,
             endDate
-          ));
-        }
-      }
-    }
+          )
+        ),
+        // Process non-gene groups individually
+        ...nonGeneGroups.map(group =>
+          processSingleNonGeneGroup(
+            group,
+            clinicalSignificance,
+            startDate,
+            endDate
+          )
+        )
+      ]);
 
-    // For non-gene-only searches
-    const { query, params } = constructGeneralSearchQuery(searchGroups, clinicalSignificance, startDate, endDate);
-    console.log('Executing query:', query);
-    console.log('With parameters:', params);
+      const flattenedResults = results
+        .flat()
+        .filter(result => !result.error);
 
-    try {
-      const [results] = await pool.execute(query, params);
-      console.log(`Query returned ${results.length} results`);
-
-      if (!results || results.length === 0) {
+      if (flattenedResults.length === 0) {
         return res.json([{
           error: "No results found",
-          details: "No matching variants in database",
+          details: "No matching variants found for any search criteria",
           searchTerms: searchGroups.map(group => 
             Object.entries(group)
               .filter(([_, value]) => value)
@@ -245,45 +358,24 @@ exports.processGeneralSearch = async (req, res) => {
         }]);
       }
 
-      const processedResults = processDbResults(results, 
-        searchGroups.map(group => 
-          Object.entries(group)
-            .filter(([_, value]) => value)
-            .map(([key, value]) => `${key}: ${value}`)
-            .join(', ')
-        ).join(' OR ')
-      );
+      res.json(flattenedResults);
 
-      res.json(processedResults);
     } catch (error) {
-      console.error('Database query error:', error);
-      // Set a longer timeout and retry once
-      console.log('Retrying query with longer timeout...');
-      pool.execute(query, params, { timeout: 60000 })
-        .then(([results]) => {
-          const processedResults = processDbResults(results, 
-            searchGroups.map(group => 
-              Object.entries(group)
-                .filter(([_, value]) => value)
-                .map(([key, value]) => `${key}: ${value}`)
-                .join(', ')
-            ).join(' OR ')
-          );
-          res.json(processedResults);
-        })
-        .catch(retryError => {
-          console.error('Retry failed:', retryError);
-          throw retryError;
-        });
+      console.error('Database search error:', error);
+      res.status(500).json([{
+        error: 'Database query failed',
+        details: error.message
+      }]);
     }
   } catch (error) {
-    console.error('Database general search error:', error);
+    console.error('General search error:', error);
     res.status(500).json([{
-      error: 'Database query failed',
+      error: 'Search processing failed',
       details: error.message
     }]);
   }
 };
+
 
 exports.fetchResultsChunk = async (req, res) => {
   const { fileId, offset, limit } = req.query;
