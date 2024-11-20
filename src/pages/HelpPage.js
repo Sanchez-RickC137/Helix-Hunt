@@ -78,14 +78,14 @@ const HelpPage = () => {
               <p className="mb-4">Access help features anytime through the floating help button in the bottom-right corner:</p>
               <ul className="list-disc list-inside space-y-2">
                 <li><strong>Contextual Help:</strong> Hover over elements to see explanations</li>
-                <li><strong>Step-by-Step Guide:</strong> Get guided walkthrough of features</li>
+                <li><strong>Step-by-Step Guide:</strong> Get guided walkthrough of query setup</li>
               </ul>
             </div>
           </div>
         </HelpCard>
 
         <HelpCard icon={Database} title="Search Types">
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <ListSection 
               title="Targeted Search"
               items={[
@@ -121,7 +121,8 @@ const HelpPage = () => {
               items={[
                 "Faster response times",
                 "Weekly updates",
-                "Optimized for frequent searches"
+                "Optimized for frequent searches",
+                "Maintenance: Saturday 23:00 - Sunday 02:00"
               ]}
             />
           </div>
@@ -170,34 +171,46 @@ const HelpPage = () => {
         </HelpCard>
 
         <HelpCard icon={AlertCircle} title="Large Result Handling">
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-medium mb-2">Gene Symbol Only Searches</h3>
-              <p className="mb-2">When searching using only a gene symbol, the system automatically uses a database query for optimal performance. This applies to both search types and provides:</p>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Faster query processing for genes with many variants</li>
-                <li>Automatic variant count detection</li>
-                <li>Weekly synchronized data with ClinVar</li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-medium mb-2">Result Size Limitations</h3>
-              <ul className="list-disc list-inside space-y-1">
-                <li>Preview disabled for results with over 1,000 assertions</li>
-                <li>Large downloads (over 10,000 assertions) require confirmation</li>
-                <li>Use filters to reduce result size if needed</li>
-              </ul>
-            </div>
+          <div className="space-y-6">
+            <ListSection 
+              title="Gene Symbol Only Searches"
+              items={[
+                "Leverages both ClinVar database and local database for complete, rapid results",
+                "Faster query processing for genes with many variants",
+                "Automatic variant count detection",
+                "Weekly synchronized data with ClinVar"
+              ]}
+            />
+            <ListSection 
+              title="Result Size Limitations"
+              items={[
+                "Preview disabled for results with over 1,000 assertions",
+                "Large downloads (over 10,000 assertions) require confirmation",
+                "Use filters to reduce result size if needed"
+              ]}
+            />
           </div>
         </HelpCard>
 
         <HelpCard icon={History} title="Best Practices">
-          <ul className="list-disc list-inside space-y-3">
-            <li>Use targeted search for known variants</li>
-            <li>Combine criteria for precise results</li>
-            <li>Preview before downloading</li>
-            <li>Save frequent searches</li>
-          </ul>
+          <div className="space-y-6">
+            <ListSection 
+              title="Search Strategy"
+              items={[
+                "Use targeted search for specific variants - it's faster and more precise",
+                "Start with gene symbol alone for broad gene exploration",
+                "Apply clinical significance filters to manage large result sets"
+              ]}
+            />
+            <ListSection 
+              title="Workflow Optimization"
+              items={[
+                "Preview results before downloading to verify query success",
+                "Save commonly used variation IDs and full names to preferences",
+                "Check query history to modify and refine previous searches"
+              ]}
+            />
+          </div>
         </HelpCard>
 
         <HelpCard icon={Mail} title="Support" fullWidth>

@@ -8,7 +8,6 @@ SELECT DISTINCT
     vs.VariationID,
     vs.Name,
     vs.GeneSymbol,
-    vs.Type,
     vs.ClinicalSignificance AS OverallClinicalSignificance,
     vs.LastEvaluated AS OverallLastEvaluated,
     vs.ReviewStatus AS OverallReviewStatus,

@@ -9,6 +9,8 @@ import StepByStepGuide from '../components/Help/StepByStepGuide';
 // import HelpTooltip from '../components/Help/HelpTooltip';
 import { getGuideSteps, getStepToSection } from '../utils/stepGuideConfig';
 import FloatingHelp from '../components/Help/FloatingHelp';
+import { checkMaintenanceWindow } from '../utils/maintenanceUtils';
+import MaintenanceWarning from '../components/Query/MaintenanceWarning';
 
 import SearchTypeToggle from '../components/Toggle/SearchTypeToggle';
 import QuerySourceToggle from '../components/Toggle/QuerySourceToggle';
@@ -38,6 +40,7 @@ const QueryPage = () => {
   const [showResultsPreview, setShowResultsPreview] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState([]);
+  const [isMaintenanceWindow, setIsMaintenanceWindow] = useState(false);
 
   // eslint-disable-next-line
   const [debugInfo, setDebugInfo] = useState(''); // Disabled eslint while debug is not being used
@@ -74,13 +77,23 @@ const QueryPage = () => {
   const stepToSection = getStepToSection(steps);
   const [helpElement, setHelpElement] = useState(null);
 
-  // // Help Feature Handlers
-  // const handleToggleStepthrough = useCallback((active) => {
-  //   if (active) {
-  //     resetQuery();
-  //     setStepGuideState({ currentStep: 0 });
-  //   }
-  // }, []);
+  useEffect(() => {
+    // Initial check
+    setIsMaintenanceWindow(checkMaintenanceWindow());
+
+    // Check every minute
+    const interval = setInterval(() => {
+      setIsMaintenanceWindow(checkMaintenanceWindow());
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (isMaintenanceWindow && querySource === 'database') {
+      setQuerySource('web');
+    }
+  }, [isMaintenanceWindow, querySource]);
 
   // Fetch user's query history on mount
   useEffect(() => {
@@ -203,23 +216,13 @@ const QueryPage = () => {
       } else {
         // Database queries
         if (searchType === 'targeted') {
-          if (addedVariationIDs.length > 0) {
-            response = await axiosInstance.post('/api/database/variation-id', {
-              variationId: addedVariationIDs[0],
-              clinicalSignificance,
-              startDate,
-              endDate
-            });
-          } else if (addedFullNames.length > 0) {
-            response = await axiosInstance.post('/api/database/full-name', {
-              fullName: addedFullNames[0],
-              clinicalSignificance,
-              startDate,
-              endDate
-            });
-          } else {
-            throw new Error('No valid search criteria provided');
-          }
+          response = await axiosInstance.post('/api/database', {
+            fullNames: addedFullNames,
+            variationIDs: addedVariationIDs,
+            clinicalSignificance,
+            startDate,
+            endDate
+          });
         } else {
           // General database search
           response = await axiosInstance.post('/api/database/general-search', {
@@ -313,23 +316,6 @@ const QueryPage = () => {
     setDebugInfo("Full name preferences loaded");
   };
 
-  // const handleHelpSelect = (option) => {
-  //   setActiveHelp(option);
-  //   if (option === 'contextHelp') {
-  //     // Enable hover listeners for help tooltips when contextual help is active
-  //     document.querySelectorAll('[data-help]').forEach(element => {
-  //       element.classList.add('help-enabled');
-  //     });
-  //   } else if (option?.id === 'stepthrough') {
-  //     setStepGuideState({ currentStep: 0 });
-  //   } else {
-  //     // Disable hover listeners when contextual help is inactive
-  //     document.querySelectorAll('[data-help]').forEach(element => {
-  //       element.classList.remove('help-enabled');
-  //     });
-  //   }
-  // };
-
   const renderHelpTooltip = (children, content, maxWidth = 'max-w-xs') => {
     if (activeHelp === 'contextHelp') {
       return (
@@ -384,6 +370,7 @@ const QueryPage = () => {
 
   return (
     <div className={`container mx-auto mt-8 p-4 ${themeConstants.mainTextColor}`}>
+      {isMaintenanceWindow && <MaintenanceWarning />}
       {/* Header section */}
       <div className="flex flex-col md:flex-row items-center justify-between mb-6">
         <h1 className={`text-3xl font-bold ${themeConstants.headingTextColor} mb-4 md:mb-0`}>
@@ -407,6 +394,7 @@ const QueryPage = () => {
               <QuerySourceToggle 
                 querySource={querySource}
                 setQuerySource={setQuerySource}
+                isMaintenanceWindow={isMaintenanceWindow}
               />,
               "Select between live ClinVar web data or local database query",
               "max-w-sm"
@@ -589,6 +577,8 @@ const QueryPage = () => {
       {/* Modals */}
       {showReviewModal && (
         <ReviewModal
+          isMaintenanceWindow={isMaintenanceWindow}
+          querySource={querySource}
           setShowReviewModal={setShowReviewModal}
           searchType={searchType}
           addedFullNames={searchType === 'targeted' ? addedFullNames : []}

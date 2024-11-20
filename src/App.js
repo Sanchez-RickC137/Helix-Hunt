@@ -10,13 +10,14 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { UserProvider } from './contexts/UserContext';
 import Header from './components/Page/Header';
 import Footer from './components/Page/Footer';
+import { useThemeConstants } from './components/Page/ThemeConstants';
+import { HelpProvider } from './contexts/HelpContext';
+
 import HomePage from './pages/HomePage';
 import AboutPage from './pages/AboutPage';
 import HelpPage from './pages/HelpPage';
 import AccountPage from './pages/AccountPage';
 import QueryPage from './pages/QueryPage';
-import { useThemeConstants } from './components/Page/ThemeConstants';
-import { HelpProvider } from './contexts/HelpContext';
 
 /**
  * AppContent component handles the main layout and routing of the application.
@@ -25,26 +26,20 @@ import { HelpProvider } from './contexts/HelpContext';
  * @returns {JSX.Element} The main application layout with routing
  */
 function AppContent() {
-  // Get theme-related styling constants
   const themeConstants = useThemeConstants();
 
   return (
     <div className={`min-h-screen flex flex-col ${themeConstants.mainBackgroundColor}`}>
-      {/* Global navigation header */}
       <Header />
-      
-      {/* Main content area with routes */}
-      <main className={`flex-grow ${themeConstants.mainTextColor}`}>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/help" element={<HelpPage />} />
-          <Route path="/account" element={<AccountPage />} />
-          <Route path="/query" element={<QueryPage />} />
-        </Routes>
-      </main>
-      
-      {/* Global footer */}
+        <main className={`flex-grow ${themeConstants.mainTextColor}`}>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/help" element={<HelpPage />} />
+            <Route path="/account" element={<AccountPage />} />
+            <Route path="/query" element={<QueryPage />} />
+          </Routes>
+        </main>
       <Footer />
     </div>
   );

@@ -313,12 +313,16 @@ const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, star
       endDate
     });
 
-    const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=clinvar&term=${geneSymbol}[gene]&retmax=20000`;
-    const response = await executeRequest({ url: esearchUrl, method: 'GET' });
-    const $ = cheerio.load(response.data, { xmlMode: true });
+    // First attempt with [gene] tag
+    let variationIds = await fetchVariationIds(geneSymbol, true);
+    
+    // If no results, retry without [gene] tag
+    if (!variationIds.length) {
+      console.log(`No results found with [gene] tag for ${geneSymbol}, retrying without tag...`);
+      variationIds = await fetchVariationIds(geneSymbol, false);
+    }
 
-    const totalCount = parseInt($('Count').first().text());
-    if (!totalCount) {
+    if (!variationIds.length) {
       return [{
         error: "No results found",
         details: "No variations found for this gene symbol",
@@ -326,7 +330,6 @@ const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, star
       }];
     }
 
-    const variationIds = $('IdList Id').map((_, el) => $(el).text()).get();
     console.log(`Retrieved ${variationIds.length} variation IDs for ${geneSymbol}`);
 
     // Process variation IDs in chunks
@@ -335,37 +338,11 @@ const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, star
 
     for (let i = 0; i < variationIds.length; i += CHUNK_SIZE) {
       const chunk = variationIds.slice(i, i + CHUNK_SIZE);
-      const placeholders = chunk.map(() => "?").join(",");
-      
-      // Start building the query and params array
-      let params = [...chunk];
-      
-      let query = `
-        ${BASE_QUERY}
-        WHERE vs.VariationID IN (${placeholders})
-      `;
-
-      if (clinicalSignificance?.length) {
-        const sigPlaceholders = clinicalSignificance.map(() => "?").join(",");
-        query += ` AND ss.ClinicalSignificance IN (${sigPlaceholders})`;
-        params.push(...clinicalSignificance);
-      }
-
-      if (startDate) {
-        query += ` AND ss.DateLastEvaluated >= ?`;
-        params.push(startDate);
-      }
-
-      if (endDate) {
-        query += ` AND ss.DateLastEvaluated <= ?`;
-        params.push(endDate);
-      }
-
-      query += ` ORDER BY ss.DateLastEvaluated DESC`;
+      const { query, params } = buildChunkQuery(chunk, clinicalSignificance, startDate, endDate);
 
       // Debug logging
       console.log('Executing query:', query);
-
+      
       const [results] = await pool.execute(query, params);
       console.log(`Raw results from database for chunk:`, results.length);
       
@@ -403,6 +380,55 @@ const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, star
   }
 };
 
+const fetchVariationIds = async (geneSymbol, useGeneTag = true) => {
+  try {
+    const searchTerm = useGeneTag ? `${geneSymbol}[gene]` : geneSymbol;
+    const esearchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=clinvar&term=${searchTerm}&retmax=20000`;
+    
+    const response = await executeRequest({ url: esearchUrl, method: 'GET' });
+    const $ = cheerio.load(response.data, { xmlMode: true });
+    
+    const totalCount = parseInt($('Count').first().text());
+    if (!totalCount) {
+      return [];
+    }
+
+    return $('IdList Id').map((_, el) => $(el).text()).get();
+  } catch (error) {
+    console.error(`Error fetching variation IDs for ${geneSymbol}:`, error);
+    return [];
+  }
+};
+
+const buildChunkQuery = (chunk, clinicalSignificance, startDate, endDate) => {
+  const placeholders = chunk.map(() => "?").join(",");
+  let params = [...chunk];
+  
+  let query = `
+    ${BASE_QUERY}
+    WHERE vs.VariationID IN (${placeholders})
+  `;
+
+  if (clinicalSignificance?.length) {
+    const sigPlaceholders = clinicalSignificance.map(() => "?").join(",");
+    query += ` AND ss.ClinicalSignificance IN (${sigPlaceholders})`;
+    params.push(...clinicalSignificance);
+  }
+
+  if (startDate) {
+    query += ` AND ss.DateLastEvaluated >= ?`;
+    params.push(startDate);
+  }
+
+  if (endDate) {
+    query += ` AND ss.DateLastEvaluated <= ?`;
+    params.push(endDate);
+  }
+
+  query += ` ORDER BY ss.DateLastEvaluated DESC`;
+
+  return { query, params };
+};
 
 /**
  * Public interface for processing gene-symbol-only queries

@@ -7,6 +7,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import Particles from '../components/Page/Particles';
+import JokeOfTheDay from '../components/Page/JokeOfTheDay';
 import { useThemeConstants } from '../components/Page/ThemeConstants';
 
 const HomePage = () => {
@@ -17,6 +18,7 @@ const HomePage = () => {
       {/* Animated DNA background */}
       <div className="absolute inset-0">
         <Particles id="tsparticles" />
+        <JokeOfTheDay />
       </div>
 
       {/* Main content overlay */}

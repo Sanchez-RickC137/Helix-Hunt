@@ -4,9 +4,21 @@ const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
 const { performance } = require('perf_hooks');
 
-dotenv.config();
+// Load environment variables if running standalone
+if (require.main === module) {
+  dotenv.config({ path: path.join(__dirname, '../../../.env') });
+}
+
 // Define log file path
-const LOG_FILE_PATH = path.join(__dirname, '../../logs/componentPartFailures.log');
+const LOG_DIR = path.join(__dirname, '../../logs');
+const LOG_FILE_PATH = path.join(LOG_DIR, 'componentPartFailures.log');
+
+// Ensure log directory exists
+fs.mkdir(LOG_DIR, { recursive: true }, (err) => {
+  if (err && err.code !== 'EEXIST') {
+    console.error('Error creating logs directory:', err);
+  }
+});
 
 function logFailure(reason, fullName) {
   const logMessage = `[${new Date().toISOString()}] Reason: ${reason} | Variant Name: ${fullName}\n`;
@@ -15,24 +27,35 @@ function logFailure(reason, fullName) {
   });
 }
 
-async function populateComponentParts() {
-  const pool = await mysql.createPool({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME,
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-  });
-
-  const connection = await pool.getConnection();
-  const CHUNK_SIZE = 10000;
-  const startTime = performance.now();
-  let processedCount = 0;
-  let insertedCount = 0;
+/**
+ * Processes variant records in smaller chunks with controlled resource usage
+ */
+async function populateComponentParts(existingPool = null, logger = console) {
+  let pool = existingPool;
+  let connection;
 
   try {
+    // Create pool if not provided (standalone mode)
+    if (!pool) {
+      pool = await mysql.createPool({
+        host: process.env.DB_HOST,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_NAME,
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0
+      });
+    }
+
+    connection = await pool.getConnection();
+    const CHUNK_SIZE = 10000; // Increased chunk size
+    const PROCESSING_DELAY = 10; // Reduced delay
+    const startTime = performance.now();
+    let processedCount = 0;
+    let insertedCount = 0;
+
+    // Create table with optimized settings
     await connection.query(`
       CREATE TABLE IF NOT EXISTS component_parts (
         variation_id VARCHAR(255) NOT NULL,
@@ -40,28 +63,38 @@ async function populateComponentParts() {
         transcript_id VARCHAR(255),
         dna_change TEXT,
         protein_change TEXT,
-        PRIMARY KEY (variation_id)
-      )
+        PRIMARY KEY (variation_id),
+        INDEX idx_gene_symbol (gene_symbol),
+        INDEX idx_transcript_id (transcript_id)
+      ) ENGINE=InnoDB
     `);
 
+    // Configure for bulk operations
+    await connection.query('SET foreign_key_checks = 0');
+    await connection.query('SET unique_checks = 0');
     await connection.query('TRUNCATE TABLE component_parts');
-    console.log('Processing records in chunks...');
+
+    logger.log('Processing records in chunks...');
 
     let lastId = '0';
     const seenIds = new Set();
+    let batchValues = [];
 
+    // Process in batches with fewer transactions
     while (true) {
+      // More efficient query with NM_ filter in WHERE clause
       const [records] = await connection.query(
-        'SELECT DISTINCT Name, VariationID FROM variant_summary WHERE Name LIKE "NM_%" AND VariationID > ? ORDER BY VariationID LIMIT ?',
+        'SELECT DISTINCT Name, VariationID FROM variant_summary ' +
+        'WHERE Name LIKE "NM_%' + 
+        '" AND VariationID > ? ' +
+        'ORDER BY VariationID LIMIT ?',
         [lastId, CHUNK_SIZE]
       );
 
       if (records.length === 0) break;
       lastId = records[records.length - 1].VariationID;
 
-      const values = [];
       for (const record of records) {
-        // Skip if we've seen this ID before
         if (seenIds.has(record.VariationID)) continue;
 
         const components = parseVariantName(record.Name);
@@ -70,7 +103,7 @@ async function populateComponentParts() {
             components.dnaChange && 
             components.transcriptId) {
 
-          values.push([
+          batchValues.push([
             record.VariationID,
             components.geneSymbol,
             components.transcriptId,
@@ -81,36 +114,63 @@ async function populateComponentParts() {
         }
       }
 
-      if (values.length > 0) {
-        await connection.query(
-          'INSERT IGNORE INTO component_parts (variation_id, gene_symbol, transcript_id, dna_change, protein_change) VALUES ?',
-          [values]
-        );
-        insertedCount += values.length;
-      }
-
       processedCount += records.length;
-      
-      if (processedCount % 50000 === 0) {
-        const duration = (performance.now() - startTime) / 1000;
-        console.log(`Processed ${processedCount.toLocaleString()} records in ${duration.toFixed(2)}s`);
-        console.log(`Inserted ${insertedCount.toLocaleString()} unique records`);
+
+      // Insert in larger batches
+      if (batchValues.length >= CHUNK_SIZE) {
+        await connection.query(
+          'INSERT IGNORE INTO component_parts ' +
+          '(variation_id, gene_symbol, transcript_id, dna_change, protein_change) ' +
+          'VALUES ?',
+          [batchValues]
+        );
+        insertedCount += batchValues.length;
+        batchValues = [];
+        
+        // Log progress less frequently
+        if (processedCount % 100000 === 0) {
+          const duration = (performance.now() - startTime) / 1000;
+          logger.log(`Processed ${processedCount.toLocaleString()} records in ${duration.toFixed(2)}s`);
+          logger.log(`Inserted ${insertedCount.toLocaleString()} unique records`);
+        }
+
+        await new Promise(resolve => setTimeout(resolve, PROCESSING_DELAY));
       }
     }
 
+    // Insert any remaining records
+    if (batchValues.length > 0) {
+      await connection.query(
+        'INSERT IGNORE INTO component_parts ' +
+        '(variation_id, gene_symbol, transcript_id, dna_change, protein_change) ' +
+        'VALUES ?',
+        [batchValues]
+      );
+      insertedCount += batchValues.length;
+    }
+
+    // Restore settings
+    await connection.query('SET foreign_key_checks = 1');
+    await connection.query('SET unique_checks = 1');
+
     const duration = (performance.now() - startTime) / 1000;
-    console.log(`\nMigration completed in ${duration.toFixed(2)} seconds`);
-    console.log(`Total processed: ${processedCount.toLocaleString()}`);
-    console.log(`Total inserted: ${insertedCount.toLocaleString()}`);
+    logger.log(`Component parts population completed in ${duration.toFixed(2)} seconds`);
+    logger.log(`Total processed: ${processedCount.toLocaleString()}`);
+    logger.log(`Total inserted: ${insertedCount.toLocaleString()}`);
+
+    return { processedCount, insertedCount, duration };
 
   } catch (error) {
-    console.error('Error during migration:', error);
+    logger.log('Error during component parts population:', error);
     throw error;
   } finally {
-    connection.release();
-    await pool.end();
+    if (connection) connection.release();
+    if (!existingPool && pool) {
+      await pool.end();
+    }
   }
 }
+
 
 function parseVariantName(fullName) {
   if (!fullName) {
@@ -161,6 +221,17 @@ function parseVariantName(fullName) {
   }
 }
 
-module.exports = {
-  populateComponentParts
+// Run if called directly
+if (require.main === module) {
+  populateComponentParts()
+    .then(() => process.exit(0))
+    .catch(error => {
+      console.error('Error:', error);
+      process.exit(1);
+    });
 }
+
+module.exports = {
+  populateComponentParts,
+  parseVariantName
+};

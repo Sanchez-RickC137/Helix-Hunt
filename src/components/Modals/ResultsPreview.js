@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { X, HelpCircle } from 'lucide-react';
+import GeneLoader from '../Page/GeneLoader';
 import { useThemeConstants } from '../Page/ThemeConstants';
 
 const HelpPopup = ({ content, position }) => {
@@ -24,36 +25,46 @@ const ResultsPreview = ({ results, onClose }) => {
   const [activeView, setActiveView] = useState('view');
   const [helpPopup, setHelpPopup] = useState(null);
   const [processedResults, setProcessedResults] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const themeConstants = useThemeConstants();
 
   useEffect(() => {
     setError(null);
-    const processResults = () => {
-      if (!results || !Array.isArray(results)) {
-        setError('No valid results to display');
-        return;
-      }
-      
-      const processed = results.map(result => {
-        if (result.error) {
-          return {
-            query: result.searchTerm || 'Unknown query',
-            error: result.error,
-            details: result.details
-          };
+    setIsLoading(true);
+
+    const processResults = async () => {
+      try {
+        if (!results || !Array.isArray(results)) {
+          setError('No valid results to display');
+          return;
         }
-        return {
-          query: result.searchTerm,
-          variantDetails: result.variantDetails,
-          assertionList: result.assertionList
-        };
-      });
-      
-      setProcessedResults(processed);
+        
+        const processed = results.map(result => {
+          if (result.error) {
+            return {
+              query: result.searchTerm || 'Unknown query',
+              error: result.error,
+              details: result.details
+            };
+          }
+          return {
+            query: result.searchTerm,
+            variantDetails: result.variantDetails,
+            assertionList: result.assertionList
+          };
+        });
+        
+        setProcessedResults(processed);
+      } catch (err) {
+        setError('Error processing results');
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    processResults();
+    const delay = setTimeout(processResults, 500);
+    return () => clearTimeout(delay);
   }, [results]);
 
   // const renderJsonView = () => {
@@ -334,9 +345,19 @@ const ResultsPreview = ({ results, onClose }) => {
   };
 
   const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full">
+          <GeneLoader size={192} />
+          <p className={`mt-4 ${themeConstants.mainTextColor}`}>Processing results...</p>
+        </div>
+      );
+    }
+
     if (error) {
       return <div className={`text-red-500 ${themeConstants.mainTextColor}`}>{error}</div>;
     }
+
     switch (activeView) {
       // case 'json':
       //   return renderJsonView();

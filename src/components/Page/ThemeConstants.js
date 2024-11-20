@@ -73,7 +73,15 @@ export const useThemeConstants = () => {
     
     // Code/Pre blocks
     codeBlockBackground: isDarkMode ? 'bg-gray-900' : 'bg-gray-50',
-    codeBlockText: isDarkMode ? 'text-gray-200' : 'text-gray-800'
+    codeBlockText: isDarkMode ? 'text-gray-200' : 'text-gray-800',
+
+    // Warnings
+    warningBackgroundColor: isDarkMode ? 'bg-amber-900/30' : 'bg-red-900',
+    warningBorderColor: isDarkMode ? 'border-amber-700/50' : 'border-red-700',
+    warningTextColor: isDarkMode ? 'text-amber-200' : 'text-white',
+    warningIconColor: isDarkMode ? 'text-amber-400' : 'text-white',
+    warningHeadingColor: isDarkMode ? 'text-amber-300' : 'text-white',
+    warningMutedTextColor: isDarkMode ? 'text-amber-400' : 'text-white/90',
   };
 };
 

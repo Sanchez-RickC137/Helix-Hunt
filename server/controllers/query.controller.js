@@ -163,64 +163,98 @@ exports.processGeneralQuery = async (req, res, next) => {
   }
 };
 
-// Database based, targeted query for variation id
-exports.processVariationIdQuery = async (req, res) => {
+/* Processes single or multiple variation IDs and full names concurrently */
+exports.processDatabaseQuery = async (req, res) => {
   try {
-    const query = `${BASE_QUERY}
-      WHERE vs.VariationID = ?
-      ORDER BY ss.DateLastEvaluated DESC`;
-
-    const [results] = await pool.execute(query, [req.body.variationId]);
+    const { fullNames, variationIDs, clinicalSignificance, startDate, endDate } = req.body;
     
-    if (results.length === 0) {
+    if ((!fullNames || fullNames.length === 0) && (!variationIDs || variationIDs.length === 0)) {
+      return res.status(400).json({ error: 'Either full name or variant ID is required' });
+    }
+
+    const promises = [];
+
+    // Process all variation IDs in parallel
+    if (variationIDs?.length > 0) {
+      const variationPromises = variationIDs.map(id => {
+        const query = `${BASE_QUERY}
+          WHERE vs.VariationID = ?
+          ${clinicalSignificance?.length ? `AND ss.ClinicalSignificance IN (${clinicalSignificance.map(() => '?').join(',')})` : ''}
+          ${startDate ? 'AND ss.DateLastEvaluated >= ?' : ''}
+          ${endDate ? 'AND ss.DateLastEvaluated <= ?' : ''}
+          ORDER BY ss.DateLastEvaluated DESC`;
+
+        const params = [id];
+        if (clinicalSignificance?.length) params.push(...clinicalSignificance);
+        if (startDate) params.push(startDate);
+        if (endDate) params.push(endDate);
+
+        return pool.execute(query, params)
+          .then(([results]) => processDbResults(results, id))
+          .catch(error => [{
+            error: "Query failed",
+            details: error.message,
+            searchTerm: id
+          }]);
+      });
+
+      promises.push(...variationPromises);
+    }
+
+    // Process all full names in parallel
+    if (fullNames?.length > 0) {
+      const namePromises = fullNames.map(name => {
+        const query = `${BASE_QUERY}
+          WHERE vs.Name = ?
+          ${clinicalSignificance?.length ? `AND ss.ClinicalSignificance IN (${clinicalSignificance.map(() => '?').join(',')})` : ''}
+          ${startDate ? 'AND ss.DateLastEvaluated >= ?' : ''}
+          ${endDate ? 'AND ss.DateLastEvaluated <= ?' : ''}
+          ORDER BY ss.DateLastEvaluated DESC`;
+
+        const params = [name];
+        if (clinicalSignificance?.length) params.push(...clinicalSignificance);
+        if (startDate) params.push(startDate);
+        if (endDate) params.push(endDate);
+
+        return pool.execute(query, params)
+          .then(([results]) => processDbResults(results, name))
+          .catch(error => [{
+            error: "Query failed",
+            details: error.message,
+            searchTerm: name
+          }]);
+      });
+
+      promises.push(...namePromises);
+    }
+
+    // Wait for all queries to complete
+    const allResults = await Promise.all(promises);
+    
+    // Flatten and filter results
+    const flattenedResults = allResults.flat().filter(result => !result.error);
+
+    if (flattenedResults.length === 0) {
       return res.json([{
-        error: "Not found",
-        details: "No results found for the specified variation ID",
-        searchTerm: req.body.variationId
+        error: "No results found",
+        details: "No matching variants found in database",
+        searchTerm: "Multiple search terms"
       }]);
     }
-   
-    const processedResults = processDbResults(results, req.body.variationId);
-    res.json(processedResults);
+
+    res.json(flattenedResults);
+
   } catch (error) {
+    console.error('Database query error:', error);
     res.status(500).json([{
       error: 'Database query failed',
       details: error.message,
-      searchTerm: req.body.variationId
-    }]);
-  }
-};
-
-// Database based, targeted query for full name
-exports.processFullNameQuery = async (req, res) => {
-  try {
-    const query = `${BASE_QUERY}
-      WHERE vs.Name = ?
-      ORDER BY ss.DateLastEvaluated DESC`;
-
-    const [results] = await pool.execute(query, [req.body.fullName]);
-    
-    if (results.length === 0) {
-      return res.json([{
-        error: "Not found",
-        details: "No results found for the specified full name",
-        searchTerm: req.body.fullName
-      }]);
-    }
-
-    const processedResults = processDbResults(results, req.body.fullName);
-    res.json(processedResults);
-  } catch (error) {
-    res.status(500).json([{
-      error: 'Database query failed',
-      details: error.message,
-      searchTerm: req.body.fullName
+      searchTerm: 'Multiple search terms'
     }]);
   }
 };
 
 // Database based, general query
-// query.controller.js
 exports.processGeneralQuery = async (req, res, next) => {
   try {
     const { searchGroups, clinicalSignificance, startDate, endDate } = req.body;
@@ -291,6 +325,7 @@ exports.processGeneralQuery = async (req, res, next) => {
   }
 };
 
+// Helper function for processGeneralQuery
 exports.processGeneralSearch = async (req, res) => {
   try {
     const { searchGroups, clinicalSignificance, startDate, endDate } = req.body;
@@ -375,7 +410,6 @@ exports.processGeneralSearch = async (req, res) => {
     }]);
   }
 };
-
 
 exports.fetchResultsChunk = async (req, res) => {
   const { fileId, offset, limit } = req.query;

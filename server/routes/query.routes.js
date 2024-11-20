@@ -7,8 +7,7 @@ const {
   getQueryHistory,
   processClinVarQuery,
   processGeneralQuery,
-  processVariationIdQuery,
-  processFullNameQuery,
+  processDatabaseQuery,
   processGeneralSearch,
   downloadResults,
   checkProcessingStatus,
@@ -44,21 +43,14 @@ router.post('/clinvar/general', [
 ], processGeneralQuery);
 
 // Database query routes
-router.post('/database/variation-id', [
-  body('variationId').notEmpty().withMessage('Variation ID is required'),
+router.post('/database', [
+  body('fullNames').optional().isArray(),
+  body('variationIDs').optional().isArray(),
   body('clinicalSignificance').optional().isArray(),
   body('startDate').optional().isString(),
   body('endDate').optional().isString(),
   validate
-], processVariationIdQuery);
-
-router.post('/database/full-name', [
-  body('fullName').notEmpty().withMessage('Full name is required'),
-  body('clinicalSignificance').optional().isArray(),
-  body('startDate').optional().isString(),
-  body('endDate').optional().isString(),
-  validate
-], processFullNameQuery);
+], processDatabaseQuery);
 
 router.post('/database/general-search', [
   body('searchGroups').isArray(),
