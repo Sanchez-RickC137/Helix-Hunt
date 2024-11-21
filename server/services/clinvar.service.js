@@ -19,16 +19,6 @@ const BATCH_SIZE = 25;
 const CONCURRENT_REQUESTS = 50;
 const MAX_RETRIES = 10;
 
-// Configure axios defaults
-// const axiosInstance = axios.create({
-//   timeout: 30000,
-//   headers: {
-//     'Accept-Encoding': 'gzip',
-//     'Connection': 'keep-alive',
-//     'User-Agent': 'Mozilla/5.0 (compatible; HelixHunt/1.0; +http://example.com)'
-//   }
-// });
-
 const axiosInstance = axios.create({
   baseURL: 'https://www.ncbi.nlm.nih.gov/',
   timeout: 30000,
@@ -173,26 +163,6 @@ const processAllUrls = async (urls, searchQuery, searchGroup = null) => {
   return { results: allResults };
 };
 
-// const processAllUrls = async (urls, searchQuery, clinicalSignificance, startDate, endDate) => {
-//   const allResults = [];
-//   let processedCount = 0;
-
-//   for (let i = 0; i < urls.length; i += CONCURRENT_REQUESTS) {
-//     const batchUrls = urls.slice(i, i + CONCURRENT_REQUESTS);
-//     const { results } = await processUrlBatch(batchUrls, searchQuery, clinicalSignificance, startDate, endDate);
-    
-//     allResults.push(...results);
-//     processedCount += batchUrls.length;
-
-//     // Log progress every 100 processed
-//     if (processedCount % 100 === 0 || processedCount === urls.length) {
-//       console.log(`Processed ${processedCount}/${urls.length} variants (${allResults.length} successful)`);
-//     }
-//   }
-
-//   return { results: allResults };
-// };
-
 exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificance, startDate, endDate) => {
   try {
     let searchUrl;
@@ -229,29 +199,29 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
         searchTerm: fullName || variantId
       }];
     }
-
+    
     const variantDetails = parseVariantDetails(variantDetailsHtml);
-    const assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
-
-    // Process results based on filters
-    if (clinicalSignificance?.length) {
-      assertionList = assertionList.filter(a => 
-        clinicalSignificance.includes(a.Classification.value)
-      );
+    let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
+    
+    // Apply filters
+    if (clinicalSignificance?.length || startDate || endDate) {
+      assertionList = assertionList.filter(a => {
+        const matchesSignificance = clinicalSignificance?.length
+          ? clinicalSignificance.includes(a.Classification.value)
+          : true;
+        const matchesStartDate = startDate
+          ? new Date(a.Classification.date) >= new Date(startDate)
+          : true;
+        const matchesEndDate = endDate
+          ? new Date(a.Classification.date) <= new Date(endDate)
+          : true;
+    
+        return matchesSignificance && matchesStartDate && matchesEndDate;
+      });
     }
 
-    if (startDate) {
-      assertionList = assertionList.filter(a => 
-        new Date(a.Classification.date) >= new Date(startDate)
-      );
-    }
-
-    if (endDate) {
-      assertionList = assertionList.filter(a => 
-        new Date(a.Classification.date) <= new Date(endDate)
-      );
-    }
-
+    assertionList.sort((a, b) => new Date(b.Classification.date) - new Date(a.Classification.date));
+    
     return [{
       searchTerm: fullName || variantId,
       variantDetails,

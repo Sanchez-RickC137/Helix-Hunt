@@ -9,7 +9,7 @@ const QuerySourceToggle = ({ querySource, setQuerySource, isMaintenanceWindow })
 
   const webHelpText = "Use the ClinVar website as the query source. Information will be more up to date and comprehensive but may take longer to retrieve.";
   const databaseHelpText = isMaintenanceWindow 
-    ? "Database queries are currently disabled due to scheduled maintenance (Saturday 23:00 - Sunday 00:00)" 
+    ? "Database queries are currently disabled due to scheduled maintenance (Saturday 23:00 - Sunday 02:00)" 
     : "Use the local database as the query source. Information is updated weekly and will return more quickly.";
 
   return (

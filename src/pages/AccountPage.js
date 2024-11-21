@@ -101,10 +101,10 @@ const AccountPage = () => {
         username={user ? user.username : ''}
       />
 
-      <div className="mt-8 p-4 bg-gray-100 rounded-lg">
+      {/* <div className="mt-8 p-4 bg-gray-100 rounded-lg">
         <h3 className="text-lg font-semibold mb-2">Debug Information:</h3>
         <pre className="whitespace-pre-wrap">{debugInfo}</pre>
-      </div>
+      </div> */}
     </div>
   );
 };

@@ -24,19 +24,23 @@ const HomePage = () => {
       {/* Main content overlay */}
       <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-8 text-center">
         {/* Heading */}
-        <h1 className={`text-8xl font-bold mb-8 ${themeConstants.headingTextColor}`}>
+        <h1
+          className={`text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold mb-8 ${themeConstants.headingTextColor}`}
+        >
           Welcome to HelixHunt
         </h1>
 
         {/* Description */}
-        <p className={`text-3xl mb-12 max-w-3xl ${themeConstants.mainTextColor}`}>
+        <p
+          className={`text-lg sm:text-xl md:text-2xl lg:text-3xl mb-12 max-w-3xl ${themeConstants.mainTextColor}`}
+        >
           Explore genetic variations with such ease, you'll swear this tool was made just for you.
         </p>
 
         {/* Call to Action */}
         <Link
           to="/query"
-          className={`${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white text-2xl font-bold py-4 px-8 rounded-lg transition-colors duration-200`}
+          className={`${themeConstants.buttonBackgroundColor} hover:${themeConstants.buttonHoverColor} text-white text-lg sm:text-xl md:text-2xl font-bold py-4 px-8 rounded-lg transition-colors duration-200`}
         >
           Start a New Query
         </Link>
