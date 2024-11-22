@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
+const path = require('path');
 const compression = require('compression');
 const { pool, initializePool, createOptimizedIndexes } = require('./config/database');
 const { initializeScheduler } = require('./services/fileService/scheduler');
@@ -167,12 +168,21 @@ async function initializeApp() {
     // Initialize scheduler
     await initializeScheduler(dbPool);
 
-    
+
     
     // Routes
     app.use('/api', authRoutes);
     app.use('/api', preferencesRoutes);
     app.use('/api', queryRoutes);
+
+    // Serve static files from the React app
+    app.use(express.static(path.join(__dirname, '../build')));
+
+    // Route all other requests to the React app
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(__dirname, '../build', 'index.html'));
+    });
+
 
     // Error handling for payload size
     app.use((error, req, res, next) => {
