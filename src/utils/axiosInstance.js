@@ -11,7 +11,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 // Create axios instance with base configuration
 const axiosInstance = axios.create({
-  baseURL: isProduction ? '' : 'http://localhost:5001',
+  baseURL: isProduction ? '' : 'http://localhost:10000',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',

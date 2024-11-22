@@ -1,10 +1,9 @@
 const mysql = require('mysql2/promise');
-const { createReadStream } = require('fs');
 const dotenv = require('dotenv');
 
 dotenv.config();
 
-// Initialize connection pool
+// Initialize connection pool with Hostinger-specific settings
 const pool = mysql.createPool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -16,49 +15,84 @@ const pool = mysql.createPool({
   queueLimit: 0,
   connectTimeout: 60000,
   acquireTimeout: 60000,
+  enableKeepAlive: true,
+  keepAliveInitialDelay: 10000,
   ssl: {
     rejectUnauthorized: false
   },
-  debug: true // Temporarily enable for debugging
+  debug: process.env.NODE_ENV !== 'production'
 });
 
-// Test and configure pool
-const initializePool = async () => {
-  try {
-    const connection = await pool.getConnection();
-    // await connection.query('SET GLOBAL local_infile = 1');
-    // console.log('LOCAL INFILE enabled');
-    connection.release();
-    
-    console.log('Successfully connected to the database.'); 
-    return pool;
-  } catch (error) {
-    console.error('Error configuring pool:', error);
-    throw error;
+// Initialize pool with retry mechanism
+const initializePool = async (retries = 5) => {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const connection = await pool.getConnection();
+      
+      // Test the connection
+      await connection.query('SELECT 1');
+      
+      connection.release();
+      console.log('Successfully connected to the database.');
+      return pool;
+    } catch (error) {
+      console.error(`Connection attempt ${attempt} failed:`, error);
+      
+      if (attempt === retries) {
+        throw new Error(`Failed to connect after ${retries} attempts: ${error.message}`);
+      }
+      
+      // Wait before next attempt (increasing delay)
+      await new Promise(resolve => setTimeout(resolve, attempt * 5000));
+    }
   }
 };
 
-/**
- * Create indexing to optimize database query returns. Indexes are created after tables exist
- * @param {*} connection 
- */
 const createOptimizedIndexes = async (connection) => {
   try {
-    // Use CREATE INDEX without IF NOT EXISTS (not supported in older MySQL versions)
-    await connection.query(`
-      CREATE INDEX idx_variant_summary_name ON variant_summary(Name(255))
-    `).catch(err => {
-      // Ignore error if index already exists
-      if (!err.message.includes('Duplicate')) {
-        console.warn('Warning: Could not create variant_summary name index:', err.message);
-      }
-    });
-    
-    console.log('Created/verified database indexes');
+    // First check if index exists
+    const [indexes] = await connection.query(`
+      SHOW INDEX FROM variant_summary 
+      WHERE Key_name = 'idx_variant_summary_name'
+    `);
+
+    if (indexes.length === 0) {
+      await connection.query(`
+        CREATE INDEX idx_variant_summary_name ON variant_summary(Name(255))
+      `);
+      console.log('Created variant_summary name index');
+    } else {
+      console.log('variant_summary name index already exists');
+    }
+
+    console.log('Database indexes verification completed');
   } catch (error) {
-    console.warn('Warning: Error creating indexes:', error);
+    console.warn('Warning: Error managing indexes:', error);
+    // Don't throw error as indexes are optimizations, not critical functionality
   }
 };
+
+// Export pool maintainer
+const maintainPool = async () => {
+  try {
+    const connection = await pool.getConnection();
+    await connection.query('SELECT 1');
+    connection.release();
+  } catch (error) {
+    console.error('Pool maintenance check failed:', error);
+    // Attempt to re-initialize pool
+    try {
+      await initializePool(3);
+    } catch (reinitError) {
+      console.error('Failed to re-initialize pool:', reinitError);
+    }
+  }
+};
+
+// Set up periodic pool maintenance
+if (process.env.NODE_ENV === 'production') {
+  setInterval(maintainPool, 60000); // Check every minute
+}
 
 module.exports = {
   pool,
