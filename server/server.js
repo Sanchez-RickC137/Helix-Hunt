@@ -14,24 +14,6 @@ const { cleanupTemporaryData } = require('./services/cleanup.service');
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 5001;
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100 // limit each IP to 100 requests per windowMs
-});
-
-// Enable compression for all routes
-app.use(compression({
-  filter: (req, res) => {
-    if (req.headers['x-no-compression']) {
-      return false;
-    }
-    return compression.filter(req, res);
-  },
-  level: 6 // Balanced compression level
-}));
 
 // Increase payload limits with validation
 app.use(express.json({
@@ -54,12 +36,32 @@ app.use(express.urlencoded({
 // Enable CORS with specific options
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
-    ? process.env.ALLOWED_ORIGIN 
+    ? 'https://helix-hunt.onrender.com' 
     : true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
+
+const port = process.env.PORT || 5001;
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
+});
+
+// Enable compression for all routes
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: 6 // Balanced compression level
+}));
+
 
 app.use(limiter);
 
@@ -96,8 +98,6 @@ app.use((req, res, next) => {
 
   next();
 });
-
-// setInterval(cleanupTemporaryData, 3600000);
 
 // Initialize database and create tables
 async function initializeDatabase(pool) {
@@ -155,7 +155,6 @@ async function initializeDatabase(pool) {
   }
 }
 
-
 // Initialize application
 async function initializeApp() {
   try {
@@ -167,6 +166,8 @@ async function initializeApp() {
     
     // Initialize scheduler
     await initializeScheduler(dbPool);
+
+    
     
     // Routes
     app.use('/api', authRoutes);

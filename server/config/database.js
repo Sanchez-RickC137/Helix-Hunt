@@ -10,20 +10,23 @@ const pool = mysql.createPool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_NAME,
+  port: 3306,
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 5,
   queueLimit: 0,
-  multipleStatements: true,
-  namedPlaceholders: true,
-  flags: ['LOCAL_FILES'],
-  infileStreamFactory: (filepath) => createReadStream(filepath)
+  connectTimeout: 60000,
+  acquireTimeout: 60000,
+  ssl: {
+    rejectUnauthorized: false
+  },
+  debug: true // Temporarily enable for debugging
 });
 
 // Test and configure pool
 const initializePool = async () => {
   try {
     const connection = await pool.getConnection();
-    await connection.query('SET GLOBAL local_infile = 1');
+    // await connection.query('SET GLOBAL local_infile = 1');
     // console.log('LOCAL INFILE enabled');
     connection.release();
     

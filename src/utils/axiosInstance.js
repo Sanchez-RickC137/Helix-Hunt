@@ -6,9 +6,29 @@
 
 import axios from 'axios';
 
+
+const isProduction = process.env.NODE_ENV === 'production';
+
 // Create axios instance with base configuration
 const axiosInstance = axios.create({
-  baseURL: 'http://localhost:5001',
+  baseURL: isProduction ? '' : 'http://localhost:5001',
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+});
+
+// Add request interceptor for debugging
+axiosInstance.interceptors.request.use(request => {
+  console.log('Making request:', {
+    url: request.url,
+    method: request.method,
+    data: request.data,
+    baseURL: request.baseURL,
+    headers: request.headers
+  });
+  return request;
 });
 
 /**
