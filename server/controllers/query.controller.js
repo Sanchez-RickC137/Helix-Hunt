@@ -546,14 +546,11 @@ exports.getGeneCount = async (req, res) => {
       return res.json(cachedData.data);
     }
 
-    // Query the database using knex
-    const query = `
-      SELECT variant_count 
-      FROM gene_variant_counts 
-      WHERE gene_symbol = $1
-    `;
-
-    const { rows } = await db.query(query, [geneSymbol]);
+    // Query the database using pool
+    const [rows] = await pool.execute(
+      'SELECT variant_count FROM gene_variant_counts WHERE gene_symbol = ?',
+      [geneSymbol]
+    );
 
     const result = rows.length === 0 
       ? { variantCount: 0, isDatabaseSearch: false }
