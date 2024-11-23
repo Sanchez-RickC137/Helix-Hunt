@@ -156,6 +156,7 @@ exports.processGeneralQuery = async (req, res, next) => {
 };
 
 /* Processes single or multiple variation IDs and full names concurrently */
+
 exports.processDatabaseQuery = async (req, res) => {
   try {
     const { fullNames, variationIDs, clinicalSignificance, startDate, endDate } = req.body;
@@ -171,24 +172,32 @@ exports.processDatabaseQuery = async (req, res) => {
       const variationPromises = variationIDs.map((id, index) => {
         let paramCount = 1;
         const query = `${BASE_QUERY}
-          WHERE vs."variationid" = $${paramCount}
+          WHERE vs."variationid" = $${paramCount}::text
           ${clinicalSignificance?.length ? `AND ss."clinicalsignificance" = ANY($${++paramCount})` : ''}
-          ${startDate ? `AND ss."datelastevaluated" >= $${++paramCount}` : ''}
-          ${endDate ? `AND ss."datelastevaluated" <= $${++paramCount}` : ''}
+          ${startDate ? `AND ss."datelastevaluated" >= $${++paramCount}::date` : ''}
+          ${endDate ? `AND ss."datelastevaluated" <= $${++paramCount}::date` : ''}
           ORDER BY ss."datelastevaluated" DESC`;
 
-        const params = [id];
+        const params = [id.toString()]; // Ensure ID is a string
         if (clinicalSignificance?.length) params.push(clinicalSignificance);
         if (startDate) params.push(startDate);
         if (endDate) params.push(endDate);
 
+        console.log('Executing variation ID query:', { query, params }); // Debug log
+
         return pool.query(query, params)
-          .then(result => processDbResults(result.rows, id))
-          .catch(error => [{
-            error: "Query failed",
-            details: error.message,
-            searchTerm: id
-          }]);
+          .then(result => {
+            console.log(`Found ${result.rows.length} rows for variation ID ${id}`); // Debug log
+            return processDbResults(result.rows, id);
+          })
+          .catch(error => {
+            console.error('Query error for variation ID:', id, error); // Debug log
+            return [{
+              error: "Query failed",
+              details: error.message,
+              searchTerm: id
+            }];
+          });
       });
 
       promises.push(...variationPromises);
@@ -199,10 +208,10 @@ exports.processDatabaseQuery = async (req, res) => {
       const namePromises = fullNames.map((name, index) => {
         let paramCount = 1;
         const query = `${BASE_QUERY}
-          WHERE vs."name" = $${paramCount}
+          WHERE vs."name" = $${paramCount}::text
           ${clinicalSignificance?.length ? `AND ss."clinicalsignificance" = ANY($${++paramCount})` : ''}
-          ${startDate ? `AND ss."datelastevaluated" >= $${++paramCount}` : ''}
-          ${endDate ? `AND ss."datelastevaluated" <= $${++paramCount}` : ''}
+          ${startDate ? `AND ss."datelastevaluated" >= $${++paramCount}::date` : ''}
+          ${endDate ? `AND ss."datelastevaluated" <= $${++paramCount}::date` : ''}
           ORDER BY ss."datelastevaluated" DESC`;
 
         const params = [name];
@@ -210,13 +219,21 @@ exports.processDatabaseQuery = async (req, res) => {
         if (startDate) params.push(startDate);
         if (endDate) params.push(endDate);
 
+        console.log('Executing full name query:', { query, params }); // Debug log
+
         return pool.query(query, params)
-          .then(result => processDbResults(result.rows, name))
-          .catch(error => [{
-            error: "Query failed",
-            details: error.message,
-            searchTerm: name
-          }]);
+          .then(result => {
+            console.log(`Found ${result.rows.length} rows for name ${name}`); // Debug log
+            return processDbResults(result.rows, name);
+          })
+          .catch(error => {
+            console.error('Query error for name:', name, error); // Debug log
+            return [{
+              error: "Query failed",
+              details: error.message,
+              searchTerm: name
+            }];
+          });
       });
 
       promises.push(...namePromises);
@@ -227,6 +244,8 @@ exports.processDatabaseQuery = async (req, res) => {
     
     // Flatten and filter results
     const flattenedResults = allResults.flat().filter(result => !result.error);
+
+    console.log('Total results found:', flattenedResults.length); // Debug log
 
     if (flattenedResults.length === 0) {
       return res.json([{
@@ -249,12 +268,15 @@ exports.processDatabaseQuery = async (req, res) => {
 };
 
 // Database based, general query
-exports.processGeneralQuery = async (req, res, next) => {
+exports.processGeneralSearch = async (req, res) => {
   try {
     const { searchGroups, clinicalSignificance, startDate, endDate } = req.body;
     
     if (!searchGroups?.length) {
-      return res.status(400).json({ error: 'At least one search group is required' });
+      return res.json([{
+        error: "Invalid search criteria",
+        details: "At least one search group with criteria is required"
+      }]);
     }
 
     if (searchGroups.length > 5) {
@@ -273,49 +295,61 @@ exports.processGeneralQuery = async (req, res, next) => {
       !(group.geneSymbol && !group.dnaChange && !group.proteinChange)
     );
 
-    // Process all groups in parallel
-    const results = await Promise.all([
-      // Process gene-only groups in parallel
-      ...geneOnlyGroups.map(group => 
-        processGeneSymbolDatabaseQuery(
-          group.geneSymbol,
-          clinicalSignificance,
-          startDate,
-          endDate
+    // Process all groups in parallel with individual queries
+    try {
+      const results = await Promise.all([
+        // Process gene-only groups in parallel
+        ...geneOnlyGroups.map(group => 
+          processGeneSymbolDatabaseQuery(
+            group.geneSymbol,
+            clinicalSignificance,
+            startDate,
+            endDate
+          )
+        ),
+        // Process non-gene groups individually
+        ...nonGeneGroups.map(group =>
+          processSingleNonGeneGroup(
+            group,
+            clinicalSignificance,
+            startDate,
+            endDate
+          )
         )
-      ),
-      // Process non-gene groups individually in parallel
-      ...nonGeneGroups.map(group => 
-        processGeneralClinVarWebQuery(
-          group,
-          clinicalSignificance,
-          startDate,
-          endDate
-        )
-      )
-    ]);
+      ]);
 
-    // Flatten results array and remove any error entries
-    const flattenedResults = results
-      .flat()
-      .filter(result => !result.error);
+      const flattenedResults = results
+        .flat()
+        .filter(result => !result.error);
 
-    if (flattenedResults.length === 0) {
-      return res.json([{
-        error: "No results found",
-        details: "No matching variants found for any search criteria",
-        searchTerms: searchGroups.map(group => 
-          Object.entries(group)
-            .filter(([_, value]) => value)
-            .map(([key, value]) => `${key}: ${value}`)
-            .join(', ')
-        )
+      if (flattenedResults.length === 0) {
+        return res.json([{
+          error: "No results found",
+          details: "No matching variants found for any search criteria",
+          searchTerms: searchGroups.map(group => 
+            Object.entries(group)
+              .filter(([_, value]) => value)
+              .map(([key, value]) => `${key}: ${value}`)
+              .join(', ')
+          )
+        }]);
+      }
+
+      res.json(flattenedResults);
+
+    } catch (error) {
+      console.error('Database search error:', error);
+      res.status(500).json([{
+        error: 'Database query failed',
+        details: error.message
       }]);
     }
-
-    res.json(flattenedResults);
   } catch (error) {
-    next(error);
+    console.error('General search error:', error);
+    res.status(500).json([{
+      error: 'Search processing failed',
+      details: error.message
+    }]);
   }
 };
 

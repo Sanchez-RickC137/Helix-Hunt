@@ -224,24 +224,23 @@ const constructGeneralSearchQuery = (searchGroups, clinicalSignificance, startDa
 const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate, endDate) => {
   const conditions = [];
   const params = [];
-  const paramIndexes = [];
   let paramCount = 1;
   
   if (group.geneSymbol || group.dnaChange || group.proteinChange) {
     conditions.push('EXISTS (SELECT 1 FROM "component_parts" cp WHERE cp."variation_id" = vs."variationid"');
     
     if (group.geneSymbol) {
-      conditions.push(`AND cp."gene_symbol" = $${paramCount}`);
+      conditions.push(`AND cp."gene_symbol" = $${paramCount}::text`);
       params.push(group.geneSymbol);
       paramCount++;
     }
     if (group.dnaChange) {
-      conditions.push(`AND cp."dna_change" = $${paramCount}`);
+      conditions.push(`AND cp."dna_change" = $${paramCount}::text`);
       params.push(group.dnaChange);
       paramCount++;
     }
     if (group.proteinChange) {
-      conditions.push(`AND cp."protein_change" = $${paramCount}`);
+      conditions.push(`AND cp."protein_change" = $${paramCount}::text`);
       params.push(group.proteinChange);
       paramCount++;
     }
@@ -265,13 +264,13 @@ const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate,
   }
 
   if (startDate) {
-    query += ` AND ss."datelastevaluated" >= $${paramCount}`;
+    query += ` AND ss."datelastevaluated" >= $${paramCount}::date`;
     params.push(startDate);
     paramCount++;
   }
 
   if (endDate) {
-    query += ` AND ss."datelastevaluated" <= $${paramCount}`;
+    query += ` AND ss."datelastevaluated" <= $${paramCount}::date`;
     params.push(endDate);
     paramCount++;
   }
@@ -318,7 +317,7 @@ const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, star
 
     // First attempt with [gene] tag
     let variationIds = await fetchVariationIds(geneSymbol, true);
-    
+   
     // If no results, retry without [gene] tag
     if (!variationIds.length) {
       console.log(`No results found with [gene] tag for ${geneSymbol}, retrying without tag...`);
@@ -339,14 +338,27 @@ const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, star
     const CHUNK_SIZE = 1000;
     const allResults = [];
 
+    // Convert all IDs to strings before processing
+    variationIds = variationIds.map(id => id.toString());
+
     for (let i = 0; i < variationIds.length; i += CHUNK_SIZE) {
       const chunk = variationIds.slice(i, i + CHUNK_SIZE);
       const { query, params } = buildChunkQuery(chunk, clinicalSignificance, startDate, endDate);
       
+      console.log('Executing chunk query:', {
+        queryPreview: query.substring(0, 200) + '...',
+        paramCount: params.length,
+        firstParam: params[0],
+        lastParam: params[params.length - 1]
+      });
+     
       const result = await pool.query(query, params);
       
+      console.log(`Got ${result.rows.length} rows for chunk of ${chunk.length} IDs`);
+     
       if (result.rows.length > 0) {
         const processedResults = processDbResults(result.rows, geneSymbol);
+        console.log(`Processed ${processedResults.length} results from chunk`);
         allResults.push(...processedResults);
       }
 
@@ -372,7 +384,6 @@ const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, star
   }
 };
 
-
 // Helper function go get variation ids for gene only
 const fetchVariationIds = async (geneSymbol, useGeneTag = true) => {
   try {
@@ -395,8 +406,8 @@ const fetchVariationIds = async (geneSymbol, useGeneTag = true) => {
 };
 
 const buildChunkQuery = (chunk, clinicalSignificance, startDate, endDate) => {
-  const placeholders = chunk.map((_, idx) => `$${idx + 1}`).join(',');
-  let params = [...chunk];
+  const placeholders = chunk.map((_, idx) => `$${idx + 1}::text`).join(',');
+  let params = chunk.map(id => id.toString()); // Ensure all IDs are strings
   let paramCount = chunk.length + 1;
   
   let query = `
@@ -411,13 +422,13 @@ const buildChunkQuery = (chunk, clinicalSignificance, startDate, endDate) => {
   }
 
   if (startDate) {
-    query += ` AND ss."datelastevaluated" >= $${paramCount}`;
+    query += ` AND ss."datelastevaluated" >= $${paramCount}::date`;
     params.push(startDate);
     paramCount++;
   }
 
   if (endDate) {
-    query += ` AND ss."datelastevaluated" <= $${paramCount}`;
+    query += ` AND ss."datelastevaluated" <= $${paramCount}::date`;
     params.push(endDate);
     paramCount++;
   }
