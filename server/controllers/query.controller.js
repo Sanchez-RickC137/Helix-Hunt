@@ -546,8 +546,8 @@ exports.getGeneCount = async (req, res) => {
       return res.json(cachedData.data);
     }
 
-    // Query the database using pool
-    const [rows] = await pool.execute(
+    // Query the database using pool.query instead of pool.execute
+    const [rows] = await pool.query(
       'SELECT variant_count FROM gene_variant_counts WHERE gene_symbol = ?',
       [geneSymbol]
     );
@@ -585,7 +585,6 @@ exports.getGeneCount = async (req, res) => {
     });
   }
 };
-
 // Cleanup function to run periodically
 setInterval(() => {
   const now = Date.now();
