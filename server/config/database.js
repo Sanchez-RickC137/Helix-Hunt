@@ -16,11 +16,12 @@ const sslConfig = process.env.NODE_ENV === 'production'
 // Create the connection pool
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ...sslConfig,
+  ssl: {
+    rejectUnauthorized: false, // Only needed if you're connecting via SSL (common on cloud-hosted databases)
+  },
   max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
-  maxUses: 7500, // Close client after this many uses to prevent memory issues
+  idleTimeoutMillis: 30000, // Timeout settings
+  connectionTimeoutMillis: 2000, // Connection timeout
 });
 
 // const pool = new Pool({
