@@ -15,12 +15,7 @@ const {
 const router = express.Router();
 
 // User registration
-router.post('/register', [
-  body('username').isLength({ min: 5 }).withMessage('Username must be at least 5 characters long'),
-  body('email').isEmail().withMessage('Must be a valid email address'),
-  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
-  validate
-], register);
+router.post('/register', register);
 
 // User login
 router.post('/login', login);
