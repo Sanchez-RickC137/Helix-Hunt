@@ -14,23 +14,23 @@ const sslConfig = process.env.NODE_ENV === 'production'
   : {};
 
 // Create the connection pool
-// const pool = new Pool({
-//   connectionString: process.env.DATABASE_URL,
-//   ...sslConfig,
-//   max: 20, // Maximum number of clients in the pool
-//   idleTimeoutMillis: 30000,
-//   connectionTimeoutMillis: 2000,
-//   maxUses: 7500, // Close client after this many uses to prevent memory issues
-// });
-
 const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT || 5432, // Default to PostgreSQL's port
-  ...sslConfig
+  connectionString: process.env.DATABASE_URL,
+  ...sslConfig,
+  max: 20, // Maximum number of clients in the pool
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+  maxUses: 7500, // Close client after this many uses to prevent memory issues
 });
+
+// const pool = new Pool({
+//   user: process.env.DB_USER,
+//   host: process.env.DB_HOST,
+//   database: process.env.DB_NAME,
+//   password: process.env.DB_PASSWORD,
+//   port: process.env.DB_PORT || 5432, // Default to PostgreSQL's port
+//   ...sslConfig
+// });
 
 // Pool error handling
 pool.on('error', (err, client) => {
