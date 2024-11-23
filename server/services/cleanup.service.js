@@ -3,8 +3,6 @@ const { pool } = require('../config/database');
 /**
  * Cleanup service for temporary data and expired chunks
  */
-const { pool } = require('../config/database');
-
 async function cleanupTemporaryData() {
   const client = await pool.connect();
   try {
