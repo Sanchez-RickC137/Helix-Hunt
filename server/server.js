@@ -44,7 +44,7 @@ app.use(cors({
   credentials: true
 }));
 
-const port = process.env.PORT || 5001;
+const port = process.env.PORT || 10000;
 
 // Rate limiting
 const limiter = rateLimit({
