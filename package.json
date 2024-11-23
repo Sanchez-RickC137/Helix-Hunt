@@ -24,6 +24,7 @@
     "jsonwebtoken": "^9.0.2",
     "lodash": "^4.17.21",
     "lucide-react": "^0.279.0",
+    "node-schedule": "^2.1.1",
     "pg": "^8.11.3",
     "pg-copy-streams": "^6.0.6",
     "pg-format": "^1.0.4",
