@@ -5,25 +5,25 @@
  */
 exports.BASE_QUERY = `
 SELECT DISTINCT
-    vs.variationid,
-    vs.name,
-    vs.genesymbol,
-    vs.clinicalsignificance AS overallclinicalsignificance,
-    vs.lastevaluated AS overalllastevaluated,
-    vs.reviewstatus AS overallreviewstatus,
-    vs.rcvaccession AS accessionid,
-    ss.clinicalsignificance,
-    ss.datelastevaluated,
-    ss.reviewstatus,
-    ss.collectionmethod AS method,
-    ss.reportedphenotypeinfo AS conditioninfo,
-    ss.submitter,
-    ss.scv AS submitteraccession,
-    ss.description,
-    ss.origincounts AS alleleorigin
-FROM variant_summary vs
-LEFT JOIN submission_summary ss 
-    ON vs.variationid = ss.variationid`;
+    vs."variationid",
+    vs."name",
+    vs."genesymbol",
+    vs."clinicalsignificance" AS "overallclinicalsignificance",
+    vs."lastevaluated" AS "overalllastevaluated",
+    vs."reviewstatus" AS "overallreviewstatus",
+    vs."rcvaccession" AS "accessionid",
+    ss."clinicalsignificance",
+    ss."datelastevaluated",
+    ss."reviewstatus",
+    ss."collectionmethod" AS "method",
+    ss."reportedphenotypeinfo" AS "conditioninfo",
+    ss."submitter",
+    ss."scv" AS "submitteraccession",
+    ss."description",
+    ss."origincounts" AS "alleleorigin"
+FROM "variant_summary" vs
+LEFT JOIN "submission_summary" ss 
+    ON vs."variationid" = ss."variationid"`;
 
 /**
  * Clinical significance values for validation

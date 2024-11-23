@@ -27,7 +27,7 @@ const processDbResults = (results, searchTerm) => {
 
   // Group results by VariationID
   const groupedResults = results.reduce((acc, result) => {
-    const variationId = result.variationid; // Note: PostgreSQL returns lowercase column names
+    const variationId = result.variationid; // lowercase for PostgreSQL
     if (!acc[variationId]) {
       acc[variationId] = [];
     }
@@ -224,21 +224,26 @@ const constructGeneralSearchQuery = (searchGroups, clinicalSignificance, startDa
 const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate, endDate) => {
   const conditions = [];
   const params = [];
+  const paramIndexes = [];
+  let paramCount = 1;
   
   if (group.geneSymbol || group.dnaChange || group.proteinChange) {
-    conditions.push('EXISTS (SELECT 1 FROM component_parts cp WHERE cp.variation_id = vs.VariationID');
+    conditions.push('EXISTS (SELECT 1 FROM "component_parts" cp WHERE cp."variation_id" = vs."variationid"');
     
     if (group.geneSymbol) {
-      conditions.push('AND cp.gene_symbol = ?');
+      conditions.push(`AND cp."gene_symbol" = $${paramCount}`);
       params.push(group.geneSymbol);
+      paramCount++;
     }
     if (group.dnaChange) {
-      conditions.push('AND cp.dna_change = ?');
+      conditions.push(`AND cp."dna_change" = $${paramCount}`);
       params.push(group.dnaChange);
+      paramCount++;
     }
     if (group.proteinChange) {
-      conditions.push('AND cp.protein_change = ?');
+      conditions.push(`AND cp."protein_change" = $${paramCount}`);
       params.push(group.proteinChange);
+      paramCount++;
     }
     
     conditions.push(')');
@@ -247,28 +252,31 @@ const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate,
   let query = `
     WITH filtered_variants AS (
       SELECT DISTINCT vs.* 
-      FROM variant_summary vs
+      FROM "variant_summary" vs
       WHERE ${conditions.join(' ')}
     )
     ${BASE_QUERY.replace('FROM variant_summary vs', 'FROM filtered_variants vs')}
   `;
 
   if (clinicalSignificance?.length) {
-    query += ` AND ss.ClinicalSignificance IN (${clinicalSignificance.map(() => '?').join(',')})`;
-    params.push(...clinicalSignificance);
+    query += ` AND ss."clinicalsignificance" = ANY($${paramCount})`;
+    params.push(clinicalSignificance);
+    paramCount++;
   }
 
   if (startDate) {
-    query += ` AND ss.DateLastEvaluated >= ?`;
+    query += ` AND ss."datelastevaluated" >= $${paramCount}`;
     params.push(startDate);
+    paramCount++;
   }
 
   if (endDate) {
-    query += ` AND ss.DateLastEvaluated <= ?`;
+    query += ` AND ss."datelastevaluated" <= $${paramCount}`;
     params.push(endDate);
+    paramCount++;
   }
 
-  query += ' ORDER BY ss.DateLastEvaluated DESC';
+  query += ' ORDER BY ss."datelastevaluated" DESC';
 
   try {
     console.log('Executing single group query:', {
@@ -277,9 +285,9 @@ const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate,
       params: params.length
     });
 
-    const [results] = await pool.execute(query, params, { timeout: 30000 });
+    const result = await pool.query(query, params);
     
-    return processDbResults(results, 
+    return processDbResults(result.rows, 
       Object.entries(group)
         .filter(([_, value]) => value)
         .map(([key, value]) => `${key}: ${value}`)
@@ -334,27 +342,18 @@ const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, star
     for (let i = 0; i < variationIds.length; i += CHUNK_SIZE) {
       const chunk = variationIds.slice(i, i + CHUNK_SIZE);
       const { query, params } = buildChunkQuery(chunk, clinicalSignificance, startDate, endDate);
-
-      // Debug logging
-      console.log('Executing query:', query);
       
-      const [results] = await pool.execute(query, params);
-      console.log(`Raw results from database for chunk:`, results.length);
+      const result = await pool.query(query, params);
       
-      if (results.length > 0) {
-        const processedResults = processDbResults(results, geneSymbol);
-        console.log(`Processed results for chunk:`, processedResults.length);
-        if (processedResults.length > 0) {
-          console.log('Sample processed result:', JSON.stringify(processedResults[0], null, 2));
-        }
+      if (result.rows.length > 0) {
+        const processedResults = processDbResults(result.rows, geneSymbol);
         allResults.push(...processedResults);
       }
 
-      console.log(`Processed ${i + chunk.length}/${variationIds.length} variants from database (Found ${allResults.length} results)`);
+      console.log(`Processed ${i + chunk.length}/${variationIds.length} variants (Found ${allResults.length} results)`);
     }
 
     if (allResults.length === 0) {
-      console.log('No results found after processing all chunks');
       return [{
         error: "No results found",
         details: "No matching variants found in database",
@@ -362,9 +361,7 @@ const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, star
       }];
     }
 
-    console.log(`Total results found: ${allResults.length}`);
     return allResults;
-
   } catch (error) {
     console.error('Error in gene symbol query:', error);
     return [{
@@ -374,6 +371,7 @@ const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, star
     }];
   }
 };
+
 
 // Helper function go get variation ids for gene only
 const fetchVariationIds = async (geneSymbol, useGeneTag = true) => {
@@ -397,31 +395,34 @@ const fetchVariationIds = async (geneSymbol, useGeneTag = true) => {
 };
 
 const buildChunkQuery = (chunk, clinicalSignificance, startDate, endDate) => {
-  const placeholders = chunk.map(() => "?").join(",");
+  const placeholders = chunk.map((_, idx) => `$${idx + 1}`).join(',');
   let params = [...chunk];
+  let paramCount = chunk.length + 1;
   
   let query = `
     ${BASE_QUERY}
-    WHERE vs.VariationID IN (${placeholders})
+    WHERE vs."variationid" IN (${placeholders})
   `;
 
   if (clinicalSignificance?.length) {
-    const sigPlaceholders = clinicalSignificance.map(() => "?").join(",");
-    query += ` AND ss.ClinicalSignificance IN (${sigPlaceholders})`;
-    params.push(...clinicalSignificance);
+    query += ` AND ss."clinicalsignificance" = ANY($${paramCount})`;
+    params.push(clinicalSignificance);
+    paramCount++;
   }
 
   if (startDate) {
-    query += ` AND ss.DateLastEvaluated >= ?`;
+    query += ` AND ss."datelastevaluated" >= $${paramCount}`;
     params.push(startDate);
+    paramCount++;
   }
 
   if (endDate) {
-    query += ` AND ss.DateLastEvaluated <= ?`;
+    query += ` AND ss."datelastevaluated" <= $${paramCount}`;
     params.push(endDate);
+    paramCount++;
   }
 
-  query += ` ORDER BY ss.DateLastEvaluated DESC`;
+  query += ` ORDER BY ss."datelastevaluated" DESC`;
 
   return { query, params };
 };

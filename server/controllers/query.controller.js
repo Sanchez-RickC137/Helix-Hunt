@@ -168,21 +168,22 @@ exports.processDatabaseQuery = async (req, res) => {
 
     // Process all variation IDs in parallel
     if (variationIDs?.length > 0) {
-      const variationPromises = variationIDs.map(id => {
+      const variationPromises = variationIDs.map((id, index) => {
+        let paramCount = 1;
         const query = `${BASE_QUERY}
-          WHERE vs.VariationID = ?
-          ${clinicalSignificance?.length ? `AND ss.ClinicalSignificance IN (${clinicalSignificance.map(() => '?').join(',')})` : ''}
-          ${startDate ? 'AND ss.DateLastEvaluated >= ?' : ''}
-          ${endDate ? 'AND ss.DateLastEvaluated <= ?' : ''}
-          ORDER BY ss.DateLastEvaluated DESC`;
+          WHERE vs."variationid" = $${paramCount}
+          ${clinicalSignificance?.length ? `AND ss."clinicalsignificance" = ANY($${++paramCount})` : ''}
+          ${startDate ? `AND ss."datelastevaluated" >= $${++paramCount}` : ''}
+          ${endDate ? `AND ss."datelastevaluated" <= $${++paramCount}` : ''}
+          ORDER BY ss."datelastevaluated" DESC`;
 
         const params = [id];
-        if (clinicalSignificance?.length) params.push(...clinicalSignificance);
+        if (clinicalSignificance?.length) params.push(clinicalSignificance);
         if (startDate) params.push(startDate);
         if (endDate) params.push(endDate);
 
-        return pool.execute(query, params)
-          .then(([results]) => processDbResults(results, id))
+        return pool.query(query, params)
+          .then(result => processDbResults(result.rows, id))
           .catch(error => [{
             error: "Query failed",
             details: error.message,
@@ -195,21 +196,22 @@ exports.processDatabaseQuery = async (req, res) => {
 
     // Process all full names in parallel
     if (fullNames?.length > 0) {
-      const namePromises = fullNames.map(name => {
+      const namePromises = fullNames.map((name, index) => {
+        let paramCount = 1;
         const query = `${BASE_QUERY}
-          WHERE vs.Name = ?
-          ${clinicalSignificance?.length ? `AND ss.ClinicalSignificance IN (${clinicalSignificance.map(() => '?').join(',')})` : ''}
-          ${startDate ? 'AND ss.DateLastEvaluated >= ?' : ''}
-          ${endDate ? 'AND ss.DateLastEvaluated <= ?' : ''}
-          ORDER BY ss.DateLastEvaluated DESC`;
+          WHERE vs."name" = $${paramCount}
+          ${clinicalSignificance?.length ? `AND ss."clinicalsignificance" = ANY($${++paramCount})` : ''}
+          ${startDate ? `AND ss."datelastevaluated" >= $${++paramCount}` : ''}
+          ${endDate ? `AND ss."datelastevaluated" <= $${++paramCount}` : ''}
+          ORDER BY ss."datelastevaluated" DESC`;
 
         const params = [name];
-        if (clinicalSignificance?.length) params.push(...clinicalSignificance);
+        if (clinicalSignificance?.length) params.push(clinicalSignificance);
         if (startDate) params.push(startDate);
         if (endDate) params.push(endDate);
 
-        return pool.execute(query, params)
-          .then(([results]) => processDbResults(results, name))
+        return pool.query(query, params)
+          .then(result => processDbResults(result.rows, name))
           .catch(error => [{
             error: "Query failed",
             details: error.message,
