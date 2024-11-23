@@ -25,40 +25,14 @@ router.get('/results-chunk', fetchResultsChunk);
 router.get('/gene-counts/:geneSymbol', getGeneCount);
 
 // ClinVar web query routes
-router.post('/clinvar', [
-  body('fullNames').optional().isArray(),
-  body('variationIDs').optional().isArray(),
-  body('clinicalSignificance').optional().isArray(),
-  body('startDate').optional().isString(),
-  body('endDate').optional().isString(),
-  validate
-], processClinVarQuery);
+router.post('/clinvar', processClinVarQuery);
 
-router.post('/clinvar/general', [
-  body('searchGroups').isArray(),
-  body('clinicalSignificance').optional().isArray(),
-  body('startDate').optional().isString(),
-  body('endDate').optional().isString(),
-  validate
-], processGeneralQuery);
+router.post('/clinvar/general', processGeneralQuery);
 
 // Database query routes
-router.post('/database', [
-  body('fullNames').optional().isArray(),
-  body('variationIDs').optional().isArray(),
-  body('clinicalSignificance').optional().isArray(),
-  body('startDate').optional().isString(),
-  body('endDate').optional().isString(),
-  validate
-], processDatabaseQuery);
+router.post('/database', processDatabaseQuery);
 
-router.post('/database/general-search', [
-  body('searchGroups').isArray(),
-  body('clinicalSignificance').optional().isArray(),
-  body('startDate').optional().isString(),
-  body('endDate').optional().isString(),
-  validate
-], processGeneralSearch);
+router.post('/database/general-search', processGeneralSearch);
 
 // Download route
 router.post('/download', downloadResults);

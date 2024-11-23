@@ -23,19 +23,10 @@ router.post('/register', [
 ], register);
 
 // User login
-router.post('/login', [
-  body('username').isLength({ min: 5 }).withMessage('Username must be at least 5 characters long'),
-  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters long'),
-  validate
-], login);
+router.post('/login', login);
 
 // Change password
-router.post('/change-password', [
-  body('username').notEmpty().withMessage('Username is required'),
-  body('currentPassword').notEmpty().withMessage('Current password is required'),
-  body('newPassword').isLength({ min: 8 }).withMessage('New password must be at least 8 characters long'),
-  validate
-], changePassword);
+router.post('/change-password', changePassword);
 
 // Password reset flow
 router.post('/forgot-password', forgotPassword);
