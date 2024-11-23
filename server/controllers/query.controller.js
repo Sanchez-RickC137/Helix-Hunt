@@ -529,11 +529,16 @@ exports.checkProcessingStatus = async (req, res) => {
   }
 };
 
-const geneCountCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const geneCountCache = new Map();
+
 exports.getGeneCount = async (req, res) => {
   try {
     const { geneSymbol } = req.params;
+
+    if (!geneSymbol) {
+      return res.status(400).json({ error: 'Gene symbol is required' });
+    }
 
     // Check cache first
     const cachedData = geneCountCache.get(geneSymbol);
@@ -541,16 +546,20 @@ exports.getGeneCount = async (req, res) => {
       return res.json(cachedData.data);
     }
 
-    const [rows] = await pool.execute(
-      'SELECT variant_count FROM gene_variant_counts WHERE gene_symbol = ?',
-      [geneSymbol]
-    );
+    // Query the database using knex
+    const query = `
+      SELECT variant_count 
+      FROM gene_variant_counts 
+      WHERE gene_symbol = $1
+    `;
+
+    const { rows } = await db.query(query, [geneSymbol]);
 
     const result = rows.length === 0 
       ? { variantCount: 0, isDatabaseSearch: false }
-      : { 
-          variantCount: rows[0].variant_count,
-          isDatabaseSearch: rows[0].variant_count > 1000
+      : {
+          variantCount: parseInt(rows[0].variant_count),
+          isDatabaseSearch: parseInt(rows[0].variant_count) > 1000
         };
 
     // Cache the result
@@ -559,13 +568,36 @@ exports.getGeneCount = async (req, res) => {
       data: result
     });
 
-    res.json(result);
+    // Clean up old cache entries periodically
+    if (geneCountCache.size > 1000) {
+      const now = Date.now();
+      for (const [key, value] of geneCountCache.entries()) {
+        if (now - value.timestamp > CACHE_TTL) {
+          geneCountCache.delete(key);
+        }
+      }
+    }
+
+    return res.json(result);
 
   } catch (error) {
     console.error('Error fetching gene count:', error);
-    res.status(500).json({ error: 'Failed to fetch gene count' });
+    return res.status(500).json({ 
+      error: 'Failed to fetch gene count',
+      details: error.message 
+    });
   }
 };
+
+// Cleanup function to run periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of geneCountCache.entries()) {
+    if (now - value.timestamp > CACHE_TTL) {
+      geneCountCache.delete(key);
+    }
+  }
+}, CACHE_TTL); // Clean up every cache TTL period
 
 // const createOptimizedQuery = (searchGroups, filters) => {
 //   let queryParts = [];
