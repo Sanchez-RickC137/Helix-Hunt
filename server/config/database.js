@@ -61,7 +61,7 @@ const createOptimizedIndexes = async (client) => {
     // Create GiST index for faster text pattern matching
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_variant_summary_name_gist ON variant_summary 
-      USING gist (Name gist_trgm_ops);
+      USING gist ("Name" gist_trgm_ops);
     `).catch(err => {
       if (!err.message.includes('already exists')) {
         console.warn('Warning: Could not create GiST index:', err.message);
@@ -70,8 +70,8 @@ const createOptimizedIndexes = async (client) => {
 
     // Create B-tree indexes for exact matching
     await client.query(`
-      CREATE INDEX IF NOT EXISTS idx_gene_symbol ON variant_summary(GeneSymbol);
-      CREATE INDEX IF NOT EXISTS idx_variation_id ON variant_summary(VariationID);
+      CREATE INDEX IF NOT EXISTS idx_gene_symbol ON variant_summary("GeneSymbol");
+      CREATE INDEX IF NOT EXISTS idx_variation_id ON variant_summary("VariationID");
     `).catch(err => {
       if (!err.message.includes('already exists')) {
         console.warn('Warning: Could not create B-tree indexes:', err.message);
