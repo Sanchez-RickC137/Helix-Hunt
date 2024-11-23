@@ -156,7 +156,6 @@ exports.processGeneralQuery = async (req, res, next) => {
 };
 
 /* Processes single or multiple variation IDs and full names concurrently */
-
 exports.processDatabaseQuery = async (req, res) => {
   try {
     const { fullNames, variationIDs, clinicalSignificance, startDate, endDate } = req.body;
@@ -169,29 +168,46 @@ exports.processDatabaseQuery = async (req, res) => {
 
     // Process all variation IDs in parallel
     if (variationIDs?.length > 0) {
-      const variationPromises = variationIDs.map((id, index) => {
+      const variationPromises = variationIDs.map(id => {
         let paramCount = 1;
-        const query = `${BASE_QUERY}
-          WHERE vs."variationid" = $${paramCount}::text
-          ${clinicalSignificance?.length ? `AND ss."clinicalsignificance" = ANY($${++paramCount})` : ''}
-          ${startDate ? `AND ss."datelastevaluated" >= $${++paramCount}::date` : ''}
-          ${endDate ? `AND ss."datelastevaluated" <= $${++paramCount}::date` : ''}
-          ORDER BY ss."datelastevaluated" DESC`;
+        const query = `
+          SELECT DISTINCT
+              vs."VariationID",
+              vs."Name",
+              vs."GeneSymbol",
+              vs."ClinicalSignificance" AS "OverallClinicalSignificance",
+              vs."LastEvaluated" AS "OverallLastEvaluated",
+              vs."ReviewStatus" AS "OverallReviewStatus",
+              vs."RCVaccession" AS "AccessionID",
+              ss.ClinicalSignificance,
+              ss.DateLastEvaluated,
+              ss.ReviewStatus,
+              ss.CollectionMethod AS "Method",
+              ss.ReportedPhenotypeInfo AS "ConditionInfo",
+              ss.Submitter,
+              ss.SCV AS "SubmitterAccession",
+              ss.Description,
+              ss.OriginCounts AS "AlleleOrigin"
+          FROM "variant_summary" vs
+          LEFT JOIN submission_summary ss 
+              ON vs."VariationID" = ss.VariationID
+          WHERE vs."VariationID" = $${paramCount}
+          ${clinicalSignificance?.length ? `AND ss.ClinicalSignificance = ANY($${++paramCount})` : ''}
+          ${startDate ? `AND ss.DateLastEvaluated::date >= $${++paramCount}::date` : ''}
+          ${endDate ? `AND ss.DateLastEvaluated::date <= $${++paramCount}::date` : ''}
+          ORDER BY ss.DateLastEvaluated DESC`;
 
-        const params = [id.toString()]; // Ensure ID is a string
+        const params = [id.toString()];
         if (clinicalSignificance?.length) params.push(clinicalSignificance);
         if (startDate) params.push(startDate);
         if (endDate) params.push(endDate);
 
-        console.log('Executing variation ID query:', { query, params }); // Debug log
+        console.log('Executing variation ID query:', { query, params });
 
         return pool.query(query, params)
-          .then(result => {
-            console.log(`Found ${result.rows.length} rows for variation ID ${id}`); // Debug log
-            return processDbResults(result.rows, id);
-          })
+          .then(result => processDbResults(result.rows, id))
           .catch(error => {
-            console.error('Query error for variation ID:', id, error); // Debug log
+            console.error('Query error for variation ID:', id, error);
             return [{
               error: "Query failed",
               details: error.message,
@@ -205,47 +221,56 @@ exports.processDatabaseQuery = async (req, res) => {
 
     // Process all full names in parallel
     if (fullNames?.length > 0) {
-      const namePromises = fullNames.map((name, index) => {
+      const namePromises = fullNames.map(name => {
         let paramCount = 1;
-        const query = `${BASE_QUERY}
-          WHERE vs."name" = $${paramCount}::text
-          ${clinicalSignificance?.length ? `AND ss."clinicalsignificance" = ANY($${++paramCount})` : ''}
-          ${startDate ? `AND ss."datelastevaluated" >= $${++paramCount}::date` : ''}
-          ${endDate ? `AND ss."datelastevaluated" <= $${++paramCount}::date` : ''}
-          ORDER BY ss."datelastevaluated" DESC`;
+        const query = `
+          SELECT DISTINCT
+              vs."VariationID",
+              vs."Name",
+              vs."GeneSymbol",
+              vs."ClinicalSignificance" AS "OverallClinicalSignificance",
+              vs."LastEvaluated" AS "OverallLastEvaluated",
+              vs."ReviewStatus" AS "OverallReviewStatus",
+              vs."RCVaccession" AS "AccessionID",
+              ss.ClinicalSignificance,
+              ss.DateLastEvaluated,
+              ss.ReviewStatus,
+              ss.CollectionMethod AS "Method",
+              ss.ReportedPhenotypeInfo AS "ConditionInfo",
+              ss.Submitter,
+              ss.SCV AS "SubmitterAccession",
+              ss.Description,
+              ss.OriginCounts AS "AlleleOrigin"
+          FROM "variant_summary" vs
+          LEFT JOIN submission_summary ss 
+              ON vs."VariationID" = ss.VariationID
+          WHERE vs."Name" = $${paramCount}
+          ${clinicalSignificance?.length ? `AND ss.ClinicalSignificance = ANY($${++paramCount})` : ''}
+          ${startDate ? `AND ss.DateLastEvaluated::date >= $${++paramCount}::date` : ''}
+          ${endDate ? `AND ss.DateLastEvaluated::date <= $${++paramCount}::date` : ''}
+          ORDER BY ss.DateLastEvaluated DESC`;
 
         const params = [name];
         if (clinicalSignificance?.length) params.push(clinicalSignificance);
         if (startDate) params.push(startDate);
         if (endDate) params.push(endDate);
 
-        console.log('Executing full name query:', { query, params }); // Debug log
-
         return pool.query(query, params)
-          .then(result => {
-            console.log(`Found ${result.rows.length} rows for name ${name}`); // Debug log
-            return processDbResults(result.rows, name);
-          })
-          .catch(error => {
-            console.error('Query error for name:', name, error); // Debug log
-            return [{
-              error: "Query failed",
-              details: error.message,
-              searchTerm: name
-            }];
-          });
+          .then(result => processDbResults(result.rows, name))
+          .catch(error => [{
+            error: "Query failed",
+            details: error.message,
+            searchTerm: name
+          }]);
       });
 
       promises.push(...namePromises);
     }
 
-    // Wait for all queries to complete
     const allResults = await Promise.all(promises);
-    
-    // Flatten and filter results
     const flattenedResults = allResults.flat().filter(result => !result.error);
 
-    console.log('Total results found:', flattenedResults.length); // Debug log
+    console.log('Total results found:', flattenedResults.length);
 
     if (flattenedResults.length === 0) {
       return res.json([{
