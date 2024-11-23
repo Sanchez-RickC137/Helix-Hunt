@@ -118,7 +118,8 @@ class SchedulerService {
         }
       }
 
-      // Post-processing
+      // Post-processing with updated component parts
+      this.logger.log('Starting component parts population...');
       await populateComponentParts(this.pool, this.logger);
       await updateGeneCounts();
 

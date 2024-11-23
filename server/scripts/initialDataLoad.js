@@ -9,6 +9,7 @@ const axios = require('axios');
 const Logger = require('../services/fileService/utils/logger');
 const { Transform } = require('stream');
 const readline = require('readline');
+const { populateComponentParts } = require('./populateComponentParts');
 
 require('dotenv').config();
 
@@ -683,15 +684,15 @@ async function initialDataLoad() {
           
         } catch (error) {
           logger.log(`Error processing ${fileName}: ${error.message}`, 'error');
-          // Continue with next file instead of stopping completely
           continue;
         }
       }
 
-      // Process component parts after both tables are loaded
+      // Post-processing with updated component parts
       try {
         await trimTables(client, logger);
-        await createAndPopulateComponentPartsTable(client, logger);
+        logger.log('Starting component parts population...');
+        await populateComponentParts(pool, logger);
         await createInitialGeneCounts(client, logger);
         await updateGeneCountsFromAPI(client, logger);
       } catch (error) {

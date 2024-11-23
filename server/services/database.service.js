@@ -17,6 +17,9 @@ const executeRequest = async (config) => {
 
 // Main database query result processing.
 const processDbResults = (results, searchTerm) => {
+  console.log("processDbResults:", results);
+  console.log("searchTerm: ", searchTerm);
+  
   if (!results || results.length === 0) {
     return [{
       error: "No results found",
