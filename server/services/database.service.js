@@ -17,9 +17,6 @@ const executeRequest = async (config) => {
 
 // Main database query result processing.
 const processDbResults = (results, searchTerm) => {
-  console.log("processDbResults:", results);
-  console.log("searchTerm: ", searchTerm);
-  
   if (!results || results.length === 0) {
     return [{
       error: "No results found",
@@ -30,7 +27,7 @@ const processDbResults = (results, searchTerm) => {
 
   // Group results by VariationID
   const groupedResults = results.reduce((acc, result) => {
-    const variationId = result.variationid; // lowercase for PostgreSQL
+    const variationId = result.VariationID; // Matches the actual casing from DB
     if (!acc[variationId]) {
       acc[variationId] = [];
     }
@@ -41,17 +38,21 @@ const processDbResults = (results, searchTerm) => {
   // Transform each group into standardized format
   return Object.entries(groupedResults).map(([variationId, submissions]) => {
     const mainResult = submissions[0];
-    let fullName = mainResult.name || '';
-    let geneSymbol = '';
+    let fullName = mainResult.Name || '';
+    let geneSymbol = mainResult.GeneSymbol || '';
     let transcriptId = '';
     let dnaChange = '';
     let proteinChange = '';
 
+    // Parse name components if format matches expected pattern
     if (fullName.includes(':') && fullName.includes('(') && fullName.includes(')') && fullName.startsWith("NM_")) {
       try {
         const geneParts = fullName.split('(');
         if (geneParts.length > 1) {
-          geneSymbol = geneParts[1].split(')')[0].trim();
+          // If GeneSymbol isn't directly available, extract from Name
+          if (!geneSymbol) {
+            geneSymbol = geneParts[1].split(')')[0].trim();
+          }
           
           if (geneSymbol.length < 10) {
             transcriptId = geneParts[0].trim();
@@ -73,13 +74,13 @@ const processDbResults = (results, searchTerm) => {
     return {
       searchTerm,
       variantDetails: {
-        fullName: mainResult.name || '',
-        geneSymbol: geneSymbol || '',
+        fullName: mainResult.Name || '',
+        geneSymbol: geneSymbol,
         transcriptID: transcriptId,
         dnaChange,
         proteinChange,
-        variationID: mainResult.variationid?.toString() || '',
-        accessionID: mainResult.rcvaccession || ''
+        variationID: mainResult.VariationID?.toString() || '',
+        accessionID: mainResult.AccessionID || ''
       },
       assertionList: submissions.map(submission => ({
         Classification: {
@@ -89,16 +90,17 @@ const processDbResults = (results, searchTerm) => {
         'Review status': {
           stars: '',
           'assertion criteria': submission.reviewstatus || '',
-          method: submission.method || ''
+          method: submission.Method || '',
+          'submission_reference': ''
         },
         Condition: {
-          name: submission.reportedphenotypeinfo?.split(':')[1]?.trim() || '',
+          name: submission.ConditionInfo?.split(':')[1]?.trim() || '',
           'Affected status': '',
-          'Allele origin': submission.origincounts || ''
+          'Allele origin': submission.AlleleOrigin || ''
         },
         Submitter: {
           name: submission.submitter || '',
-          Accession: submission.scv || '',
+          Accession: submission.SubmitterAccession || '',
           'First in ClinVar': '',
           'Last updated': submission.datelastevaluated || ''
         },
