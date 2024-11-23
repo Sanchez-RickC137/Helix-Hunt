@@ -1,18 +1,10 @@
 const { pool } = require('../config/database');
 const { BASE_QUERY } = require('../constants/queries');
-const {
-  processClinVarWebQuery,
-  processGeneralClinVarWebQuery,
-  generateDownloadContent,
-  processClinVarData, 
-  extractTableData
-} = require('../services/clinvar.service');
-const {
-  processDbResults,
-  constructGeneralSearchQuery,
-  processGeneSymbolDatabaseQuery,
-  processSingleNonGeneGroup
- } = require('../services/database.service');
+const { processClinVarWebQuery, processGeneralClinVarWebQuery, generateDownloadContent, processClinVarData, extractTableData } = require('../services/clinvar.service');
+const { processDbResults,constructGeneralSearchQuery, processGeneSymbolDatabaseQuery, processSingleNonGeneGroup } = require('../services/database.service');
+const format = require('pg-format');
+const { createILikePattern, createJsonContains } = require('../utils/postgresUtils');
+const PerformanceMonitor = require('../utils/performanceMonitoring');
 
 // Saves a user query if a user is logged in
 exports.saveQuery = async (req, res, next) => {
@@ -456,7 +448,6 @@ exports.downloadResults = async (req, res) => {
   }
 };
 
-
 exports.checkProcessingStatus = async (req, res) => {
   const { queryId } = req.params;
   
@@ -514,3 +505,143 @@ exports.getGeneCount = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch gene count' });
   }
 };
+
+// const createOptimizedQuery = (searchGroups, filters) => {
+//   let queryParts = [];
+//   const params = [];
+//   let paramCount = 1;
+
+//   searchGroups.forEach(group => {
+//     const groupConditions = [];
+    
+//     // Use GiST index for text pattern matching
+//     if (group.geneSymbol) {
+//       groupConditions.push(`cp.gene_symbol ILIKE $${paramCount}`);
+//       params.push(`%${group.geneSymbol}%`);
+//       paramCount++;
+//     }
+
+//     // Use trigram similarity for fuzzy matching
+//     if (group.dnaChange) {
+//       groupConditions.push(
+//         `similarity(cp.dna_change, $${paramCount}) > 0.3 OR cp.dna_change ILIKE $${paramCount + 1}`
+//       );
+//       params.push(group.dnaChange, `%${group.dnaChange}%`);
+//       paramCount += 2;
+//     }
+
+//     if (group.proteinChange) {
+//       groupConditions.push(
+//         `similarity(cp.protein_change, $${paramCount}) > 0.3 OR cp.protein_change ILIKE $${paramCount + 1}`
+//       );
+//       params.push(group.proteinChange, `%${group.proteinChange}%`);
+//       paramCount += 2;
+//     }
+
+//     if (groupConditions.length > 0) {
+//       queryParts.push(`(${groupConditions.join(' AND ')})`);
+//     }
+//   });
+
+//   let query = `
+//     WITH filtered_variants AS (
+//       SELECT DISTINCT vs.* 
+//       FROM variant_summary vs
+//       INNER JOIN component_parts cp ON vs.variationid = cp.variation_id
+//       ${queryParts.length > 0 ? `WHERE ${queryParts.join(' OR ')}` : ''}
+//     )
+//   `;
+
+//   // Add filters
+//   const filterConditions = [];
+  
+//   if (filters.clinicalSignificance?.length) {
+//     filterConditions.push(`clinicalsignificance = ANY($${paramCount})`);
+//     params.push(filters.clinicalSignificance);
+//     paramCount++;
+//   }
+
+//   if (filters.startDate) {
+//     filterConditions.push(`datelastevaluated >= $${paramCount}::date`);
+//     params.push(filters.startDate);
+//     paramCount++;
+//   }
+
+//   if (filters.endDate) {
+//     filterConditions.push(`datelastevaluated <= $${paramCount}::date`);
+//     params.push(filters.endDate);
+//     paramCount++;
+//   }
+
+//   query += `
+//     SELECT *
+//     FROM filtered_variants
+//     ${filterConditions.length > 0 ? `WHERE ${filterConditions.join(' AND ')}` : ''}
+//     ORDER BY datelastevaluated DESC
+//   `;
+
+//   return { query, params };
+// };
+
+// exports.executeOptimizedQuery = async (searchGroups, filters) => {
+//   const startTime = process.hrtime();
+//   const client = await pool.connect();
+  
+//   try {
+//     const { query, params } = createOptimizedQuery(searchGroups, filters);
+    
+//     // Create execution plan
+//     const plan = await client.query(`EXPLAIN ANALYZE ${query}`, params);
+//     console.log('Query execution plan:', plan.rows);
+
+//     // Execute query
+//     const result = await client.query(query, params);
+    
+//     // Log performance
+//     const endTime = process.hrtime(startTime);
+//     const executionTime = endTime[0] * 1000 + endTime[1] / 1000000;
+    
+//     await PerformanceMonitor.logQueryPerformance(
+//       query.slice(0, 100), // Use first 100 chars as query ID
+//       executionTime,
+//       result
+//     );
+
+//     return result.rows;
+//   } finally {
+//     client.release();
+//   }
+// };
+
+// exports.createMaterializedResults = async (queryId, results) => {
+//   const client = await pool.connect();
+//   try {
+//     await client.query('BEGIN');
+
+//     // Create materialized results table if it doesn't exist
+//     await client.query(`
+//       CREATE TABLE IF NOT EXISTS materialized_results (
+//         query_id TEXT PRIMARY KEY,
+//         results JSONB,
+//         created_at TIMESTAMP DEFAULT NOW(),
+//         expires_at TIMESTAMP DEFAULT NOW() + INTERVAL '1 day'
+//       )
+//     `);
+
+//     // Store results
+//     await client.query(
+//       `INSERT INTO materialized_results (query_id, results)
+//        VALUES ($1, $2)
+//        ON CONFLICT (query_id) 
+//        DO UPDATE SET results = $2, created_at = NOW(), expires_at = NOW() + INTERVAL '1 day'`,
+//       [queryId, JSON.stringify(results)]
+//     );
+
+//     await client.query('COMMIT');
+//   } catch (error) {
+//     await client.query('ROLLBACK');
+//     throw error;
+//   } finally {
+//     client.release();
+//   }
+// };

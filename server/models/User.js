@@ -7,63 +7,57 @@
 const pool = require('../config/database');
 
 class User {
-  // Creates a new user in the database
   static async create(username, hashedPassword) {
-    const [result] = await pool.execute(
-      'INSERT INTO users (username, password) VALUES (?, ?)',
+    const { rows: [user] } = await pool.query(
+      'INSERT INTO users (username, password) VALUES ($1, $2) RETURNING id',
       [username, hashedPassword]
     );
-    return result.insertId;
+    return user.id;
   }
 
-  // Finds a user by username
   static async findByUsername(username) {
-    const [users] = await pool.execute(
-      'SELECT * FROM users WHERE username = ?',
+    const { rows } = await pool.query(
+      'SELECT * FROM users WHERE username = $1',
       [username]
     );
-    return users[0];
+    return rows[0];
   }
 
-  // Finds a user by ID
   static async findById(id) {
-    const [users] = await pool.execute(
-      'SELECT id, username FROM users WHERE id = ?',
+    const { rows } = await pool.query(
+      'SELECT id, username FROM users WHERE id = $1',
       [id]
     );
-    return users[0];
+    return rows[0];
   }
 
-  // Updates user's password
   static async updatePassword(id, hashedPassword) {
-    await pool.execute(
-      'UPDATE users SET password = ? WHERE id = ?',
+    await pool.query(
+      'UPDATE users SET password = $1 WHERE id = $2',
       [hashedPassword, id]
     );
   }
 
-  // Updates user's full name preferences
   static async updateFullNamePreferences(id, preferences) {
-    await pool.execute(
-      'UPDATE user_preferences SET full_name_preferences = ? WHERE user_id = ?',
+    await pool.query(
+      'UPDATE user_preferences SET full_name_preferences = $1 WHERE user_id = $2',
       [JSON.stringify(preferences), id]
     );
   }
 
-  // Updates user's variation ID preferences
   static async updateVariationIDPreferences(id, preferences) {
-    await pool.execute(
-      'UPDATE user_preferences SET variation_id_preferences = ? WHERE user_id = ?',
+    await pool.query(
+      'UPDATE user_preferences SET variation_id_preferences = $1 WHERE user_id = $2',
       [JSON.stringify(preferences), id]
     );
   }
 
-  // Retrieves user's preferences
   static async getPreferences(id) {
-    const [rows] = await pool.execute(
-      'SELECT full_name_preferences, variation_id_preferences FROM user_preferences WHERE user_id = ?',
+    const { rows } = await pool.query(
+      'SELECT full_name_preferences, variation_id_preferences FROM user_preferences WHERE user_id = $1',
       [id]
     );
+    
     if (rows.length > 0) {
       return {
         fullNamePreferences: JSON.parse(rows[0].full_name_preferences || '[]'),

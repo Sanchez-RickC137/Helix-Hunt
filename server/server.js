@@ -102,57 +102,54 @@ app.use((req, res, next) => {
 
 // Initialize database and create tables
 async function initializeDatabase(pool) {
+  const client = await pool.connect();
   try {
-    const connection = await pool.getConnection();
-    try {
-      // Create users table
-      await connection.query(`
-        CREATE TABLE IF NOT EXISTS users (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          username VARCHAR(255) UNIQUE NOT NULL,
-          email VARCHAR(255) UNIQUE NOT NULL,
-          password VARCHAR(255) NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `);
+    // Create users table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
 
-      // Create query_chunks table with corrected syntax
-      await connection.query(`
-        CREATE TABLE IF NOT EXISTS query_chunks (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          query_id VARCHAR(255) NOT NULL,
-          chunk_number INT NOT NULL,
-          data LONGTEXT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          expires_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP + INTERVAL 1 DAY),
-          INDEX idx_query_chunks (query_id, chunk_number)
-        ) ENGINE=InnoDB
-      `);
+    // Create query_chunks table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS query_chunks (
+        id SERIAL PRIMARY KEY,
+        query_id VARCHAR(255) NOT NULL,
+        chunk_number INTEGER NOT NULL,
+        data TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP + INTERVAL '1 day'
+      )
+    `);
 
-      // Create processing_status table
-      await connection.query(`
-        CREATE TABLE IF NOT EXISTS processing_status (
-          id VARCHAR(255) PRIMARY KEY,
-          status ENUM('pending', 'processing', 'completed', 'failed') NOT NULL,
-          progress INT DEFAULT 0,
-          total_items INT DEFAULT 0,
-          error_message TEXT,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB
-      `);
-      
-      // Create optimized indexes
-      await createOptimizedIndexes(connection);
-      
-      console.log('Database tables and indexes created successfully');
-      return pool;
-    } finally {
-      connection.release();
-    }
-  } catch (error) {
-    console.error('Database initialization error:', error);
-    throw error;
+    // Create index
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_query_chunks ON query_chunks(query_id, chunk_number)
+    `);
+
+    // Create processing_status table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS processing_status (
+        id VARCHAR(255) PRIMARY KEY,
+        status VARCHAR(20) CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+        progress INTEGER DEFAULT 0,
+        total_items INTEGER DEFAULT 0,
+        error_message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    await createOptimizedIndexes(client);
+    
+    return pool;
+  } finally {
+    client.release();
   }
 }
 

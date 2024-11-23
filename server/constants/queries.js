@@ -1,29 +1,29 @@
 /**
  * Base SQL query for variant retrieval
  * Joins variant_summary and submission_summary tables
- * Includes all commonly needed fields
+ * Note: Column names are lowercase in PostgreSQL
  */
 exports.BASE_QUERY = `
 SELECT DISTINCT
-    vs.VariationID,
-    vs.Name,
-    vs.GeneSymbol,
-    vs.ClinicalSignificance AS OverallClinicalSignificance,
-    vs.LastEvaluated AS OverallLastEvaluated,
-    vs.ReviewStatus AS OverallReviewStatus,
-    vs.RCVaccession AS AccessionID,
-    ss.ClinicalSignificance,
-    ss.DateLastEvaluated,
-    ss.ReviewStatus,
-    ss.CollectionMethod AS Method,
-    ss.ReportedPhenotypeInfo AS ConditionInfo,
-    ss.Submitter,
-    ss.SCV AS SubmitterAccession,
-    ss.Description,
-    ss.OriginCounts AS AlleleOrigin
+    vs.variationid,
+    vs.name,
+    vs.genesymbol,
+    vs.clinicalsignificance AS overallclinicalsignificance,
+    vs.lastevaluated AS overalllastevaluated,
+    vs.reviewstatus AS overallreviewstatus,
+    vs.rcvaccession AS accessionid,
+    ss.clinicalsignificance,
+    ss.datelastevaluated,
+    ss.reviewstatus,
+    ss.collectionmethod AS method,
+    ss.reportedphenotypeinfo AS conditioninfo,
+    ss.submitter,
+    ss.scv AS submitteraccession,
+    ss.description,
+    ss.origincounts AS alleleorigin
 FROM variant_summary vs
 LEFT JOIN submission_summary ss 
-    ON vs.VariationID = ss.VariationID`;
+    ON vs.variationid = ss.variationid`;
 
 /**
  * Clinical significance values for validation

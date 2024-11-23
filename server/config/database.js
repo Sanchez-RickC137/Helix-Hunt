@@ -1,101 +1,85 @@
-const mysql = require('mysql2/promise');
+const { Pool } = require('pg');
 const dotenv = require('dotenv');
+
 
 dotenv.config();
 
-// Initialize connection pool with Hostinger-specific settings
-const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: 3306,
-  waitForConnections: true,
-  connectionLimit: 5,
-  queueLimit: 0,
-  connectTimeout: 60000,
-  acquireTimeout: 60000,
-  enableKeepAlive: true,
-  keepAliveInitialDelay: 10000,
-  ssl: {
-    rejectUnauthorized: false
-  },
-  debug: process.env.NODE_ENV !== 'production'
+// Configure SSL based on environment
+const sslConfig = process.env.NODE_ENV === 'production' 
+  ? {
+      ssl: {
+        rejectUnauthorized: false // Required for some hosting providers
+      }
+    }
+  : {};
+
+// Create the connection pool
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ...sslConfig,
+  max: 20, // Maximum number of clients in the pool
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000,
+  maxUses: 7500, // Close client after this many uses to prevent memory issues
 });
 
-// Initialize pool with retry mechanism
-const initializePool = async (retries = 5) => {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const connection = await pool.getConnection();
-      
-      // Test the connection
-      await connection.query('SELECT 1');
-      
-      connection.release();
-      console.log('Successfully connected to the database.');
-      return pool;
-    } catch (error) {
-      console.error(`Connection attempt ${attempt} failed:`, error);
-      
-      if (attempt === retries) {
-        throw new Error(`Failed to connect after ${retries} attempts: ${error.message}`);
+// Pool error handling
+pool.on('error', (err, client) => {
+  console.error('Unexpected error on idle client', err);
+  process.exit(-1);
+});
+
+// Initialize pool
+const initializePool = async () => {
+  try {
+    const client = await pool.connect();
+    console.log('Successfully connected to PostgreSQL');
+    client.release();
+    return pool;
+  } catch (error) {
+    console.error('Error configuring pool:', error);
+    throw error;
+  }
+};
+
+/**
+ * Create optimized indexes for PostgreSQL
+ * @param {PoolClient} client - PostgreSQL client
+ */
+const createOptimizedIndexes = async (client) => {
+  try {
+    // Create GiST index for faster text pattern matching
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_variant_summary_name_gist ON variant_summary 
+      USING gist (Name gist_trgm_ops);
+    `).catch(err => {
+      if (!err.message.includes('already exists')) {
+        console.warn('Warning: Could not create GiST index:', err.message);
       }
-      
-      // Wait before next attempt (increasing delay)
-      await new Promise(resolve => setTimeout(resolve, attempt * 5000));
-    }
-  }
-};
+    });
 
-const createOptimizedIndexes = async (connection) => {
-  try {
-    // First check if index exists
-    const [indexes] = await connection.query(`
-      SHOW INDEX FROM variant_summary 
-      WHERE Key_name = 'idx_variant_summary_name'
-    `);
+    // Create B-tree indexes for exact matching
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS idx_gene_symbol ON variant_summary(GeneSymbol);
+      CREATE INDEX IF NOT EXISTS idx_variation_id ON variant_summary(VariationID);
+    `).catch(err => {
+      if (!err.message.includes('already exists')) {
+        console.warn('Warning: Could not create B-tree indexes:', err.message);
+      }
+    });
 
-    if (indexes.length === 0) {
-      await connection.query(`
-        CREATE INDEX idx_variant_summary_name ON variant_summary(Name(255))
-      `);
-      console.log('Created variant_summary name index');
-    } else {
-      console.log('variant_summary name index already exists');
-    }
-
-    console.log('Database indexes verification completed');
+    console.log('Created/verified database indexes');
   } catch (error) {
-    console.warn('Warning: Error managing indexes:', error);
-    // Don't throw error as indexes are optimizations, not critical functionality
+    console.warn('Warning: Error creating indexes:', error);
   }
 };
 
-// Export pool maintainer
-const maintainPool = async () => {
-  try {
-    const connection = await pool.getConnection();
-    await connection.query('SELECT 1');
-    connection.release();
-  } catch (error) {
-    console.error('Pool maintenance check failed:', error);
-    // Attempt to re-initialize pool
-    try {
-      await initializePool(3);
-    } catch (reinitError) {
-      console.error('Failed to re-initialize pool:', reinitError);
-    }
-  }
-};
-
-// Set up periodic pool maintenance
-if (process.env.NODE_ENV === 'production') {
-  setInterval(maintainPool, 60000); // Check every minute
-}
+// Helper function for parameterized queries
+const query = (text, params) => pool.query(text, params);
 
 module.exports = {
   pool,
+  query,
   initializePool,
   createOptimizedIndexes
 };

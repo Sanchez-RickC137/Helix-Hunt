@@ -1,5 +1,5 @@
 const { pool } = require('../config/database');
-const axios = require('axios');  // Add this import
+const axios = require('axios');
 const cheerio = require('cheerio');
 const { BASE_QUERY } = require('../constants/queries');
 
@@ -27,7 +27,7 @@ const processDbResults = (results, searchTerm) => {
 
   // Group results by VariationID
   const groupedResults = results.reduce((acc, result) => {
-    const variationId = result.VariationID;
+    const variationId = result.variationid; // Note: PostgreSQL returns lowercase column names
     if (!acc[variationId]) {
       acc[variationId] = [];
     }
@@ -38,13 +38,12 @@ const processDbResults = (results, searchTerm) => {
   // Transform each group into standardized format
   return Object.entries(groupedResults).map(([variationId, submissions]) => {
     const mainResult = submissions[0];
-    let fullName = mainResult.Name || '';
+    let fullName = mainResult.name || '';
     let geneSymbol = '';
     let transcriptId = '';
     let dnaChange = '';
     let proteinChange = '';
 
-    // Parse name components if format matches expected pattern
     if (fullName.includes(':') && fullName.includes('(') && fullName.includes(')') && fullName.startsWith("NM_")) {
       try {
         const geneParts = fullName.split('(');
@@ -71,39 +70,39 @@ const processDbResults = (results, searchTerm) => {
     return {
       searchTerm,
       variantDetails: {
-        fullName: mainResult.Name || '',
+        fullName: mainResult.name || '',
         geneSymbol: geneSymbol || '',
         transcriptID: transcriptId,
         dnaChange,
         proteinChange,
-        variationID: mainResult.VariationID?.toString() || '',
-        accessionID: mainResult.RCVaccession || ''
+        variationID: mainResult.variationid?.toString() || '',
+        accessionID: mainResult.rcvaccession || ''
       },
       assertionList: submissions.map(submission => ({
         Classification: {
-          value: submission.ClinicalSignificance || '',
-          date: submission.DateLastEvaluated || ''
+          value: submission.clinicalsignificance || '',
+          date: submission.datelastevaluated || ''
         },
         'Review status': {
           stars: '',
-          'assertion criteria': submission.ReviewStatus || '',
-          method: submission.Method || ''
+          'assertion criteria': submission.reviewstatus || '',
+          method: submission.method || ''
         },
         Condition: {
-          name: submission.ConditionInfo?.split(':')[1]?.trim() || '',
+          name: submission.reportedphenotypeinfo?.split(':')[1]?.trim() || '',
           'Affected status': '',
-          'Allele origin': submission.AlleleOrigin || ''
+          'Allele origin': submission.origincounts || ''
         },
         Submitter: {
-          name: submission.Submitter || '',
-          Accession: submission.SubmitterAccession || '',
+          name: submission.submitter || '',
+          Accession: submission.scv || '',
           'First in ClinVar': '',
-          'Last updated': submission.DateLastEvaluated || ''
+          'Last updated': submission.datelastevaluated || ''
         },
         'More information': {
           Publications: {},
           'Other databases': {},
-          Comment: submission.Description || ''
+          Comment: submission.description || ''
         }
       }))
     };
@@ -138,11 +137,7 @@ const constructSearchQuery = (conditions, clinicalSignificance, startDate, endDa
   return query;
 };
 
-/**
- * Constructs SQL query for general search
- * @param {Array} searchGroups - Array of search criteria groups
- * @returns {Object} Object containing SQL query and parameters
- */
+// Constructs SQL query for general search 
 const constructGeneralSearchQuery = (searchGroups, clinicalSignificance, startDate, endDate) => {
   const conditions = [];
   const params = [];
@@ -225,8 +220,7 @@ const constructGeneralSearchQuery = (searchGroups, clinicalSignificance, startDa
   return { query, params };
 };
 
-
-
+// Single search group for non gene only
 const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate, endDate) => {
   const conditions = [];
   const params = [];
@@ -304,6 +298,7 @@ const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate,
   }
 };
 
+// Single search group for gene only
 const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, startDate, endDate) => {
   try {
     console.log('Starting gene symbol query with filters:', {
@@ -380,6 +375,7 @@ const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, star
   }
 };
 
+// Helper function go get variation ids for gene only
 const fetchVariationIds = async (geneSymbol, useGeneTag = true) => {
   try {
     const searchTerm = useGeneTag ? `${geneSymbol}[gene]` : geneSymbol;

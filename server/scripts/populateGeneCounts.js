@@ -1,6 +1,6 @@
 const fs = require('fs').promises;
 const path = require('path');
-const { pool, initializePool } = require('../config/database');
+const { initializePool } = require('../config/database');
 
 async function populateGeneCounts() {
   let dbPool;
@@ -20,42 +20,32 @@ async function populateGeneCounts() {
     console.log(`Found ${geneSymbols.length} gene symbols to process`);
 
     // Use a transaction for better performance and atomicity
-    const connection = await dbPool.getConnection();
+    const connection = await dbPool.connect();
     try {
-      await connection.beginTransaction();
+      await connection.query('BEGIN');
 
-      // Insert gene symbols with initial count of 0
+      // Insert gene symbols with an initial count of 0
       const insertQuery = `
         INSERT INTO gene_variant_counts (gene_symbol, variant_count)
-        VALUES (?, 0)
-        ON DUPLICATE KEY UPDATE gene_symbol = gene_symbol`;
+        VALUES ($1, 0)
+        ON CONFLICT (gene_symbol) DO NOTHING`;
 
       for (const geneSymbol of geneSymbols) {
-        await connection.execute(insertQuery, [geneSymbol]);
+        await connection.query(insertQuery, [geneSymbol]);
       }
 
-      await connection.commit();
+      await connection.query('COMMIT');
       console.log('Successfully populated gene counts table');
-
     } catch (error) {
-      await connection.rollback();
+      await connection.query('ROLLBACK');
       throw error;
     } finally {
       connection.release();
     }
-
-    process.exit(0);
   } catch (error) {
     console.error('Error populating gene counts table:', error);
-    process.exit(1);
-  } finally {
-    if (dbPool) {
-      await dbPool.end().catch(console.error);
-    }
+    throw error;
   }
 }
 
-// Only run if called directly
-if (require.main === module) {
-  populateGeneCounts();
-}
+module.exports = { populateGeneCounts };

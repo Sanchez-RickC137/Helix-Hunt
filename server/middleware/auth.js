@@ -1,27 +1,15 @@
+const jwt = require('jsonwebtoken');
+const { pool } = require('../config/database');
+
 /**
  * Authentication middleware for protecting API routes
  * Verifies JWT tokens and adds user information to requests
  */
-
-const jwt = require('jsonwebtoken');
-
-/**
- * Middleware function to authenticate requests
- * Checks for valid JWT token in Authorization header
- * Adds userId to request object if authentication successful
- * 
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- * @param {Function} next - Express next middleware function
- * @returns {void}
- * 
- * @throws {401} If no Authorization header is provided
- * @throws {401} If token is invalid or expired
- */
-const auth = (req, res, next) => {
+const auth = async (req, res, next) => {
   console.log('Auth middleware called');
+  const client = await pool.connect();
+  
   try {
-    // Extract Authorization header
     const authHeader = req.header('Authorization');
     console.log('Auth header:', authHeader);
 
@@ -29,21 +17,47 @@ const auth = (req, res, next) => {
       return res.status(401).json({ error: 'No Authorization header provided' });
     }
 
-    // Remove 'Bearer ' prefix and verify token
     const token = authHeader.replace('Bearer ', '');
     console.log('Extracted token:', token);
 
     try {
-      // Verify token and decode payload
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       console.log('Decoded token:', decoded);
-      
-      // Add userId to request for use in protected routes
+
+      // Verify user exists in database
+      const { rows } = await client.query(
+        'SELECT id, username FROM users WHERE id = $1',
+        [decoded.userId]
+      );
+
+      if (rows.length === 0) {
+        throw new Error('User not found');
+      }
+
+      // Check if token is blacklisted
+      const { rows: blacklistedTokens } = await client.query(
+        'SELECT * FROM token_blacklist WHERE token = $1 AND expires_at > NOW()',
+        [token]
+      );
+
+      if (blacklistedTokens.length > 0) {
+        throw new Error('Token is blacklisted');
+      }
+
+      // Add user info to request
       req.userId = decoded.userId;
+      req.user = rows[0];
       next();
     } catch (error) {
-      // Handle token expiration specifically
       if (error.name === 'TokenExpiredError') {
+        // Blacklist expired token
+        await client.query(
+          `INSERT INTO token_blacklist (token, expires_at) 
+           VALUES ($1, NOW() + INTERVAL '1 day')
+           ON CONFLICT (token) DO NOTHING`,
+          [token]
+        );
+        
         return res.status(401).json({ error: 'Token expired', isExpired: true });
       }
       throw error;
@@ -51,6 +65,8 @@ const auth = (req, res, next) => {
   } catch (error) {
     console.error('Authentication error:', error);
     res.status(401).json({ error: 'Please authenticate', details: error.message });
+  } finally {
+    client.release();
   }
 };
 

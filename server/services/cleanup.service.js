@@ -3,36 +3,45 @@ const { pool } = require('../config/database');
 /**
  * Cleanup service for temporary data and expired chunks
  */
+const { pool } = require('../config/database');
+
 async function cleanupTemporaryData() {
-  const connection = await pool.getConnection();
+  const client = await pool.connect();
   try {
-    // Delete expired chunks
-    await connection.query(`
+    await client.query('BEGIN');
+
+    // Delete expired chunks with PostgreSQL interval
+    await client.query(`
       DELETE FROM query_chunks 
       WHERE expires_at < NOW()
     `);
 
     // Clean up stale processing statuses
-    await connection.query(`
+    await client.query(`
       DELETE FROM processing_status 
-      WHERE created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR)
+      WHERE created_at < NOW() - INTERVAL '24 hours'
       AND status IN ('completed', 'failed')
     `);
 
     // Reset hanging processes
-    await connection.query(`
+    await client.query(`
       UPDATE processing_status 
       SET status = 'failed', 
           error_message = 'Process timed out'
       WHERE status = 'processing'
-      AND updated_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)
+      AND updated_at < NOW() - INTERVAL '1 hour'
     `);
 
+    // Vacuum analyze tables to reclaim space and update statistics
+    await client.query('VACUUM ANALYZE query_chunks, processing_status');
+
+    await client.query('COMMIT');
     console.log('Cleanup completed successfully');
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error during cleanup:', error);
   } finally {
-    connection.release();
+    client.release();
   }
 }
 

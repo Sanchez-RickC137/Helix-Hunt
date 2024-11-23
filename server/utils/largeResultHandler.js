@@ -1,8 +1,8 @@
 const fs = require('fs').promises;
-const fsSync = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const { promisify } = require('util');
+const { pool } = require('../config/database');
 
 const gzip = promisify(zlib.gzip);
 const gunzip = promisify(zlib.gunzip);
@@ -16,53 +16,69 @@ class LargeResultHandler {
     await fs.mkdir(this.tempDir, { recursive: true });
   }
 
-  /**
-   * Save intermediate results to prevent memory buildup
-   */
   async saveIntermediateResults(results, identifier) {
-    const tempFilePath = path.join(this.tempDir, `${identifier}_intermediate.json.gz`);
-    
+    const client = await pool.connect();
     try {
+      // Store in database instead of files
       const compressedData = await gzip(JSON.stringify(results));
-      await fs.writeFile(tempFilePath, compressedData);
+      
+      await client.query(`
+        INSERT INTO query_chunks (query_id, chunk_number, data, expires_at)
+        VALUES ($1, $2, $3, NOW() + INTERVAL '1 day')
+        ON CONFLICT (query_id, chunk_number) 
+        DO UPDATE SET data = $3, expires_at = NOW() + INTERVAL '1 day'
+      `, [identifier, 1, compressedData]);
+
     } catch (error) {
       console.error('Error saving intermediate results:', error);
-      // Don't throw - we want to continue processing even if save fails
+    } finally {
+      client.release();
     }
   }
 
-  /**
-   * Load intermediate results if needed
-   */
   async loadIntermediateResults(identifier) {
-    const tempFilePath = path.join(this.tempDir, `${identifier}_intermediate.json.gz`);
-    
+    const client = await pool.connect();
     try {
-      const exists = await fs.access(tempFilePath)
-        .then(() => true)
-        .catch(() => false);
-      
-      if (!exists) return null;
+      const { rows } = await client.query(`
+        SELECT data 
+        FROM query_chunks 
+        WHERE query_id = $1 
+        AND expires_at > NOW()
+        ORDER BY chunk_number
+      `, [identifier]);
 
-      const compressedData = await fs.readFile(tempFilePath);
-      const decompressedData = await gunzip(compressedData);
+      if (rows.length === 0) return null;
+
+      const decompressedData = await gunzip(rows[0].data);
       return JSON.parse(decompressedData.toString());
     } catch (error) {
       console.error('Error loading intermediate results:', error);
       return null;
+    } finally {
+      client.release();
     }
   }
 
-  /**
-   * Clean up intermediate files
-   */
   async cleanup(identifier) {
+    const client = await pool.connect();
     try {
-      const tempFilePath = path.join(this.tempDir, `${identifier}_intermediate.json.gz`);
-      await fs.unlink(tempFilePath).catch(() => {});
+      await client.query('DELETE FROM query_chunks WHERE query_id = $1', [identifier]);
     } catch (error) {
-      console.error('Error cleaning up temp files:', error);
+      console.error('Error cleaning up chunks:', error);
+    } finally {
+      client.release();
     }
+  }
+
+  // New method for batch processing
+  async processBatch(items, batchSize = 1000, processFunc) {
+    const results = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+      const batch = items.slice(i, i + batchSize);
+      const batchResults = await processFunc(batch);
+      results.push(...batchResults);
+    }
+    return results;
   }
 }
 
