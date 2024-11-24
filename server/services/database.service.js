@@ -306,7 +306,6 @@ const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate,
   }
 };
 
-
 // Single search group for gene only
 const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, startDate, endDate) => {
   try {
@@ -400,10 +399,30 @@ const fetchVariationIds = async (geneSymbol, useGeneTag = true) => {
   }
 };
 
+const buildSignificanceCondition = (params, paramCount) => {
+  if (!params.length) return '';
+  
+  // For each significance value, create a normalized comparison
+  const conditions = params.map((_, i) => {
+    const position = paramCount + i;
+    return `LOWER(REGEXP_REPLACE(ss.ClinicalSignificance, '[_-]', ' ', 'g')) = LOWER($${position})`;
+  });
+
+  return `AND (${conditions.join(' OR ')})`;
+};
+
+/**
+ * Updates buildChunkQuery with normalized significance matching
+ */
 const buildChunkQuery = (chunk, clinicalSignificance, startDate, endDate) => {
   const placeholders = chunk.map((_, idx) => `$${idx + 1}`).join(',');
   let params = chunk.map(id => id.toString());
   let paramCount = chunk.length + 1;
+  
+  // Normalize clinical significance values before adding to params
+  const normalizedSignificance = clinicalSignificance?.map(sig => 
+    normalizeClinicalSignificance(sig)
+  );
   
   const query = `
     SELECT DISTINCT
@@ -427,17 +446,13 @@ const buildChunkQuery = (chunk, clinicalSignificance, startDate, endDate) => {
     LEFT JOIN submission_summary ss 
         ON vs."VariationID" = ss.VariationID
     WHERE vs."VariationID" IN (${placeholders})
-    ${clinicalSignificance?.length ? 
-      `AND LOWER(ss.ClinicalSignificance) = ANY(ARRAY[${clinicalSignificance.map(
-        (_, i) => `LOWER($${paramCount + i})`
-      ).join(', ')}])` : 
-      ''}
-    ${startDate ? `AND ss.DateLastEvaluated::date >= $${paramCount + (clinicalSignificance?.length || 0)}::date` : ''}
-    ${endDate ? `AND ss.DateLastEvaluated::date <= $${paramCount + (clinicalSignificance?.length || 0) + (startDate ? 1 : 0)}::date` : ''}
+    ${normalizedSignificance?.length ? buildSignificanceCondition(normalizedSignificance, paramCount) : ''}
+    ${startDate ? `AND ss.DateLastEvaluated::date >= $${paramCount + (normalizedSignificance?.length || 0)}::date` : ''}
+    ${endDate ? `AND ss.DateLastEvaluated::date <= $${paramCount + (normalizedSignificance?.length || 0) + (startDate ? 1 : 0)}::date` : ''}
     ORDER BY ss.DateLastEvaluated DESC`;
 
-  if (clinicalSignificance?.length) {
-    params.push(...clinicalSignificance);
+  if (normalizedSignificance?.length) {
+    params.push(...normalizedSignificance);
   }
   if (startDate) params.push(startDate);
   if (endDate) params.push(endDate);

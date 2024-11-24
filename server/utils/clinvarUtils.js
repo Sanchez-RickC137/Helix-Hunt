@@ -90,8 +90,30 @@ function parseVariantDetails(html) {
  * Normalizes clinical significance for consistent comparison
  */
 function normalizeClinicalSignificance(value) {
-  return value.toLowerCase().trim();
+  if (!value) return '';
+  
+  // First, normalize to lowercase and trim
+  let normalized = value.toLowerCase().trim();
+
+  // Map of standard forms (all lowercase)
+  const standardForms = {
+    'uncertain_significance': 'uncertain significance',
+    'uncertain-significance': 'uncertain significance',
+    'vus': 'uncertain significance',
+    'vous': 'uncertain significance',
+    'likely_pathogenic': 'likely pathogenic',
+    'likely-pathogenic': 'likely pathogenic',
+    'likely_benign': 'likely benign',
+    'likely-benign': 'likely benign',
+  };
+
+  // Replace any underscores or hyphens with spaces
+  normalized = normalized.replace(/[_-]/g, ' ');
+
+  // Check if we need to map to a standard form
+  return standardForms[normalized] || normalized;
 }
+
 
 /**
  * Converts ClinVar HTML table to structured JSON format
@@ -132,7 +154,9 @@ function refinedClinvarHtmlTableToJson(html) {
     
     // Classification (1st column)
     const $classificationCell = $cells.eq(0);
-    entry.Classification.value = $classificationCell.find('.germline-submission > div').contents().first().text().trim();
+    // Get raw classification value and normalize it
+    const rawClassification = $classificationCell.find('.germline-submission > div').contents().first().text().trim();
+    entry.Classification.value = normalizeClinicalSignificance(rawClassification);
     entry.Classification.date = $classificationCell.find('.smaller').last().text().trim().replace(/[()]/g, '');
 
     // Review status (2nd column)
