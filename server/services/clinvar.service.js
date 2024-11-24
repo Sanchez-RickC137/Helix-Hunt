@@ -207,7 +207,9 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
     if (clinicalSignificance?.length || startDate || endDate) {
       assertionList = assertionList.filter(a => {
         const matchesSignificance = clinicalSignificance?.length
-          ? clinicalSignificance.includes(a.Classification.value)
+          ? clinicalSignificance.some(sig => 
+              normalizeClinicalSignificance(sig) === normalizeClinicalSignificance(a.Classification.value)
+            )
           : true;
         const matchesStartDate = startDate
           ? new Date(a.Classification.date) >= new Date(startDate)

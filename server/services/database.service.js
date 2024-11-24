@@ -427,12 +427,18 @@ const buildChunkQuery = (chunk, clinicalSignificance, startDate, endDate) => {
     LEFT JOIN submission_summary ss 
         ON vs."VariationID" = ss.VariationID
     WHERE vs."VariationID" IN (${placeholders})
-    ${clinicalSignificance?.length ? `AND ss.ClinicalSignificance = ANY($${paramCount++})` : ''}
-    ${startDate ? `AND ss.DateLastEvaluated::date >= $${paramCount++}::date` : ''}
-    ${endDate ? `AND ss.DateLastEvaluated::date <= $${paramCount++}::date` : ''}
+    ${clinicalSignificance?.length ? 
+      `AND LOWER(ss.ClinicalSignificance) = ANY(ARRAY[${clinicalSignificance.map(
+        (_, i) => `LOWER($${paramCount + i})`
+      ).join(', ')}])` : 
+      ''}
+    ${startDate ? `AND ss.DateLastEvaluated::date >= $${paramCount + (clinicalSignificance?.length || 0)}::date` : ''}
+    ${endDate ? `AND ss.DateLastEvaluated::date <= $${paramCount + (clinicalSignificance?.length || 0) + (startDate ? 1 : 0)}::date` : ''}
     ORDER BY ss.DateLastEvaluated DESC`;
 
-  if (clinicalSignificance?.length) params.push(clinicalSignificance);
+  if (clinicalSignificance?.length) {
+    params.push(...clinicalSignificance);
+  }
   if (startDate) params.push(startDate);
   if (endDate) params.push(endDate);
 

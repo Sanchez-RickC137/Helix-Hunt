@@ -87,6 +87,13 @@ function parseVariantDetails(html) {
 }
 
 /**
+ * Normalizes clinical significance for consistent comparison
+ */
+function normalizeClinicalSignificance(value) {
+  return value.toLowerCase().trim();
+}
+
+/**
  * Converts ClinVar HTML table to structured JSON format
  * Uses optimized parsing and caching for better performance
  */
@@ -179,7 +186,7 @@ function refinedClinvarHtmlTableToJson(html) {
     // More information (5th column)
     const $moreInfoCell = $cells.eq(4);
     
-    // Publications with caching
+    // Publications
     const $pubLinks = $moreInfoCell.find('dl.submit-evidence a');
     $pubLinks.each((_, el) => {
       const $link = $(el);
@@ -197,7 +204,7 @@ function refinedClinvarHtmlTableToJson(html) {
       }
     });
 
-    // Comments with optimized parsing
+    // Comments
     let comment = '';
     const $fullComment = $moreInfoCell.find('.full_comment');
     
@@ -226,5 +233,6 @@ function refinedClinvarHtmlTableToJson(html) {
 
 module.exports = {
   parseVariantDetails,
-  refinedClinvarHtmlTableToJson
+  refinedClinvarHtmlTableToJson,
+  normalizeClinicalSignificance
 };
