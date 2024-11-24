@@ -189,8 +189,8 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
       }];
     }
 
-    // Track seen variant IDs
-    const seenVariants = new Set();
+    // Track seen variants with assertion combinations
+    const seenEntries = new Set();
     const results = [];
 
     // Process each variant section
@@ -201,10 +201,6 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
       if (!variantDetailsHtml || !assertionListTable) return;
 
       const variantDetails = parseVariantDetails(variantDetailsHtml);
-      
-      // Skip if we've already seen this variant
-      if (seenVariants.has(variantDetails.variationID)) return;
-      seenVariants.add(variantDetails.variationID);
 
       let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
 
@@ -229,14 +225,20 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
         });
       }
 
-      // Only add if there are matching assertions after filtering
-      if (assertionList.length > 0) {
-        results.push({
-          searchTerm: fullName || variantId,
-          variantDetails,
-          assertionList
-        });
-      }
+      // Skip if no assertions match after filtering
+      if (assertionList.length === 0) return;
+
+      // Check for duplicates (variantDetails + assertionList combo)
+      const entryKey = JSON.stringify({ variantDetails, assertionList });
+      if (seenEntries.has(entryKey)) return;
+
+      // Add to results and mark as seen
+      seenEntries.add(entryKey);
+      results.push({
+        searchTerm: fullName || variantId,
+        variantDetails,
+        assertionList
+      });
     });
 
     return results.length > 0 ? results : [{
