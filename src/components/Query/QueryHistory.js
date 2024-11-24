@@ -9,53 +9,48 @@ const QueryHistory = ({ queryHistory, onSelectQuery }) => {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const formatTimestamp = (timestamp) => {
-    return new Date(timestamp).toLocaleString();
-  };
-
-  const renderSearchContent = (query) => {
+  const renderQueryDetails = (query) => {
     if (query.search_type === 'targeted') {
-      return (
-        <>
-          {query.full_names?.length > 0 && (
-            <div className="mb-2">
-              <strong>Full Names:</strong>
-              <ul className="list-disc list-inside ml-4">
-                {query.full_names.map((name, idx) => (
-                  <li key={idx} className="text-sm">{name}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-          {query.variation_ids?.length > 0 && (
-            <div className="mb-2">
-              <strong>Variation IDs:</strong>
-              <ul className="list-disc list-inside ml-4">
-                {query.variation_ids.map((id, idx) => (
-                  <li key={idx} className="text-sm">{id}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </>
-      );
-    }
+      const variations = [];
+      
+      // Add variation IDs if present
+      if (query.variation_ids && query.variation_ids.length > 0) {
+        variations.push(
+          <div key="variations" className="mb-2">
+            <strong>Variation IDs: </strong>
+            {query.variation_ids.join(', ')}
+          </div>
+        );
+      }
 
-    return query.search_groups?.length > 0 ? (
-      <div className="mb-2">
-        <strong>Search Groups:</strong>
-        <ul className="list-disc list-inside ml-4">
-          {query.search_groups.map((group, idx) => (
-            <li key={idx} className="text-sm">
+      // Add full names if present
+      if (query.full_names && query.full_names.length > 0) {
+        variations.push(
+          <div key="fullnames" className="mb-2">
+            <strong>Full Names: </strong>
+            {query.full_names.join(', ')}
+          </div>
+        );
+      }
+
+      return variations.length > 0 ? variations : <div>No query details available</div>;
+    } else if (query.search_type === 'general' && query.search_groups) {
+      return (
+        <div>
+          <strong>Search Groups: </strong>
+          {query.search_groups.map((group, index) => (
+            <div key={index} className="ml-4 mb-1">
               {Object.entries(group)
                 .filter(([_, value]) => value)
                 .map(([key, value]) => `${key}: ${value}`)
                 .join(', ')}
-            </li>
+            </div>
           ))}
-        </ul>
-      </div>
-    ) : null;
+        </div>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -69,29 +64,42 @@ const QueryHistory = ({ queryHistory, onSelectQuery }) => {
             className={`p-4 rounded-lg cursor-pointer ${themeConstants.unselectedItemBackgroundColor} 
               hover:${themeConstants.unselectedItemHoverColor}`}
           >
-            <div className="flex justify-between items-start mb-2">
-              <span className={`inline-block px-2 py-1 rounded text-sm ${themeConstants.tagBackgroundColor} text-white`}>
+            {/* Search Type Badge */}
+            <div className="flex justify-between items-center mb-3">
+              <span className={`px-3 py-1 rounded-full text-sm ${themeConstants.tagBackgroundColor} text-white`}>
                 {query.search_type.charAt(0).toUpperCase() + query.search_type.slice(1)} / {query.query_source}
               </span>
               <span className="text-sm text-gray-500">
-                {formatTimestamp(query.timestamp)}
+                Queried on: {new Date(query.timestamp).toLocaleString()}
               </span>
             </div>
 
-            {renderSearchContent(query)}
+            {/* Query Details */}
+            <div className="mb-3">
+              {renderQueryDetails(query)}
+            </div>
 
-            {query.clinical_significance?.length > 0 && (
-              <div className="mt-2">
+            {/* Clinical Significance */}
+            {query.clinical_significance && query.clinical_significance.length > 0 && (
+              <div className="mb-2">
                 <strong>Clinical Significance: </strong>
                 {query.clinical_significance.join(', ')}
               </div>
             )}
 
-            <div className="mt-2 text-sm text-gray-500">
-              <span>Date Range: {formatDate(query.start_date)} to {formatDate(query.end_date)}</span>
+            {/* Date Range */}
+            <div className="text-sm text-gray-600">
+              <strong>Date Range: </strong>
+              {formatDate(query.start_date)} to {formatDate(query.end_date)}
             </div>
           </div>
         ))}
+
+        {queryHistory.length === 0 && (
+          <div className="text-center text-gray-500 py-4">
+            No query history available
+          </div>
+        )}
       </div>
     </div>
   );
