@@ -203,13 +203,26 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
     const variantDetails = parseVariantDetails(variantDetailsHtml);
     let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
 
-    // Apply filters with case-insensitive matching
+    // Log the original values for debugging
+    console.log('Filtering with clinical significance:', clinicalSignificance);
+    
     if (clinicalSignificance?.length || startDate || endDate) {
       assertionList = assertionList.filter(a => {
+        const assertionValue = a.Classification.value;
+        console.log('Comparing assertion value:', assertionValue);
+        
         const matchesSignificance = clinicalSignificance?.length
-          ? clinicalSignificance.some(sig => 
-              normalizeClinicalSignificance(sig) === normalizeClinicalSignificance(a.Classification.value)
-            )
+          ? clinicalSignificance.some(sig => {
+              const normalizedSig = sig.toLowerCase().trim();
+              const normalizedAssertion = assertionValue.toLowerCase().trim();
+              console.log('Comparing:', {
+                original: { sig, assertionValue },
+                normalized: { normalizedSig, normalizedAssertion }
+              });
+              // Try a more flexible comparison
+              return normalizedAssertion.includes(normalizedSig) || 
+                     normalizedSig.includes(normalizedAssertion);
+            })
           : true;
           
         const matchesStartDate = startDate
@@ -220,12 +233,20 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
           ? new Date(a.Classification.date) <= new Date(endDate)
           : true;
 
+        // Log if we're filtering out this assertion
+        if (!matchesSignificance) {
+          console.log('Filtered out assertion:', {
+            value: assertionValue,
+            criteria: clinicalSignificance
+          });
+        }
+
         return matchesSignificance && matchesStartDate && matchesEndDate;
       });
     }
 
-    // Sort by date
-    assertionList.sort((a, b) => new Date(b.Classification.date) - new Date(a.Classification.date));
+    // Log final filtered results
+    console.log('Final filtered assertions count:', assertionList.length);
 
     return [{
       searchTerm: fullName || variantId,
