@@ -149,7 +149,7 @@ async function decompressFile(inputPath, outputPath) {
 
 async function createTables(connection) {
   for (const [tableName, schema] of Object.entries(TABLE_SCHEMAS)) {
-    console.log(`Creating table ${tableName}...`);
+    // console.log(`Creating table ${tableName}...`);
     await connection.query(schema);
   }
 }
@@ -186,7 +186,7 @@ async function downloadAndLoad() {
       try {
         // Download
         const downloadPath = path.join(DIRECTORIES.download, fileInfo.fileName);
-        console.log(`Downloading ${fileInfo.fileName}...`);
+        // console.log(`Downloading ${fileInfo.fileName}...`);
         await downloadFile(fileInfo.url, downloadPath);
 
         // Decompress
@@ -195,13 +195,13 @@ async function downloadAndLoad() {
             fileInfo.fileName.replace('.gz', '') : 
             fileInfo.fileName
         );
-        console.log(`Decompressing ${fileInfo.fileName}...`);
+        // console.log(`Decompressing ${fileInfo.fileName}...`);
         await decompressFile(downloadPath, decompressedPath);
 
         // Load into database
         const tableName = FILE_TABLE_MAP[fileInfo.fileName];
         if (tableName) {
-          console.log(`Loading ${fileInfo.fileName} into ${tableName}...`);
+          // console.log(`Loading ${fileInfo.fileName} into ${tableName}...`);
           const connection = await pool.getConnection();
           try {
             await connection.query('SET foreign_key_checks = 0');
@@ -226,7 +226,7 @@ async function downloadAndLoad() {
 
             // Get count
             const [countResult] = await connection.query(`SELECT COUNT(*) as count FROM ${tableName}`);
-            console.log(`Loaded ${countResult[0].count} rows into ${tableName}`);
+            // console.log(`Loaded ${countResult[0].count} rows into ${tableName}`);
           } finally {
             connection.release();
           }

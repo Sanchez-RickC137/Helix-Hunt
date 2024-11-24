@@ -64,7 +64,7 @@ const processUrlBatch = async (urls, searchQuery, clinicalSignificance, startDat
     let retryCount = 0;
     while (retryCount < MAX_RETRIES) {
       try {
-        console.log(url);
+        // console.log(url);
         const response = await executeRequest({ url, method: 'GET' });
         const variantPage = cheerio.load(response.data);
         
@@ -143,11 +143,11 @@ const processAllUrls = async (urls, searchQuery, searchGroup = null) => {
     processedCount += batchUrls.length;
 
     // Log progress and success rate
-    console.log(
-      `Processed ${processedCount}/${urls.length} variants. ` +
-      `Batch success rate: ${(successRate * 100).toFixed(2)}%. ` +
-      `Dynamic batch size: ${dynamicBatchSize}.`
-    );
+    // console.log(
+    //   `Processed ${processedCount}/${urls.length} variants. ` +
+    //   `Batch success rate: ${(successRate * 100).toFixed(2)}%. ` +
+    //   `Dynamic batch size: ${dynamicBatchSize}.`
+    // );
 
     // Add a small delay to avoid overwhelming the server between batches
     if (i + dynamicBatchSize < urls.length) {
@@ -155,10 +155,10 @@ const processAllUrls = async (urls, searchQuery, searchGroup = null) => {
     }
   }
 
-  console.log(
-    `Completed processing ${processedCount} URLs. ` +
-    `Total results: ${allResults.length} successful.`
-  );
+  // console.log(
+  //   `Completed processing ${processedCount} URLs. ` +
+  //   `Total results: ${allResults.length} successful.`
+  // );
 
   return { results: allResults };
 };

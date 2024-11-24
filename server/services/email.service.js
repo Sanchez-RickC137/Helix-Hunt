@@ -28,7 +28,7 @@ exports.sendResetEmail = async (email, resetCode) => {
 
   try {
     const response = await sgMail.send(msg);
-    console.log('Reset code email sent successfully');
+    // console.log('Reset code email sent successfully');
     return response;
   } catch (error) {
     console.error('SendGrid error:', {
@@ -73,7 +73,7 @@ exports.sendQueryNotification = async (email, queryDetails) => {
 
   try {
     const response = await sgMail.send(msg);
-    console.log('Query notification email sent successfully');
+    // console.log('Query notification email sent successfully');
     return response;
   } catch (error) {
     console.error('SendGrid error:', {

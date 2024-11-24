@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { useThemeConstants } from '../Page/ThemeConstants';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { useThemeConstants } from '../Page/ThemeConstants';
 
 const StepByStepGuide = ({ 
   isActive, 
@@ -54,105 +54,110 @@ const StepByStepGuide = ({
   const isLastStep = validatedCurrentStep === steps.length - 1;
 
   return (
-    <div className={`${themeConstants.sectionBackgroundColor} rounded-lg shadow-xl p-4 sm:p-6 w-full`}>
-      {/* Simplified mobile view with just title and navigation */}
-      <div className="sm:hidden">
-        <div className="flex justify-between items-center">
-          <h3 className="text-base font-semibold truncate mr-2">
-            Step {validatedCurrentStep + 1}: {currentStepData.title}
-          </h3>
-          <button
-            onClick={onSkip}
-            className="text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap"
-          >
-            Exit
-          </button>
-        </div>
-        <div className="flex justify-between mt-4">
-          {!isFirstStep ? (
-            <button
-              onClick={() => setCurrentStep(validatedCurrentStep - 1)}
-              className={`px-3 py-1.5 ${themeConstants.buttonBackgroundColor} text-white rounded text-sm`}
-            >
-              Back
-            </button>
-          ) : <div />}
-          {!isLastStep ? (
-            <button
-              onClick={() => setCurrentStep(validatedCurrentStep + 1)}
-              className={`px-3 py-1.5 ${themeConstants.buttonBackgroundColor} text-white rounded text-sm`}
-            >
-              Next
-            </button>
-          ) : (
-            <button
-              onClick={onComplete}
-              className={`px-3 py-1.5 ${themeConstants.buttonBackgroundColor} text-white rounded text-sm`}
-            >
-              Finish
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Full desktop view with all components */}
-      <div className="hidden sm:block">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold truncate mr-2">{currentStepData.title}</h3>
-          <button
-            onClick={onSkip}
-            className="text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap"
-          >
-            Exit Guide
-          </button>
-        </div>
-        
-        <div className="min-h-[60px] mb-6">
-          <p className="text-gray-600">{currentStepData.instruction}</p>
-        </div>
-        
-        <div className="flex items-center justify-between">
-          <div className="flex space-x-2">
-            {!isFirstStep && (
+    <div className="fixed inset-0 z-[9999] overflow-hidden flex items-end justify-center">
+      <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => onSkip()} />
+      <div className="relative z-[10000] w-full sm:w-[480px] mx-4 mb-4">
+        <div className={`${themeConstants.sectionBackgroundColor} rounded-lg shadow-xl p-4 sm:p-6 w-full`}>
+          {/* Mobile view */}
+          <div className="sm:hidden">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-semibold truncate mr-2">
+                Step {validatedCurrentStep + 1}: {currentStepData.title}
+              </h3>
               <button
-                onClick={() => setCurrentStep(validatedCurrentStep - 1)}
-                className={`px-4 py-2 ${themeConstants.buttonBackgroundColor} text-white rounded hover:${themeConstants.buttonHoverColor} flex items-center`}
+                onClick={onSkip}
+                className="text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap"
               >
-                <ArrowLeft className="mr-2" size={16} />
-                Back
+                Exit
               </button>
-            )}
+            </div>
+            <div className="flex justify-between mt-4">
+              {!isFirstStep ? (
+                <button
+                  onClick={() => setCurrentStep(validatedCurrentStep - 1)}
+                  className={`px-3 py-1.5 ${themeConstants.buttonBackgroundColor} text-white rounded text-sm`}
+                >
+                  Back
+                </button>
+              ) : <div />}
+              {!isLastStep ? (
+                <button
+                  onClick={() => setCurrentStep(validatedCurrentStep + 1)}
+                  className={`px-3 py-1.5 ${themeConstants.buttonBackgroundColor} text-white rounded text-sm`}
+                >
+                  Next
+                </button>
+              ) : (
+                <button
+                  onClick={onComplete}
+                  className={`px-3 py-1.5 ${themeConstants.buttonBackgroundColor} text-white rounded text-sm`}
+                >
+                  Finish
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex space-x-2">
-            {!isLastStep ? (
-              <button
-                onClick={() => setCurrentStep(validatedCurrentStep + 1)}
-                className={`px-4 py-2 ${themeConstants.buttonBackgroundColor} text-white rounded hover:${themeConstants.buttonHoverColor} flex items-center`}
-              >
-                Next
-                <ArrowRight className="ml-2" size={16} />
-              </button>
-            ) : (
-              <button
-                onClick={onComplete}
-                className={`px-4 py-2 ${themeConstants.buttonBackgroundColor} text-white rounded hover:${themeConstants.buttonHoverColor}`}
-              >
-                Finish
-              </button>
-            )}
-          </div>
-        </div>
 
-        <div className="flex justify-center mt-4">
-          <div className="flex space-x-2">
-            {steps.map((_, index) => (
-              <div
-                key={index}
-                className={`w-2 h-2 rounded-full ${
-                  index === validatedCurrentStep ? 'bg-blue-500' : 'bg-gray-300'
-                }`}
-              />
-            ))}
+          {/* Desktop view */}
+          <div className="hidden sm:block">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold truncate mr-2">{currentStepData.title}</h3>
+              <button
+                onClick={onSkip}
+                className="text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap"
+              >
+                Exit Guide
+              </button>
+            </div>
+            
+            <div className="min-h-[60px] mb-6">
+              <p className="text-gray-600">{currentStepData.instruction}</p>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex space-x-2">
+                {!isFirstStep && (
+                  <button
+                    onClick={() => setCurrentStep(validatedCurrentStep - 1)}
+                    className={`px-4 py-2 ${themeConstants.buttonBackgroundColor} text-white rounded hover:${themeConstants.buttonHoverColor} flex items-center`}
+                  >
+                    <ArrowLeft className="mr-2" size={16} />
+                    Back
+                  </button>
+                )}
+              </div>
+              <div className="flex space-x-2">
+                {!isLastStep ? (
+                  <button
+                    onClick={() => setCurrentStep(validatedCurrentStep + 1)}
+                    className={`px-4 py-2 ${themeConstants.buttonBackgroundColor} text-white rounded hover:${themeConstants.buttonHoverColor} flex items-center`}
+                  >
+                    Next
+                    <ArrowRight className="ml-2" size={16} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={onComplete}
+                    className={`px-4 py-2 ${themeConstants.buttonBackgroundColor} text-white rounded hover:${themeConstants.buttonHoverColor}`}
+                  >
+                    Finish
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex justify-center mt-4">
+              <div className="flex space-x-2">
+                {steps.map((_, index) => (
+                  <div
+                    key={index}
+                    className={`w-2 h-2 rounded-full ${
+                      index === validatedCurrentStep ? 'bg-blue-500' : 'bg-gray-300'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -77,7 +77,7 @@ exports.processClinVarQuery = async (req, res, next) => {
       results.push(...result); // Spread the result array instead of pushing the whole array
     }
 
-    console.log('Results from processClinVarQuery:', JSON.stringify(results, null, 2));
+    // console.log('Results from processClinVarQuery:', JSON.stringify(results, null, 2));
     res.json(results);
   } catch (error) {
     next(error);
@@ -202,7 +202,7 @@ exports.processDatabaseQuery = async (req, res) => {
         if (startDate) params.push(startDate);
         if (endDate) params.push(endDate);
 
-        console.log('Executing variation ID query:', { query, params });
+        // console.log('Executing variation ID query:', { query, params });
 
         return pool.query(query, params)
           .then(result => processDbResults(result.rows, id))
@@ -270,7 +270,7 @@ exports.processDatabaseQuery = async (req, res) => {
     const allResults = await Promise.all(promises);
     const flattenedResults = allResults.flat().filter(result => !result.error);
 
-    console.log('Total results found:', flattenedResults.length);
+    // console.log('Total results found:', flattenedResults.length);
 
     if (flattenedResults.length === 0) {
       return res.json([{

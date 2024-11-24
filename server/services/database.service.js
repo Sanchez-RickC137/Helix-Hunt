@@ -310,17 +310,17 @@ const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate,
 // Single search group for gene only
 const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, startDate, endDate) => {
   try {
-    console.log('Starting gene symbol query with filters:', {
-      geneSymbol,
-      clinicalSignificance,
-      startDate,
-      endDate
-    });
+    // console.log('Starting gene symbol query with filters:', {
+    //   geneSymbol,
+    //   clinicalSignificance,
+    //   startDate,
+    //   endDate
+    // });
 
     let variationIds = await fetchVariationIds(geneSymbol, true);
     
     if (!variationIds.length) {
-      console.log(`No results found with [gene] tag for ${geneSymbol}, retrying without tag...`);
+      // console.log(`No results found with [gene] tag for ${geneSymbol}, retrying without tag...`);
       variationIds = await fetchVariationIds(geneSymbol, false);
     }
 
@@ -332,7 +332,7 @@ const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, star
       }];
     }
 
-    console.log(`Retrieved ${variationIds.length} variation IDs for ${geneSymbol}`);
+    // console.log(`Retrieved ${variationIds.length} variation IDs for ${geneSymbol}`);
     
     const CHUNK_SIZE = 1000;
     const allResults = [];
@@ -342,12 +342,12 @@ const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, star
       const chunk = variationIds.slice(i, i + CHUNK_SIZE);
       const { query, params } = buildChunkQuery(chunk, clinicalSignificance, startDate, endDate);
       
-      console.log('Executing chunk query:', {
-        queryPreview: query.substring(0, 200) + '...',
-        paramCount: params.length,
-        firstParam: params[0],
-        lastParam: params[params.length - 1]
-      });
+      // console.log('Executing chunk query:', {
+      //   queryPreview: query.substring(0, 200) + '...',
+      //   paramCount: params.length,
+      //   firstParam: params[0],
+      //   lastParam: params[params.length - 1]
+      // });
       
       const result = await pool.query(query, params);
       
@@ -356,7 +356,7 @@ const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, star
         allResults.push(...processedResults);
       }
 
-      console.log(`Processed ${i + chunk.length}/${variationIds.length} variants (Found ${allResults.length} results)`);
+      // console.log(`Processed ${i + chunk.length}/${variationIds.length} variants (Found ${allResults.length} results)`);
     }
 
     if (allResults.length === 0) {

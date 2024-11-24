@@ -240,13 +240,13 @@ const QueryPage = () => {
   
       const end = performance.now();
       const duration = (end - start) / 1000;
-      console.log(`Query ${queryType} completed in ${duration.toFixed(2)} seconds`);
-      console.log('Query parameters:', {
-        searchGroups,
-        clinicalSignificance,
-        startDate,
-        endDate
-      });
+      // console.log(`Query ${queryType} completed in ${duration.toFixed(2)} seconds`);
+      // console.log('Query parameters:', {
+      //   searchGroups,
+      //   clinicalSignificance,
+      //   startDate,
+      //   endDate
+      // });
       
       setQueryResults(response.data);
       setShowReviewModal(false);

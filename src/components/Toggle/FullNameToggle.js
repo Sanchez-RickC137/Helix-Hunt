@@ -25,7 +25,7 @@ const FullNameToggle = ({ isFullName, setIsFullName }) => {
             }`}
           >
             <span className="hidden sm:inline">Transcript ID / Gene Symbol</span>
-            <span className="sm:hidden">Transcript ID / Gene Symbol</span>
+            <span className="sm:hidden">Transcript/Gene</span>
             <div 
                 className="ml-1 relative"
                 onMouseEnter={() => setShowSymbolHelp(true)}
@@ -52,7 +52,7 @@ const FullNameToggle = ({ isFullName, setIsFullName }) => {
             }`}
           >
             <span className="hidden sm:inline">Full Gene Name</span>
-            <span className="sm:hidden">Full Gene Name</span>
+            <span className="sm:hidden">Full Name</span>
             <div 
                 className="ml-1 relative"
                 onMouseEnter={() => setShowFullNameHelp(true)}

@@ -16,7 +16,7 @@ const AccountPage = () => {
   const themeConstants = useThemeConstants();
 
   useEffect(() => {
-    console.log('Preferences in AccountPage:', preferences);
+    // console.log('Preferences in AccountPage:', preferences);
     setLocalPreferences(preferences);
   }, [preferences]);
 
@@ -32,7 +32,7 @@ const AccountPage = () => {
     try {
       await savePreferences(localPreferences);
       updatePreferences(localPreferences);
-      console.log('Preferences saved successfully');
+      // console.log('Preferences saved successfully');
     } catch (error) {
       console.error('Error saving preferences:', error);
     }

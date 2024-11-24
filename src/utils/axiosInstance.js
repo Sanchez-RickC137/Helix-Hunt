@@ -21,13 +21,13 @@ const axiosInstance = axios.create({
 
 // Add request interceptor for debugging
 axiosInstance.interceptors.request.use(request => {
-  console.log('Making request:', {
-    url: request.url,
-    method: request.method,
-    data: request.data,
-    baseURL: request.baseURL,
-    headers: request.headers
-  });
+  // console.log('Making request:', {
+  //   url: request.url,
+  //   method: request.method,
+  //   data: request.data,
+  //   baseURL: request.baseURL,
+  //   headers: request.headers
+  // });
   return request;
 });
 
