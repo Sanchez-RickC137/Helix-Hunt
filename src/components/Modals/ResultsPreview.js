@@ -54,6 +54,8 @@ const ResultsPreview = ({ results, onClose }) => {
             assertionList: result.assertionList
           };
         });
+
+        console.log(processed);
         
         setProcessedResults(processed);
       } catch (err) {

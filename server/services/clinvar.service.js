@@ -207,20 +207,23 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
       // Apply filters
       if (clinicalSignificance?.length || startDate || endDate) {
         assertionList = assertionList.filter(a => {
+          // Normalize a.Classification.value for comparison
+          const value = a.Classification.value.toLowerCase().trim().replace(/\s+/g, ' ');
+          
           const matchesSignificance = clinicalSignificance?.length
             ? clinicalSignificance.some(sig => 
-                a.Classification.value.toLowerCase().trim() === sig.toLowerCase().trim()
+                value === sig.toLowerCase().trim().replace(/\s+/g, ' ')
               )
             : true;
-            
+      
           const matchesStartDate = startDate
             ? new Date(a.Classification.date) >= new Date(startDate)
             : true;
-            
+      
           const matchesEndDate = endDate
             ? new Date(a.Classification.date) <= new Date(endDate)
             : true;
-
+      
           return matchesSignificance && matchesStartDate && matchesEndDate;
         });
       }
@@ -240,6 +243,8 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
         assertionList
       });
     });
+
+    console.log(results);
 
     return results.length > 0 ? results : [{
       error: "No matching results",
