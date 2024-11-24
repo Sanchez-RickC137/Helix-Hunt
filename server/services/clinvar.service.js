@@ -202,14 +202,37 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
     
     const variantDetails = parseVariantDetails(variantDetailsHtml);
     let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
-    
-    // Apply filters
+
+    // First deduplicate the assertions
+    const seenAssertions = new Set();
+    assertionList = assertionList.filter(assertion => {
+      // Create a unique identifier for each assertion
+      const assertionKey = `${assertion.Classification.value}-${assertion.Submitter.name}-${assertion.Classification.date}`;
+      if (seenAssertions.has(assertionKey)) {
+        return false;
+      }
+      seenAssertions.add(assertionKey);
+      return true;
+    });
+
+    // Then apply filters with more lenient comparison for clinical significance
     if (clinicalSignificance?.length || startDate || endDate) {
       assertionList = assertionList.filter(a => {
+        // More lenient clinical significance matching
         const matchesSignificance = clinicalSignificance?.length
           ? clinicalSignificance.some(sig => {
-              // Simple case-insensitive comparison
-              return a.Classification.value.toLowerCase().trim() === sig.toLowerCase().trim();
+              const assertionValue = (a.Classification.value || '').toLowerCase().trim();
+              const sigValue = sig.toLowerCase().trim();
+              
+              // Log the comparison
+              console.log('Comparing significance:', {
+                assertion: assertionValue,
+                filter: sigValue,
+                matches: assertionValue.includes(sigValue) || sigValue.includes(assertionValue)
+              });
+
+              // More flexible matching
+              return assertionValue.includes(sigValue) || sigValue.includes(assertionValue);
             })
           : true;
           
@@ -225,20 +248,8 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
       });
     }
 
-    // Sort by date and deduplicate based on unique key combination
-    const uniqueAssertions = new Map();
-    assertionList.forEach(assertion => {
-      // Create a unique key using relevant fields
-      const key = `${assertion.Classification.value}-${assertion.Submitter.name}-${assertion.Classification.date}`;
-      
-      if (!uniqueAssertions.has(key)) {
-        uniqueAssertions.set(key, assertion);
-      }
-    });
-
-    // Convert back to array and sort by date
-    assertionList = Array.from(uniqueAssertions.values())
-      .sort((a, b) => new Date(b.Classification.date) - new Date(a.Classification.date));
+    // Sort by date
+    assertionList.sort((a, b) => new Date(b.Classification.date) - new Date(a.Classification.date));
 
     return [{
       searchTerm: fullName || variantId,
