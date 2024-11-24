@@ -91,33 +91,11 @@ function parseVariantDetails(html) {
  */
 function normalizeClinicalSignificance(value) {
   if (!value) return '';
-  
-  // First, normalize to lowercase and trim
-  let normalized = value.toLowerCase().trim();
-
-  // Map of standard forms (all lowercase)
-  const standardForms = {
-    'uncertain_significance': 'uncertain significance',
-    'uncertain-significance': 'uncertain significance',
-    'vus': 'uncertain significance',
-    'vous': 'uncertain significance',
-    'likely_pathogenic': 'likely pathogenic',
-    'likely-pathogenic': 'likely pathogenic',
-    'likely_benign': 'likely benign',
-    'likely-benign': 'likely benign',
-  };
-
-  // Replace any underscores or hyphens with spaces
-  normalized = normalized.replace(/[_-]/g, ' ');
-
-  // Check if we need to map to a standard form
-  return standardForms[normalized] || normalized;
+  return value.toLowerCase().trim();
 }
-
 
 /**
  * Converts ClinVar HTML table to structured JSON format
- * Uses optimized parsing and caching for better performance
  */
 function refinedClinvarHtmlTableToJson(html) {
   const $ = cheerio.load(html, {
@@ -154,9 +132,8 @@ function refinedClinvarHtmlTableToJson(html) {
     
     // Classification (1st column)
     const $classificationCell = $cells.eq(0);
-    // Get raw classification value and normalize it
-    const rawClassification = $classificationCell.find('.germline-submission > div').contents().first().text().trim();
-    entry.Classification.value = normalizeClinicalSignificance(rawClassification);
+    // Preserve original case in value, only normalize for comparison
+    entry.Classification.value = $classificationCell.find('.germline-submission > div').contents().first().text().trim();
     entry.Classification.date = $classificationCell.find('.smaller').last().text().trim().replace(/[()]/g, '');
 
     // Review status (2nd column)

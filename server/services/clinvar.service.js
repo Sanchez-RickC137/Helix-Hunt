@@ -202,21 +202,20 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
     
     const variantDetails = parseVariantDetails(variantDetailsHtml);
     let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
-    
-    // Apply filters with normalized significance comparison
+
+    // Apply filters with case-insensitive matching
     if (clinicalSignificance?.length || startDate || endDate) {
       assertionList = assertionList.filter(a => {
         const matchesSignificance = clinicalSignificance?.length
-          ? clinicalSignificance.some(sig => {
-              const normalizedSig = normalizeClinicalSignificance(sig);
-              const normalizedAssertion = normalizeClinicalSignificance(a.Classification.value);
-              return normalizedSig === normalizedAssertion;
-            })
+          ? clinicalSignificance.some(sig => 
+              normalizeClinicalSignificance(sig) === normalizeClinicalSignificance(a.Classification.value)
+            )
           : true;
-
+          
         const matchesStartDate = startDate
           ? new Date(a.Classification.date) >= new Date(startDate)
           : true;
+          
         const matchesEndDate = endDate
           ? new Date(a.Classification.date) <= new Date(endDate)
           : true;
@@ -225,9 +224,9 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
       });
     }
 
-    // Sort by date (most recent first)
+    // Sort by date
     assertionList.sort((a, b) => new Date(b.Classification.date) - new Date(a.Classification.date));
-    
+
     return [{
       searchTerm: fullName || variantId,
       variantDetails,
