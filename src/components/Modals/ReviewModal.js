@@ -51,17 +51,11 @@ const ReviewModal = ({
     }
 
     return (
-      <div className={`mt-4 p-4 rounded-lg ${
-        isDarkMode 
-          ? 'bg-blue-900/30 text-blue-200' 
-          : 'bg-blue-50 text-blue-800 border border-blue-200'
-      }`}>
-        <h3 className={`font-semibold mb-2 ${
-          isDarkMode ? 'text-blue-300' : 'text-blue-900'
-        }`}>
+      <div className={`mt-4 p-4 rounded-lg ${themeConstants.sectionBackgroundColor} border ${themeConstants.borderColor}`}>
+        <h3 className={`font-semibold mb-2 ${themeConstants.headingTextColor}`}>
           Active Filters:
         </h3>
-        <ul className="list-disc list-inside">
+        <ul className={`list-disc list-inside ${themeConstants.mainTextColor}`}>
           {filters.map((filter, index) => (
             <li key={index} className="font-medium">
               {filter}
@@ -88,7 +82,7 @@ const ReviewModal = ({
             {searchType === 'targeted' ? (
               <>
                 {addedFullNames?.length > 0 && (
-                  <div className="mb-4">
+                  <div className={`mb-4 ${themeConstants.mainTextColor}`}>
                     <h3 className="font-semibold">Full Names:</h3>
                     <ul className="list-disc list-inside ml-4">
                       {addedFullNames.map((item, index) => (
@@ -98,7 +92,7 @@ const ReviewModal = ({
                   </div>
                 )}
                 {addedVariationIDs?.length > 0 && (
-                  <div className="mb-4">
+                  <div className={`mb-4 ${themeConstants.mainTextColor}`}>
                     <h3 className="font-semibold">Variation IDs:</h3>
                     <ul className="list-disc list-inside ml-4">
                       {addedVariationIDs.map((item, index) => (
@@ -111,14 +105,14 @@ const ReviewModal = ({
             ) : (
               searchGroups?.length > 0 && (
                 <div className="mb-4">
-                  <h3 className="font-semibold mb-2">Search Groups:</h3>
+                  <h3 className={`font-semibold mb-2 ${themeConstants.headingTextColor}`}>Search Groups:</h3>
                   <div className="space-y-2">
                     {searchGroups.map((group, index) => (
                       <div key={index} className={`p-4 rounded-lg ${themeConstants.unselectedItemBackgroundColor}`}>
                         {Object.entries(group)
                           .filter(([_, value]) => value)
                           .map(([key, value]) => (
-                            <div key={key} className="mb-1">
+                            <div key={key} className={`mb-1 ${themeConstants.mainTextColor}`}>
                               <span className="font-medium">{key}:</span> {value}
                             </div>
                           ))}
