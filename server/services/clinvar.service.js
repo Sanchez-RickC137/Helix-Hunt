@@ -202,26 +202,14 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
     
     const variantDetails = parseVariantDetails(variantDetailsHtml);
     let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
-
-    // Log the original values for debugging
-    console.log('Filtering with clinical significance:', clinicalSignificance);
     
+    // Apply filters
     if (clinicalSignificance?.length || startDate || endDate) {
       assertionList = assertionList.filter(a => {
-        const assertionValue = a.Classification.value;
-        console.log('Comparing assertion value:', assertionValue);
-        
         const matchesSignificance = clinicalSignificance?.length
           ? clinicalSignificance.some(sig => {
-              const normalizedSig = sig.toLowerCase().trim();
-              const normalizedAssertion = assertionValue.toLowerCase().trim();
-              console.log('Comparing:', {
-                original: { sig, assertionValue },
-                normalized: { normalizedSig, normalizedAssertion }
-              });
-              // Try a more flexible comparison
-              return normalizedAssertion.includes(normalizedSig) || 
-                     normalizedSig.includes(normalizedAssertion);
+              // Simple case-insensitive comparison
+              return a.Classification.value.toLowerCase().trim() === sig.toLowerCase().trim();
             })
           : true;
           
@@ -233,20 +221,24 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
           ? new Date(a.Classification.date) <= new Date(endDate)
           : true;
 
-        // Log if we're filtering out this assertion
-        if (!matchesSignificance) {
-          console.log('Filtered out assertion:', {
-            value: assertionValue,
-            criteria: clinicalSignificance
-          });
-        }
-
         return matchesSignificance && matchesStartDate && matchesEndDate;
       });
     }
 
-    // Log final filtered results
-    console.log('Final filtered assertions count:', assertionList.length);
+    // Sort by date and deduplicate based on unique key combination
+    const uniqueAssertions = new Map();
+    assertionList.forEach(assertion => {
+      // Create a unique key using relevant fields
+      const key = `${assertion.Classification.value}-${assertion.Submitter.name}-${assertion.Classification.date}`;
+      
+      if (!uniqueAssertions.has(key)) {
+        uniqueAssertions.set(key, assertion);
+      }
+    });
+
+    // Convert back to array and sort by date
+    assertionList = Array.from(uniqueAssertions.values())
+      .sort((a, b) => new Date(b.Classification.date) - new Date(a.Classification.date));
 
     return [{
       searchTerm: fullName || variantId,
@@ -263,6 +255,15 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
     }];
   }
 };
+
+// Helper function to consistently normalize clinical significance strings
+function normalizeSignificanceString(value) {
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, ' ')  // Replace multiple spaces with single space
+    .replace(/[.,;:\-_]/g, ' ')  // Replace punctuation with spaces
+    .trim();
+}
 
 exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance, startDate, endDate) => {
   try {
