@@ -189,72 +189,60 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
       }];
     }
 
-    const variantDetailsHtml = $('#id_first').html();
-    const assertionListTable = $('#assertion-list').prop('outerHTML');
+    // Track seen variant IDs
+    const seenVariants = new Set();
+    const results = [];
 
-    if (!variantDetailsHtml || !assertionListTable) {
-      return [{
-        error: "Invalid response",
-        details: "Could not parse variant details",
-        searchTerm: fullName || variantId
-      }];
-    }
-    
-    const variantDetails = parseVariantDetails(variantDetailsHtml);
-    let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
+    // Process each variant section
+    $('div.variant-section').each((_, section) => {
+      const variantDetailsHtml = $(section).find('#id_first').html();
+      const assertionListTable = $(section).find('#assertion-list').prop('outerHTML');
 
-    // First deduplicate the assertions
-    const seenAssertions = new Set();
-    assertionList = assertionList.filter(assertion => {
-      // Create a unique identifier for each assertion
-      const assertionKey = `${assertion.Classification.value}-${assertion.Submitter.name}-${assertion.Classification.date}`;
-      if (seenAssertions.has(assertionKey)) {
-        return false;
+      if (!variantDetailsHtml || !assertionListTable) return;
+
+      const variantDetails = parseVariantDetails(variantDetailsHtml);
+      
+      // Skip if we've already seen this variant
+      if (seenVariants.has(variantDetails.variationID)) return;
+      seenVariants.add(variantDetails.variationID);
+
+      let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
+
+      // Apply filters
+      if (clinicalSignificance?.length || startDate || endDate) {
+        assertionList = assertionList.filter(a => {
+          const matchesSignificance = clinicalSignificance?.length
+            ? clinicalSignificance.some(sig => 
+                a.Classification.value.toLowerCase().trim() === sig.toLowerCase().trim()
+              )
+            : true;
+            
+          const matchesStartDate = startDate
+            ? new Date(a.Classification.date) >= new Date(startDate)
+            : true;
+            
+          const matchesEndDate = endDate
+            ? new Date(a.Classification.date) <= new Date(endDate)
+            : true;
+
+          return matchesSignificance && matchesStartDate && matchesEndDate;
+        });
       }
-      seenAssertions.add(assertionKey);
-      return true;
+
+      // Only add if there are matching assertions after filtering
+      if (assertionList.length > 0) {
+        results.push({
+          searchTerm: fullName || variantId,
+          variantDetails,
+          assertionList
+        });
+      }
     });
 
-    // Then apply filters with more lenient comparison for clinical significance
-    if (clinicalSignificance?.length || startDate || endDate) {
-      assertionList = assertionList.filter(a => {
-        // More lenient clinical significance matching
-        const matchesSignificance = clinicalSignificance?.length
-          ? clinicalSignificance.some(sig => {
-              const assertionValue = (a.Classification.value || '').toLowerCase().trim();
-              const sigValue = sig.toLowerCase().trim();
-              
-              // Log the comparison
-              console.log('Comparing significance:', {
-                assertion: assertionValue,
-                filter: sigValue,
-                matches: assertionValue.includes(sigValue) || sigValue.includes(assertionValue)
-              });
-
-              // More flexible matching
-              return assertionValue.includes(sigValue) || sigValue.includes(assertionValue);
-            })
-          : true;
-          
-        const matchesStartDate = startDate
-          ? new Date(a.Classification.date) >= new Date(startDate)
-          : true;
-          
-        const matchesEndDate = endDate
-          ? new Date(a.Classification.date) <= new Date(endDate)
-          : true;
-
-        return matchesSignificance && matchesStartDate && matchesEndDate;
-      });
-    }
-
-    // Sort by date
-    assertionList.sort((a, b) => new Date(b.Classification.date) - new Date(a.Classification.date));
-
-    return [{
-      searchTerm: fullName || variantId,
-      variantDetails,
-      assertionList
+    return results.length > 0 ? results : [{
+      error: "No matching results",
+      details: "No variants match the specified criteria",
+      searchTerm: fullName || variantId
     }];
 
   } catch (error) {
