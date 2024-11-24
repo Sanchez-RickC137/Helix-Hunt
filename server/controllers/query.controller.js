@@ -49,7 +49,60 @@ exports.saveQuery = async (req, res, next) => {
 };
 
 // Retrieves a user query history if logged in
+exports.getQueryHistory = async (req, res, next) => {
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query(
+      `SELECT 
+        id,
+        user_id,
+        search_type,
+        query_source,
+        timestamp,
+        full_names,
+        variation_ids,
+        clinical_significance,
+        search_groups,
+        start_date,
+        end_date
+      FROM query_history 
+      WHERE user_id = $1 
+      ORDER BY timestamp DESC 
+      LIMIT 5`,
+      [req.userId]
+    );
+    
+    // Transform the data to ensure proper JSON parsing
+    const transformedRows = rows.map(row => ({
+      id: row.id,
+      user_id: row.user_id,
+      search_type: row.search_type || 'targeted',
+      query_source: row.query_source || 'web',
+      timestamp: row.timestamp,
+      full_names: typeof row.full_names === 'string' ? 
+        JSON.parse(row.full_names) : row.full_names || [],
+      variation_ids: typeof row.variation_ids === 'string' ? 
+        JSON.parse(row.variation_ids) : row.variation_ids || [],
+      clinical_significance: typeof row.clinical_significance === 'string' ? 
+        JSON.parse(row.clinical_significance) : row.clinical_significance || [],
+      search_groups: typeof row.search_groups === 'string' ? 
+        JSON.parse(row.search_groups) : row.search_groups || [],
+      start_date: row.start_date,
+      end_date: row.end_date
+    }));
 
+    // Set explicit content length to avoid truncation
+    const jsonResponse = JSON.stringify(transformedRows);
+    res.setHeader('Content-Length', Buffer.byteLength(jsonResponse));
+    res.json(transformedRows);
+
+  } catch (error) {
+    console.error('Error fetching query history:', error);
+    next(error);
+  } finally {
+    client.release();
+  }
+};
 
 // Web based, targeted query
 exports.processClinVarQuery = async (req, res, next) => {
