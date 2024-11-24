@@ -58,13 +58,13 @@ const executeRequest = async (config) => {
 };
 
 const processUrlBatch = async (urls, searchQuery, clinicalSignificance, startDate, endDate) => {
+  const seenVariants = new Set();
   const results = [];
   
   const promises = urls.map(async (url) => {
     let retryCount = 0;
     while (retryCount < MAX_RETRIES) {
       try {
-        // console.log(url);
         const response = await executeRequest({ url, method: 'GET' });
         const variantPage = cheerio.load(response.data);
         
@@ -74,33 +74,52 @@ const processUrlBatch = async (urls, searchQuery, clinicalSignificance, startDat
         if (!variantDetailsHtml || !assertionListTable) return null;
 
         const variantDetails = parseVariantDetails(variantDetailsHtml);
+        
+        // Skip if we've already seen this variant
+        if (seenVariants.has(variantDetails.variationID)) {
+          return null;
+        }
+        seenVariants.add(variantDetails.variationID);
+
         let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
 
-        // Apply filters
-        if (clinicalSignificance?.length) {
-          assertionList = assertionList.filter(a => 
-            clinicalSignificance.includes(a.Classification.value)
-          );
-        }
-        if (startDate) {
-          assertionList = assertionList.filter(a => 
-            new Date(a.Classification.date) >= new Date(startDate)
-          );
-        }
-        if (endDate) {
-          assertionList = assertionList.filter(a => 
-            new Date(a.Classification.date) <= new Date(endDate)
-          );
+        // Apply filters with case-insensitive matching
+        if (clinicalSignificance?.length || startDate || endDate) {
+          assertionList = assertionList.filter(a => {
+            const matchesSignificance = clinicalSignificance?.length
+              ? clinicalSignificance.some(sig => {
+                  // Log the comparison for debugging
+                  console.log('Comparing:', {
+                    assertion: a.Classification.value.toLowerCase().trim(),
+                    filter: sig.toLowerCase().trim()
+                  });
+                  return a.Classification.value.toLowerCase().trim() === sig.toLowerCase().trim();
+                })
+              : true;
+
+            const matchesStartDate = startDate
+              ? new Date(a.Classification.date) >= new Date(startDate)
+              : true;
+
+            const matchesEndDate = endDate
+              ? new Date(a.Classification.date) <= new Date(endDate)
+              : true;
+
+            return matchesSignificance && matchesStartDate && matchesEndDate;
+          });
         }
 
-        return assertionList.length > 0 ? {
+        if (assertionList.length === 0) return null;
+
+        return {
           searchTerm: searchQuery,
           variantDetails,
           assertionList
-        } : null;
+        };
       } catch (error) {
         retryCount++;
         if (retryCount === MAX_RETRIES) {
+          console.error(`Failed to process URL after ${MAX_RETRIES} attempts:`, url, error);
           return null;
         }
         await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
@@ -108,8 +127,8 @@ const processUrlBatch = async (urls, searchQuery, clinicalSignificance, startDat
     }
   });
 
-  const batchResults = await Promise.all(promises);
-  results.push(...batchResults.filter(Boolean));
+  const batchResults = (await Promise.all(promises)).filter(Boolean);
+  results.push(...batchResults);
 
   return { results };
 };
@@ -117,50 +136,34 @@ const processUrlBatch = async (urls, searchQuery, clinicalSignificance, startDat
 const processAllUrls = async (urls, searchQuery, searchGroup = null) => {
   const allResults = [];
   let processedCount = 0;
-  let dynamicBatchSize = CONCURRENT_REQUESTS; // Start with the default batch size
+  let dynamicBatchSize = CONCURRENT_REQUESTS;
 
-  // Function to adjust batch size dynamically
-  const adjustBatchSize = (successRate) => {
-    if (successRate < 0.8 && dynamicBatchSize > 5) {
-      dynamicBatchSize = Math.max(5, Math.floor(dynamicBatchSize * 0.8)); // Decrease batch size
-    } else if (successRate > 0.9 && dynamicBatchSize < 50) {
-      dynamicBatchSize = Math.min(50, Math.floor(dynamicBatchSize * 1.2)); // Increase batch size
-    }
-  };
-
+  // Process URLs in batches
   for (let i = 0; i < urls.length; i += dynamicBatchSize) {
     const batchUrls = urls.slice(i, i + dynamicBatchSize);
     
-    // Process a batch of URLs
-    const { results } = await processUrlBatch(batchUrls, searchQuery, searchGroup);
+    const { results } = await processUrlBatch(
+      batchUrls, 
+      searchQuery,
+      searchGroup
+    );
 
-    // Track success rate for the current batch
-    const successRate = results.length / batchUrls.length;
-    adjustBatchSize(successRate);
-
-    // Add batch results to the final collection
     allResults.push(...results);
     processedCount += batchUrls.length;
 
-    // Log progress and success rate
-    // console.log(
-    //   `Processed ${processedCount}/${urls.length} variants. ` +
-    //   `Batch success rate: ${(successRate * 100).toFixed(2)}%. ` +
-    //   `Dynamic batch size: ${dynamicBatchSize}.`
-    // );
+    console.log(
+      `Processed ${processedCount}/${urls.length} variants. ` +
+      `Found ${results.length} matching results.`
+    );
 
-    // Add a small delay to avoid overwhelming the server between batches
     if (i + dynamicBatchSize < urls.length) {
       await delay(100);
     }
   }
 
-  // console.log(
-  //   `Completed processing ${processedCount} URLs. ` +
-  //   `Total results: ${allResults.length} successful.`
-  // );
-
-  return { results: allResults };
+  return { 
+    results: allResults 
+  };
 };
 
 exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificance, startDate, endDate) => {
@@ -189,67 +192,43 @@ exports.processClinVarWebQuery = async (fullName, variantId, clinicalSignificanc
       }];
     }
 
-    // Track seen variants with assertion combinations
-    const seenEntries = new Set();
-    const results = [];
+    const variantDetailsHtml = $('#id_first').html();
+    const assertionListTable = $('#assertion-list').prop('outerHTML');
 
-    // Process each variant section
-    $('div.variant-section').each((_, section) => {
-      const variantDetailsHtml = $(section).find('#id_first').html();
-      const assertionListTable = $(section).find('#assertion-list').prop('outerHTML');
-
-      if (!variantDetailsHtml || !assertionListTable) return;
-
-      const variantDetails = parseVariantDetails(variantDetailsHtml);
-
-      let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
-
-      // Apply filters
-      if (clinicalSignificance?.length || startDate || endDate) {
-        assertionList = assertionList.filter(a => {
-          // Normalize a.Classification.value for comparison
-          const value = a.Classification.value.toLowerCase().trim().replace(/\s+/g, ' ');
-          
-          const matchesSignificance = clinicalSignificance?.length
-            ? clinicalSignificance.some(sig => 
-                value === sig.toLowerCase().trim().replace(/\s+/g, ' ')
-              )
-            : true;
-      
-          const matchesStartDate = startDate
-            ? new Date(a.Classification.date) >= new Date(startDate)
-            : true;
-      
-          const matchesEndDate = endDate
-            ? new Date(a.Classification.date) <= new Date(endDate)
-            : true;
-      
-          return matchesSignificance && matchesStartDate && matchesEndDate;
-        });
-      }
-
-      // Skip if no assertions match after filtering
-      if (assertionList.length === 0) return;
-
-      // Check for duplicates (variantDetails + assertionList combo)
-      const entryKey = JSON.stringify({ variantDetails, assertionList });
-      if (seenEntries.has(entryKey)) return;
-
-      // Add to results and mark as seen
-      seenEntries.add(entryKey);
-      results.push({
-        searchTerm: fullName || variantId,
-        variantDetails,
-        assertionList
+    if (!variantDetailsHtml || !assertionListTable) {
+      return [{
+        error: "Invalid response",
+        details: "Could not parse variant details",
+        searchTerm: fullName || variantId
+      }];
+    }
+    
+    const variantDetails = parseVariantDetails(variantDetailsHtml);
+    let assertionList = refinedClinvarHtmlTableToJson(assertionListTable);
+    
+    // Apply filters
+    if (clinicalSignificance?.length || startDate || endDate) {
+      assertionList = assertionList.filter(a => {
+        const matchesSignificance = clinicalSignificance?.length
+          ? clinicalSignificance.includes(a.Classification.value)
+          : true;
+        const matchesStartDate = startDate
+          ? new Date(a.Classification.date) >= new Date(startDate)
+          : true;
+        const matchesEndDate = endDate
+          ? new Date(a.Classification.date) <= new Date(endDate)
+          : true;
+    
+        return matchesSignificance && matchesStartDate && matchesEndDate;
       });
-    });
+    }
 
-    console.log(results);
-
-    return results.length > 0 ? results : [{
-      error: "No matching results",
-      details: "No variants match the specified criteria",
-      searchTerm: fullName || variantId
+    assertionList.sort((a, b) => new Date(b.Classification.date) - new Date(a.Classification.date));
+    
+    return [{
+      searchTerm: fullName || variantId,
+      variantDetails,
+      assertionList
     }];
 
   } catch (error) {
