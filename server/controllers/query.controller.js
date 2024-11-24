@@ -8,6 +8,7 @@ const PerformanceMonitor = require('../utils/performanceMonitoring');
 
 // Saves a user query if a user is logged in
 exports.saveQuery = async (req, res, next) => {
+  const client = await pool.connect();
   try {
     const {
       search_type,
@@ -16,14 +17,15 @@ exports.saveQuery = async (req, res, next) => {
       search_groups,
       clinical_significance,
       start_date,
-      end_date
+      end_date,
+      query_source
     } = req.body;
     
-    await pool.execute(
+    await client.query(
       `INSERT INTO query_history 
        (user_id, search_type, full_names, variation_ids, search_groups, 
-        clinical_significance, start_date, end_date) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        clinical_significance, start_date, end_date, query_source) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         req.userId,
         search_type || 'targeted',
@@ -32,27 +34,44 @@ exports.saveQuery = async (req, res, next) => {
         JSON.stringify(search_groups || []),
         JSON.stringify(clinical_significance || []),
         start_date || null,
-        end_date || null
+        end_date || null,
+        query_source || 'web'
       ]
     );
     
+    await client.query('COMMIT');
     res.json({ message: 'Query saved to history successfully' });
   } catch (error) {
+    await client.query('ROLLBACK');
     next(error);
+  } finally {
+    client.release();
   }
 };
 
 // Retrieves a user query history if logged in
 exports.getQueryHistory = async (req, res, next) => {
+  const client = await pool.connect();
   try {
-    const [rows] = await pool.query(
-      'SELECT * FROM query_history WHERE user_id = ? ORDER BY timestamp DESC LIMIT 5', 
+    const { rows } = await client.query(
+      'SELECT * FROM query_history WHERE user_id = $1 ORDER BY timestamp DESC LIMIT 5',
       [req.userId]
     );
     
-    res.json(rows);
+    // Parse JSON fields before sending response
+    const parsedRows = rows.map(row => ({
+      ...row,
+      full_names: JSON.parse(row.full_names || '[]'),
+      variation_ids: JSON.parse(row.variation_ids || '[]'),
+      search_groups: JSON.parse(row.search_groups || '[]'),
+      clinical_significance: JSON.parse(row.clinical_significance || '[]')
+    }));
+    
+    res.json(parsedRows);
   } catch (error) {
     next(error);
+  } finally {
+    client.release();
   }
 };
 

@@ -27,20 +27,20 @@ const errorHandler = (err, req, res, next) => {
   // Log error with memory usage and PostgreSQL specific details
   console.error('Error:', {
     message: err.message,
-    code: err.code, // PostgreSQL error code
-    schema: err.schema, // PostgreSQL schema
-    table: err.table, // PostgreSQL table
-    column: err.column, // PostgreSQL column
-    constraint: err.constraint, // PostgreSQL constraint
-    detail: err.detail, // PostgreSQL error detail
-    hint: err.hint, // PostgreSQL error hint
-    position: err.position, // PostgreSQL error position
+    code: err.code,
+    schema: err.schema,
+    table: err.table,
+    column: err.column,
+    constraint: err.constraint,
+    detail: err.detail,
+    hint: err.hint,
+    position: err.position,
     internalPosition: err.internalPosition,
     internalQuery: err.internalQuery,
     where: err.where,
-    file: err.file, // PostgreSQL source file
-    line: err.line, // PostgreSQL source line
-    routine: err.routine, // PostgreSQL routine
+    file: err.file,
+    line: err.line,
+    routine: err.routine,
     stack: err.stack,
     memoryUsage: {
       heapUsed: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
@@ -52,9 +52,9 @@ const errorHandler = (err, req, res, next) => {
   });
 
   // Handle PostgreSQL specific errors
-  if (err instanceof Pool.PostgresError) {
-    const statusCode = err.code?.startsWith('23') ? 400 : 500; // 23xxx are constraint violations
-    const message = PG_ERROR_MESSAGES[err.code] || err.message;
+  if (err.code && typeof err.code === 'string' && err.code.length === 5) {
+    const statusCode = err.code.startsWith('23') ? 400 : 500; // 23xxx are constraint violations
+    const message = err.message || 'Database error';
     
     return res.status(statusCode).json({
       error: {
@@ -70,7 +70,7 @@ const errorHandler = (err, req, res, next) => {
   }
 
   // Handle query timeout errors
-  if (err instanceof Pool.TimeoutError) {
+  if (err.message && err.message.includes('timeout')) {
     return res.status(504).json({
       error: {
         message: 'Query timed out',
@@ -82,7 +82,7 @@ const errorHandler = (err, req, res, next) => {
   }
 
   // Handle connection errors
-  if (err instanceof Pool.ConnectionError) {
+  if (err.message && err.message.includes('connection')) {
     return res.status(503).json({
       error: {
         message: 'Database connection error',
