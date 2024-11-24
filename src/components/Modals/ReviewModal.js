@@ -4,14 +4,14 @@ import { useThemeConstants } from '../Page/ThemeConstants';
 import GeneLoader from '../Page/GeneLoader';
 // import GeneLoader from '../Page/GeneLoader2';
 
-const ReviewModal = ({
-  setShowReviewModal,
-  searchType,
-  addedFullNames,
-  addedVariationIDs,
+const ReviewModal = ({ 
+  setShowReviewModal, 
+  searchType, 
+  addedFullNames, 
+  addedVariationIDs, 
   searchGroups,
-  clinicalSignificance,
-  startDate,
+  clinicalSignificance, 
+  startDate, 
   endDate,
   outputFormat,
   handleSubmit,
@@ -21,7 +21,6 @@ const ReviewModal = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const themeConstants = useThemeConstants();
 
-  // Block database queries and gene-symbol-only searches during maintenance
   const isDatabaseQueryBlocked = isMaintenanceWindow && (
     querySource === 'database' ||
     (searchType === 'general' && searchGroups?.some(group =>
@@ -30,73 +29,12 @@ const ReviewModal = ({
   );
 
   const handleFormSubmit = async () => {
-    setIsSubmitting(true); // Show loader
+    setIsSubmitting(true);
     try {
-      await handleSubmit(); // Trigger the parent component's submission logic
+      await handleSubmit();
     } finally {
-      setIsSubmitting(false); // Hide loader after completion
+      setIsSubmitting(false);
     }
-  };
-
-  const renderTargetedContent = () => {
-    if (!addedFullNames?.length && !addedVariationIDs?.length) return null;
-    
-    return (
-      <>
-        {addedFullNames?.length > 0 && (
-          <div className="mb-4">
-            <h3 className="font-semibold">Full Names:</h3>
-            <ul className="list-disc list-inside">
-              {addedFullNames.map((item, index) => (
-                <li key={index}>{item}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {addedVariationIDs?.length > 0 && (
-          <div className="mb-4">
-            <h3 className="font-semibold">Variation IDs:</h3>
-            <ul className="list-disc list-inside">
-              {addedVariationIDs.map((item, index) => (
-                <li key={index}>{item}</li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </>
-    );
-  };
-
-  const renderGeneralContent = () => {
-    if (!searchGroups?.length) return null;
-
-    const formatKey = (key) => {
-      return key
-        .replace(/([A-Z])/g, ' $1')
-        .replace(/^./, str => str.toUpperCase());
-    };
-
-    return (
-      <div className="mb-4">
-        <h3 className="font-semibold mb-2">Search Groups:</h3>
-        <ul className="list-none space-y-4">
-          {searchGroups.map((group, index) => (
-            <li key={index} className={`p-4 rounded-lg ${themeConstants.unselectedItemBackgroundColor}`}>
-              <div className="space-y-2">
-                {Object.entries(group)
-                  .filter(([_, value]) => value)
-                  .map(([key, value]) => (
-                    <div key={key} className="flex items-center space-x-2">
-                      <span className="font-medium min-w-[120px]">{formatKey(key)}:</span>
-                      <span>{value}</span>
-                    </div>
-                  ))}
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
   };
 
   const renderFilters = () => {
@@ -113,11 +51,21 @@ const ReviewModal = ({
     }
 
     return (
-      <div className="mt-4 p-4 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-200 rounded">
-        <h3 className="font-semibold mb-2">Active Filters:</h3>
+      <div className={`mt-4 p-4 rounded-lg ${
+        isDarkMode 
+          ? 'bg-blue-900/30 text-blue-200' 
+          : 'bg-blue-50 text-blue-800 border border-blue-200'
+      }`}>
+        <h3 className={`font-semibold mb-2 ${
+          isDarkMode ? 'text-blue-300' : 'text-blue-900'
+        }`}>
+          Active Filters:
+        </h3>
         <ul className="list-disc list-inside">
           {filters.map((filter, index) => (
-            <li key={index}>{filter}</li>
+            <li key={index} className="font-medium">
+              {filter}
+            </li>
           ))}
         </ul>
       </div>
@@ -130,14 +78,57 @@ const ReviewModal = ({
         <h2 className={`text-2xl font-bold mb-6 ${themeConstants.headingTextColor}`}>
           Review Your {searchType === 'targeted' ? 'Targeted' : 'General'} Query
         </h2>
+
         {isSubmitting ? (
           <div className="flex justify-center items-center min-h-[200px]">
-            {/* <GeneLoader numGenes={15} containerHeight={200}/> */}
             <GeneLoader size={100} />
           </div>
         ) : (
           <div className="space-y-6">
-            {searchType === 'targeted' ? renderTargetedContent() : renderGeneralContent()}
+            {searchType === 'targeted' ? (
+              <>
+                {addedFullNames?.length > 0 && (
+                  <div className="mb-4">
+                    <h3 className="font-semibold">Full Names:</h3>
+                    <ul className="list-disc list-inside ml-4">
+                      {addedFullNames.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {addedVariationIDs?.length > 0 && (
+                  <div className="mb-4">
+                    <h3 className="font-semibold">Variation IDs:</h3>
+                    <ul className="list-disc list-inside ml-4">
+                      {addedVariationIDs.map((item, index) => (
+                        <li key={index}>{item}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            ) : (
+              searchGroups?.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="font-semibold mb-2">Search Groups:</h3>
+                  <div className="space-y-2">
+                    {searchGroups.map((group, index) => (
+                      <div key={index} className={`p-4 rounded-lg ${themeConstants.unselectedItemBackgroundColor}`}>
+                        {Object.entries(group)
+                          .filter(([_, value]) => value)
+                          .map(([key, value]) => (
+                            <div key={key} className="mb-1">
+                              <span className="font-medium">{key}:</span> {value}
+                            </div>
+                          ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            )}
+
             {renderFilters()}
 
             {/* Maintenance Warning */}

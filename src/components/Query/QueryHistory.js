@@ -9,6 +9,10 @@ const QueryHistory = ({ queryHistory, onSelectQuery }) => {
     return new Date(dateString).toLocaleDateString();
   };
 
+  const capitalizeSource = (source) => {
+    return source.charAt(0).toUpperCase() + source.slice(1);
+  };
+
   const renderSearchGroup = (group) => {
     const parts = [];
     
@@ -89,7 +93,7 @@ const QueryHistory = ({ queryHistory, onSelectQuery }) => {
                 <span className={`px-3 py-1 rounded-full text-sm ${
                   query.query_source === 'web' ? 'bg-blue-500' : 'bg-green-500'
                 } text-white`}>
-                  {query.query_source}
+                  {capitalizeSource(query.query_source)}
                 </span>
               </div>
               <span className="text-sm text-gray-500">
