@@ -89,10 +89,10 @@ const processUrlBatch = async (urls, searchQuery, clinicalSignificance, startDat
             const matchesSignificance = clinicalSignificance?.length
               ? clinicalSignificance.some(sig => {
                   // Log the comparison for debugging
-                  console.log('Comparing:', {
-                    assertion: a.Classification.value.toLowerCase().trim(),
-                    filter: sig.toLowerCase().trim()
-                  });
+                  // console.log('Comparing:', {
+                  //   assertion: a.Classification.value.toLowerCase().trim(),
+                  //   filter: sig.toLowerCase().trim()
+                  // });
                   return a.Classification.value.toLowerCase().trim() === sig.toLowerCase().trim();
                 })
               : true;

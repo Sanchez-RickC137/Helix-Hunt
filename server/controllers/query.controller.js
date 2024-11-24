@@ -21,19 +21,34 @@ exports.saveQuery = async (req, res, next) => {
       end_date
     } = req.body;
 
+    console.log('Saving query with data:', JSON.stringify({
+      search_type,
+      query_source,
+      full_names,
+      variation_ids,
+      search_groups,
+      clinical_significance
+    }, null, 2));
+
+    // Ensure proper JSON formatting for JSONB columns
+    const formattedFullNames = Array.isArray(full_names) ? full_names : [];
+    const formattedVariationIds = Array.isArray(variation_ids) ? variation_ids : [];
+    const formattedSearchGroups = Array.isArray(search_groups) ? search_groups : [];
+    const formattedClinicalSignificance = Array.isArray(clinical_significance) ? clinical_significance : [];
+
     await client.query(
       `INSERT INTO query_history 
-        (user_id, search_type, query_source, full_names, variation_ids, 
-         search_groups, clinical_significance, start_date, end_date)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+       (user_id, search_type, query_source, full_names, variation_ids, 
+        search_groups, clinical_significance, start_date, end_date)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [
         req.userId,
         search_type || 'targeted',
         query_source || 'web',
-        full_names || [],
-        variation_ids || [],
-        search_groups || [],
-        clinical_significance || [],
+        JSON.stringify(formattedFullNames),
+        JSON.stringify(formattedVariationIds),
+        JSON.stringify(formattedSearchGroups),
+        JSON.stringify(formattedClinicalSignificance),
         start_date || null,
         end_date || null
       ]
@@ -42,6 +57,7 @@ exports.saveQuery = async (req, res, next) => {
     res.json({ message: 'Query saved successfully' });
   } catch (error) {
     console.error('Error saving query:', error);
+    console.error('Request body:', req.body);
     next(error);
   } finally {
     client.release();
