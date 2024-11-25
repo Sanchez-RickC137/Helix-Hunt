@@ -547,22 +547,20 @@ exports.fetchResultsChunk = async (req, res) => {
 // Download query Results to file 
 exports.downloadResults = async (req, res) => {
   try {
+    console.log('Download request received');
     const { results, format } = req.body;
 
     if (!results || !format) {
+      console.log('Missing parameters:', { results: !!results, format });
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
-    console.log(`Processing download request for ${results.length} results in ${format} format`);
-
-    // Filter out any error results
+    // Filter out any error results and log counts
     const validResults = results.filter(result => !result.error);
-    
-    if (validResults.length === 0) {
-      return res.status(400).json({ error: 'No valid results to download' });
-    }
+    console.log(`Processing ${validResults.length} valid results for download in ${format} format`);
 
     const content = await generateDownloadContent(validResults, format);
+    console.log('Content generated, preparing to send');
 
     // Set appropriate headers
     const contentTypes = {
@@ -574,8 +572,9 @@ exports.downloadResults = async (req, res) => {
     res.setHeader('Content-Type', contentTypes[format]);
     res.setHeader('Content-Disposition', `attachment; filename=clinvar_results_${new Date().toISOString().split('T')[0]}.${format}`);
     
-    // Send the response
+    console.log('Sending response');
     res.send(content);
+    console.log('Download response sent');
 
   } catch (error) {
     console.error('Download generation error:', error);
