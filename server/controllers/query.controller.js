@@ -553,7 +553,16 @@ exports.downloadResults = async (req, res) => {
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
-    const content = generateDownloadContent(results, format);
+    console.log(`Processing download request for ${results.length} results in ${format} format`);
+
+    // Filter out any error results
+    const validResults = results.filter(result => !result.error);
+    
+    if (validResults.length === 0) {
+      return res.status(400).json({ error: 'No valid results to download' });
+    }
+
+    const content = await generateDownloadContent(validResults, format);
 
     // Set appropriate headers
     const contentTypes = {
@@ -564,12 +573,16 @@ exports.downloadResults = async (req, res) => {
 
     res.setHeader('Content-Type', contentTypes[format]);
     res.setHeader('Content-Disposition', `attachment; filename=clinvar_results_${new Date().toISOString().split('T')[0]}.${format}`);
-
+    
+    // Send the response
     res.send(content);
 
   } catch (error) {
     console.error('Download generation error:', error);
-    res.status(500).json({ error: 'Failed to generate download' });
+    res.status(500).json({ 
+      error: 'Failed to generate download',
+      details: error.message 
+    });
   }
 };
 
@@ -597,6 +610,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const geneCountCache = new Map();
 
 exports.getGeneCount = async (req, res) => {
+  const client = await pool.connect();
   try {
     const { geneSymbol } = req.params;
 
@@ -610,34 +624,22 @@ exports.getGeneCount = async (req, res) => {
       return res.json(cachedData.data);
     }
 
-    // Query the database using pool.query instead of pool.execute
-    const [rows] = await pool.query(
-      'SELECT variant_count FROM gene_variant_counts WHERE gene_symbol = ?',
+    // Query the database using parameterized query
+    const { rows } = await client.query(
+      'SELECT variant_count FROM gene_variant_counts WHERE gene_symbol = $1',
       [geneSymbol]
     );
 
-    const result = rows.length === 0 
-      ? { variantCount: 0, isDatabaseSearch: false }
-      : {
-          variantCount: parseInt(rows[0].variant_count),
-          isDatabaseSearch: parseInt(rows[0].variant_count) > 1000
-        };
+    const result = {
+      variantCount: rows.length > 0 ? parseInt(rows[0].variant_count) : 0,
+      isDatabaseSearch: rows.length > 0 && parseInt(rows[0].variant_count) > 1000
+    };
 
     // Cache the result
     geneCountCache.set(geneSymbol, {
       timestamp: Date.now(),
       data: result
     });
-
-    // Clean up old cache entries periodically
-    if (geneCountCache.size > 1000) {
-      const now = Date.now();
-      for (const [key, value] of geneCountCache.entries()) {
-        if (now - value.timestamp > CACHE_TTL) {
-          geneCountCache.delete(key);
-        }
-      }
-    }
 
     return res.json(result);
 
@@ -647,8 +649,11 @@ exports.getGeneCount = async (req, res) => {
       error: 'Failed to fetch gene count',
       details: error.message 
     });
+  } finally {
+    client.release();
   }
 };
+
 // Cleanup function to run periodically
 setInterval(() => {
   const now = Date.now();

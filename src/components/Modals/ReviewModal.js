@@ -52,10 +52,10 @@ const ReviewModal = ({
 
     return (
       <div className={`mt-4 p-4 rounded-lg ${themeConstants.sectionBackgroundColor} border ${themeConstants.borderColor}`}>
-        <h3 className={`font-semibold mb-2 ${themeConstants.headingTextColor2}`}>
+        <h3 className={`font-semibold mb-2 ${themeConstants.headingTextColor}`}>
           Active Filters:
         </h3>
-        <ul className={`list-disc list-inside ${themeConstants.headingTextColor2}`}>
+        <ul className={`list-disc list-inside ${themeConstants.mainTextColor}`}>
           {filters.map((filter, index) => (
             <li key={index} className="font-medium">
               {filter}

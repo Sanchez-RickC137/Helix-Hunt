@@ -42,7 +42,7 @@ const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, them
   const handleDownload = async () => {
     try {
       setDownloadError('');
-      
+        
       if (resultStats.assertions > DOWNLOAD_THRESHOLD) {
         if (!window.confirm(
           `This download contains ${resultStats.assertions.toLocaleString()} assertions ` +
@@ -52,21 +52,29 @@ const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, them
         }
       }
   
-      // Normalize results for download
+      // Add loading state
       const normalizedResults = Array.isArray(results) ? 
-        results.flatMap(result => Array.isArray(result) ? result : [result]) : 
+        results.flatMap(result => Array.isArray(result) ? result : [result])
+        .filter(result => !result.error) : // Filter out error results
         [];
   
+      console.log('Initiating download with', normalizedResults.length, 'results');
+      
       const response = await axiosInstance.post('/api/download', {
         results: normalizedResults,
         format: downloadFormat
       }, {
         responseType: 'blob',
-        timeout: 300000
+        timeout: 300000, // 5 minute timeout
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity
       });
       
       // Create and trigger download
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const blob = new Blob([response.data], {
+        type: response.headers['content-type']
+      });
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `clinvar_results_${new Date().toISOString().split('T')[0]}.${downloadFormat}`);
@@ -76,7 +84,7 @@ const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, them
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Download failed:', error);
-      setDownloadError('Failed to download results. Please try again.');
+      setDownloadError(`Failed to download results: ${error.message}`);
     }
   };
   
