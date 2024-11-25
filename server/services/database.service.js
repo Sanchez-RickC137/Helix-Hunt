@@ -39,7 +39,7 @@ const processDbResults = (results, searchTerm) => {
   return Object.entries(groupedResults).map(([variationId, submissions]) => {
     const mainResult = submissions[0];
     let fullName = mainResult.Name || '';
-    let geneSymbol = mainResult.GeneSymbol || '';
+    let geneSymbol = '';
     let transcriptId = '';
     let dnaChange = '';
     let proteinChange = '';
@@ -80,7 +80,7 @@ const processDbResults = (results, searchTerm) => {
         dnaChange,
         proteinChange,
         variationID: mainResult.VariationID?.toString() || '',
-        accessionID: mainResult.AccessionID || ''
+        accessionID: ''
       },
       assertionList: submissions.map(submission => ({
         Classification: {
