@@ -43,24 +43,58 @@ const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, them
     try {
       setDownloadError('');
         
-      // Normalize results for download - no confirmation needed
-      const normalizedResults = Array.isArray(results) ? 
-        results.flatMap(result => Array.isArray(result) ? result : [result])
-        .filter(result => !result.error) : 
-        [];
+      // Normalize results for download and determine query type
+      const isGeneSymbolOnly = results.some(result => 
+        result.searchTerm && !result.searchTerm.includes(':') && !result.searchTerm.includes('(')
+      );
   
-      console.log(`Initiating download of ${normalizedResults.length} results`);
+      // For large results, show confirmation
+      if (resultStats.assertions > DOWNLOAD_THRESHOLD) {
+        const confirmed = window.confirm(
+          `This download contains ${resultStats.assertions.toLocaleString()} assertions ` +
+          `from ${resultStats.variants.toLocaleString()} variants. This may take some time. Continue?`
+        );
+        
+        if (!confirmed) {
+          return;
+        }
+      }
+  
+      let response;
       
-      const response = await axiosInstance.post('/api/download', {
-        results: normalizedResults,
-        format: downloadFormat
-      }, {
-        responseType: 'blob',
-        timeout: 600000, // 10 minute timeout
-        maxContentLength: Infinity,
-        maxBodyLength: Infinity
-      });
-      
+      // For gene-symbol-only queries, send minimal info
+      if (isGeneSymbolOnly) {
+        response = await axiosInstance.post('/api/download', {
+          queryParams: {
+            geneSymbol: results[0].searchTerm,
+            fromCache: true
+          },
+          format: downloadFormat
+        }, {
+          responseType: 'blob',
+          timeout: 300000,
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity
+        });
+      } else {
+        // For all other queries, send full results
+        const normalizedResults = Array.isArray(results) ? 
+          results.flatMap(result => Array.isArray(result) ? result : [result])
+          .filter(result => !result.error) : 
+          [];
+  
+        response = await axiosInstance.post('/api/download', {
+          results: normalizedResults,
+          format: downloadFormat
+        }, {
+          responseType: 'blob',
+          timeout: 300000,
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity
+        });
+      }
+  
+      // Create and trigger download
       const blob = new Blob([response.data], {
         type: response.headers['content-type']
       });
