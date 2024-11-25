@@ -56,6 +56,9 @@ const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, them
           `This download contains ${resultStats.assertions.toLocaleString()} assertions ` +
           `from ${resultStats.variants.toLocaleString()} variants. This may take some time. Continue?`
         );
+
+        if (confirmed)
+          console.log("Download Confirmation");
         
         if (!confirmed) {
           return; // Exit if user cancels
