@@ -42,54 +42,65 @@ const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, them
   const handleDownload = async () => {
     try {
       setDownloadError('');
-      
+        
+      // Normalize results first
+      const normalizedResults = Array.isArray(results) ? 
+        results.flatMap(result => Array.isArray(result) ? result : [result])
+        .filter(result => !result.error) : 
+        [];
+  
+      // Confirm large downloads before processing
       if (resultStats.assertions > DOWNLOAD_THRESHOLD) {
-        if (!window.confirm(
+        // Use the native confirm dialog, but handle the response properly
+        const confirmed = window.confirm(
           `This download contains ${resultStats.assertions.toLocaleString()} assertions ` +
           `from ${resultStats.variants.toLocaleString()} variants. This may take some time. Continue?`
-        )) {
-          return;
+        );
+        
+        if (!confirmed) {
+          return; // Exit if user cancels
         }
       }
   
-      // Add loading state
-      const normalizedResults = Array.isArray(results) ? 
-        results.flatMap(result => Array.isArray(result) ? result : [result])
-        .filter(result => !result.error) : [];
-  
       console.log(`Initiating download of ${normalizedResults.length} results`);
       
+      // Make the download request
       const response = await axiosInstance.post('/api/download', {
         results: normalizedResults,
         format: downloadFormat
       }, {
         responseType: 'blob',
-        timeout: 300000, // 5 minute timeout
+        timeout: 600000, // 10 minute timeout for large downloads
         maxContentLength: Infinity,
-        maxBodyLength: Infinity,
-        onDownloadProgress: (progressEvent) => {
-          console.log('Download progress:', progressEvent);
-        }
+        maxBodyLength: Infinity
       });
-  
-      // Handle the downloaded blob
+      
+      // Handle the response
       const blob = new Blob([response.data], {
         type: response.headers['content-type']
       });
       
-      // Use browser's download capability
+      // Create and trigger download
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `clinvar_results_${new Date().toISOString().split('T')[0]}.${downloadFormat}`);
+      
+      // Append, click, and cleanup
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
       
+      console.log('Download completed successfully');
+  
     } catch (error) {
       console.error('Download failed:', error);
-      setDownloadError(`Download failed: ${error.message}. Please try again.`);
+      setDownloadError('Failed to download results. Please try again.');
+      // Log more details about the error
+      if (error.response) {
+        console.error('Error response:', error.response);
+      }
     }
   };
   
