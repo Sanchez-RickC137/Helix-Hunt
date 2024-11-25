@@ -41,6 +41,7 @@ const QueryPage = () => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState([]);
   const [isMaintenanceWindow, setIsMaintenanceWindow] = useState(false);
+  const [isPopupVisible, setIsPopupVisible] = useState(false);
 
   // eslint-disable-next-line
   const [debugInfo, setDebugInfo] = useState(''); // Disabled eslint while debug is not being used
@@ -143,6 +144,10 @@ const QueryPage = () => {
   };
 
   const handleAddSearchGroup = (group) => {
+    if (searchGroups.length === 5) {
+      setIsPopupVisible(true);
+      return;
+    }
     setSearchGroups(prev => [...prev, group]);
   };
 
@@ -508,10 +513,15 @@ const QueryPage = () => {
             </>
           ) : (
             
-            <div id="search-group">
+          <div id="search-group">
             {renderHelpTooltip(
               <GeneralSearchInput onAddSearchGroup={handleAddSearchGroup} />,
               "Create search groups consisting of any combination gene symbol, dna change, protein change. At least one must be entered to generate a search group"
+            )}
+            {isPopupVisible && (
+              <div className="mt-4 text-center text-red-500 font-medium">
+                Only 5 search groups can be added at a time.
+              </div>
             )}
           </div>
               
