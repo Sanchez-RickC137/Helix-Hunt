@@ -521,14 +521,6 @@ const buildChunkQuery = (chunk, clinicalSignificance, startDate, endDate) => {
   return { query, params };
 };
 
-/**
- * Public interface for processing gene-symbol-only queries
- * Used by the query controller
- */
-const processGeneSymbolDatabaseQuery = (geneSymbol, clinicalSignificance, startDate, endDate) => {
-  return processGeneSymbolOnlyQuery(geneSymbol, clinicalSignificance, startDate, endDate);
-};
-
 module.exports = {
   processDbResults,
   constructGeneralSearchQuery,
