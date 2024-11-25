@@ -39,66 +39,138 @@ const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, them
   const PREVIEW_THRESHOLD = 1000;
   const DOWNLOAD_THRESHOLD = 10000;
 
+  const generateDownloadContent = (results, format) => {
+    // Define fields for all formats
+    const fields = [
+      'SearchTerm',
+      'TranscriptID',
+      'GeneSymbol', 
+      'DNAChange',
+      'ProteinChange',
+      'GeneName',
+      'VariationID',
+      'AccessionID',
+      'Classification',
+      'LastEvaluated',
+      'AssertionReference',
+      'AssertionCriteria',
+      'Method',
+      'Condition',
+      'AffectedStatus',
+      'AlleleOrigin',
+      'Submitter',
+      'SubmitterAccession',
+      'FirstInClinVar',
+      'LastUpdated',
+      'Comment'
+    ];
+  
+    // Normalize the results data
+    const normalizedData = results.flatMap(result => {
+      if (result.error) return [];
+      
+      return result.assertionList.map(assertion => ({
+        SearchTerm: result.searchTerm || 'N/A',
+        TranscriptID: result.variantDetails?.transcriptID || 'N/A',
+        GeneSymbol: result.variantDetails?.geneSymbol || 'N/A',
+        DNAChange: result.variantDetails?.dnaChange || 'N/A',
+        ProteinChange: result.variantDetails?.proteinChange || 'N/A',
+        GeneName: result.variantDetails?.fullName || 'N/A',
+        VariationID: result.variantDetails?.variationID || 'N/A',
+        AccessionID: result.variantDetails?.accessionID || 'N/A',
+        Classification: `${assertion.Classification?.value || 'N/A'} (${assertion.Classification?.date || 'N/A'})`,
+        LastEvaluated: assertion.Classification?.date || 'N/A',
+        AssertionReference: assertion['Review status']?.submission_reference || 'N/A',
+        AssertionCriteria: assertion['Review status']?.['assertion criteria'] || 'N/A',
+        Method: assertion['Review status']?.method || 'N/A',
+        Condition: assertion.Condition?.name || 'N/A',
+        AffectedStatus: assertion.Condition?.['Affected status'] || 'N/A',
+        AlleleOrigin: assertion.Condition?.['Allele origin'] || 'N/A',
+        Submitter: assertion.Submitter?.name || 'N/A',
+        SubmitterAccession: assertion.Submitter?.Accession || 'N/A',
+        FirstInClinVar: assertion.Submitter?.['First in ClinVar'] || 'N/A',
+        LastUpdated: assertion.Submitter?.['Last updated'] || 'N/A',
+        Comment: assertion['More information']?.Comment || 'N/A'
+      }));
+    });
+  
+    const escapeField = (field) => {
+      if (typeof field !== 'string' && typeof field !== 'number') return '';
+      const stringField = String(field);
+      if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+        return `"${stringField.replace(/"/g, '""')}"`;
+      }
+      return stringField;
+    };
+  
+    switch (format) {
+      case 'csv': {
+        // Generate CSV content
+        const header = fields.join(',');
+        const rows = normalizedData.map(row => 
+          fields.map(field => escapeField(row[field])).join(',')
+        );
+        return [header, ...rows].join('\n');
+      }
+      
+      case 'tsv': {
+        // Generate TSV content
+        const header = fields.join('\t');
+        const rows = normalizedData.map(row => 
+          fields.map(field => String(row[field] || '').replace(/\t/g, ' ')).join('\t')
+        );
+        return [header, ...rows].join('\n');
+      }
+      
+      case 'xml': {
+        // Generate XML content
+        const xmlRows = normalizedData.map(row => 
+          Object.entries(row)
+            .map(([key, value]) => `    <${key}>${String(value || '').replace(/[<>&]/g, c => ({
+              '<': '&lt;',
+              '>': '&gt;',
+              '&': '&amp;'
+            })[c])}</${key}>`)
+            .join('\n')
+        );
+        return `<?xml version="1.0" encoding="UTF-8"?>
+  <ClinVarResults>
+    ${xmlRows.map(row => `  <Result>\n${row}\n  </Result>`).join('\n')}
+  </ClinVarResults>`;
+      }
+      
+      default:
+        throw new Error('Unsupported format');
+    }
+  };
+  
   const handleDownload = async () => {
     try {
       setDownloadError('');
-        
-      // Normalize results for download and determine query type
-      const isGeneSymbolOnly = results.some(result => 
-        result.searchTerm && !result.searchTerm.includes(':') && !result.searchTerm.includes('(')
-      );
   
-      // For large results, show confirmation
       if (resultStats.assertions > DOWNLOAD_THRESHOLD) {
         const confirmed = window.confirm(
           `This download contains ${resultStats.assertions.toLocaleString()} assertions ` +
           `from ${resultStats.variants.toLocaleString()} variants. This may take some time. Continue?`
         );
         
-        if (!confirmed) {
-          return;
-        }
+        if (!confirmed) return;
       }
   
-      let response;
+      const content = generateDownloadContent(results, downloadFormat);
       
-      // For gene-symbol-only queries, send minimal info
-      if (isGeneSymbolOnly) {
-        response = await axiosInstance.post('/api/download', {
-          queryParams: {
-            geneSymbol: results[0].searchTerm,
-            fromCache: true
-          },
-          format: downloadFormat
-        }, {
-          responseType: 'blob',
-          timeout: 300000,
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity
-        });
-      } else {
-        // For all other queries, send full results
-        const normalizedResults = Array.isArray(results) ? 
-          results.flatMap(result => Array.isArray(result) ? result : [result])
-          .filter(result => !result.error) : 
-          [];
+      // Create blob with appropriate type
+      const contentTypes = {
+        csv: 'text/csv;charset=utf-8',
+        tsv: 'text/tab-separated-values;charset=utf-8',
+        xml: 'application/xml;charset=utf-8'
+      };
   
-        response = await axiosInstance.post('/api/download', {
-          results: normalizedResults,
-          format: downloadFormat
-        }, {
-          responseType: 'blob',
-          timeout: 300000,
-          maxContentLength: Infinity,
-          maxBodyLength: Infinity
-        });
-      }
-  
-      // Create and trigger download
-      const blob = new Blob([response.data], {
-        type: response.headers['content-type']
+      const blob = new Blob([content], { 
+        type: contentTypes[downloadFormat] 
       });
       
+      // Create and trigger download
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -110,7 +182,7 @@ const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, them
   
     } catch (error) {
       console.error('Download failed:', error);
-      setDownloadError('Failed to download results. Please try again.');
+      setDownloadError('Failed to generate download. Please try again.');
     }
   };
   
