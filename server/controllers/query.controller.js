@@ -548,21 +548,42 @@ exports.fetchResultsChunk = async (req, res) => {
 exports.downloadResults = async (req, res) => {
   try {
     console.log('Download request received');
-    const { results, format } = req.body;
+    const { results, queryParams, format } = req.body;
+    
+    console.log('Received download parameters:', { 
+      hasResults: !!results, 
+      hasQueryParams: !!queryParams, 
+      format 
+    });
 
-    if (!results || !format) {
-      console.log('Missing parameters:', { results: !!results, format });
+    if ((!results && !queryParams) || !format) {
+      console.log('Missing parameters:', { 
+        results: !!results, 
+        queryParams: !!queryParams, 
+        format 
+      });
       return res.status(400).json({ error: 'Missing required parameters' });
     }
 
-    // Filter out any error results and log counts
-    const validResults = results.filter(result => !result.error);
-    console.log(`Processing ${validResults.length} valid results for download in ${format} format`);
+    let contentToDownload;
 
-    const content = await generateDownloadContent(validResults, format);
-    console.log('Content generated, preparing to send');
+    if (queryParams?.fromCache && queryParams.geneSymbol) {
+      console.log('Processing cached gene-symbol query download');
+      const cachedResults = await processGeneSymbolDatabaseQuery(
+        queryParams.geneSymbol,
+        queryParams.clinicalSignificance,
+        queryParams.startDate,
+        queryParams.endDate
+      );
+      contentToDownload = await generateDownloadContent(cachedResults, format);
+    } else if (results) {
+      console.log('Processing normal results download');
+      contentToDownload = await generateDownloadContent(results, format);
+    } else {
+      return res.status(400).json({ error: 'Invalid download parameters' });
+    }
 
-    // Set appropriate headers
+    // Set headers and send response
     const contentTypes = {
       csv: 'text/csv',
       tsv: 'text/tab-separated-values',
@@ -572,9 +593,7 @@ exports.downloadResults = async (req, res) => {
     res.setHeader('Content-Type', contentTypes[format]);
     res.setHeader('Content-Disposition', `attachment; filename=clinvar_results_${new Date().toISOString().split('T')[0]}.${format}`);
     
-    console.log('Sending response');
-    res.send(content);
-    console.log('Download response sent');
+    res.send(contentToDownload);
 
   } catch (error) {
     console.error('Download generation error:', error);
