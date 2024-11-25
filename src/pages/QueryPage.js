@@ -143,7 +143,18 @@ const QueryPage = () => {
   };
 
   const handleAddSearchGroup = (group) => {
+    if (searchGroups.length >= 5) {
+      setErrors(['Maximum of 5 search groups allowed']);
+      return;
+    }
+    
+    if (!group.geneSymbol && !group.dnaChange && !group.proteinChange) {
+      setErrors(['Please provide at least one search criteria']);
+      return;
+    }
+    
     setSearchGroups(prev => [...prev, group]);
+    setErrors([]); // Clear any previous errors
   };
 
   const handleRemoveSearchGroup = (index) => {

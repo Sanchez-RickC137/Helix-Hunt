@@ -3,8 +3,6 @@ import { useThemeConstants } from '../Page/ThemeConstants';
 import { X, RotateCcw, Database } from 'lucide-react';
 import axiosInstance from '../../utils/axiosInstance';
 
-// import HelpTooltip from '../Help/HelpTooltip';
-
 const SearchGroupEntry = ({ group, onRemove, index }) => {
   const themeConstants = useThemeConstants();
   const [variantInfo, setVariantInfo] = useState(null);

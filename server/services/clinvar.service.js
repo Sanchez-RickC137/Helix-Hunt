@@ -4,7 +4,7 @@ const { Parser } = require('json2csv');
 const xml2js = require('xml2js');
 const { parseVariantDetails, refinedClinvarHtmlTableToJson } = require('../utils/clinvarUtils');
 const largeResultHandler = require('../utils/largeResultHandler');
-const { processGeneSymbolOnlyQuery } = require('./database.service');
+const { processSingleNonGeneGroup, processGeneSymbolOnlyQuery } = require('../services/database.service');
 
 // Rate limiting configuration
 const RATE_LIMIT = {
@@ -250,7 +250,7 @@ function normalizeSignificanceString(value) {
     .trim();
 }
 
-exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance, startDate, endDate) => {
+const processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance, startDate, endDate) => {
   try {
     // Check for gene-symbol-only search
     const isGeneSymbolOnly = searchGroup.geneSymbol && 
@@ -293,6 +293,16 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
         details: "No variants match the search criteria.",
         searchTerm: searchTerms
       }];
+    }
+
+    // Check result count
+    const resultCountMeta = $('meta[name="ncbi_resultcount"]');
+    if (resultCountMeta.length > 0) {
+      const count = parseInt(resultCountMeta.attr('content'));
+      if (count > 100) {
+        // Redirect to database query if count is too high
+        return processSingleNonGeneGroup(searchGroup, clinicalSignificance, startDate, endDate);
+      }
     }
 
     // Collect all matching URLs
