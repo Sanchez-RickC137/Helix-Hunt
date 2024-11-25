@@ -306,6 +306,67 @@ const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate,
   }
 };
 
+const QUERY_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const queryResultCache = new Map();
+
+// Public interface for processing gene-symbol-only queries, Used by the query controller
+const processGeneSymbolDatabaseQuery = async (geneSymbol, clinicalSignificance, startDate, endDate) => {
+  // Create cache key based on all parameters
+  const cacheKey = JSON.stringify({
+    geneSymbol,
+    clinicalSignificance,
+    startDate,
+    endDate
+  });
+
+  // Check cache
+  const cachedResult = queryResultCache.get(cacheKey);
+  if (cachedResult && (Date.now() - cachedResult.timestamp < QUERY_CACHE_TTL)) {
+    console.log(`Returning cached results for ${geneSymbol}`);
+    return cachedResult.data;
+  }
+
+  try {
+    console.log(`Starting gene symbol query for ${geneSymbol}`);
+    const results = await processGeneSymbolOnlyQuery(
+      geneSymbol, 
+      clinicalSignificance, 
+      startDate, 
+      endDate
+    );
+
+    // Cache the results
+    queryResultCache.set(cacheKey, {
+      timestamp: Date.now(),
+      data: results
+    });
+
+    // Cleanup old cache entries if cache gets too large
+    if (queryResultCache.size > 100) {
+      const now = Date.now();
+      for (const [key, value] of queryResultCache.entries()) {
+        if (now - value.timestamp > QUERY_CACHE_TTL) {
+          queryResultCache.delete(key);
+        }
+      }
+    }
+
+    return results;
+  } catch (error) {
+    console.error(`Error in gene symbol query for ${geneSymbol}:`, error);
+    throw error;
+  }
+};
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of queryResultCache.entries()) {
+    if (now - value.timestamp > QUERY_CACHE_TTL) {
+      queryResultCache.delete(key);
+    }
+  }
+}, QUERY_CACHE_TTL);
+
 // Single search group for gene only
 const processGeneSymbolOnlyQuery = async (geneSymbol, clinicalSignificance, startDate, endDate) => {
   try {

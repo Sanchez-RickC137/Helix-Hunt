@@ -42,7 +42,7 @@ const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, them
   const handleDownload = async () => {
     try {
       setDownloadError('');
-        
+      
       if (resultStats.assertions > DOWNLOAD_THRESHOLD) {
         if (!window.confirm(
           `This download contains ${resultStats.assertions.toLocaleString()} assertions ` +
@@ -55,10 +55,9 @@ const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, them
       // Add loading state
       const normalizedResults = Array.isArray(results) ? 
         results.flatMap(result => Array.isArray(result) ? result : [result])
-        .filter(result => !result.error) : // Filter out error results
-        [];
+        .filter(result => !result.error) : [];
   
-      console.log('Initiating download with', normalizedResults.length, 'results');
+      console.log(`Initiating download of ${normalizedResults.length} results`);
       
       const response = await axiosInstance.post('/api/download', {
         results: normalizedResults,
@@ -67,24 +66,30 @@ const DownloadPrompt = ({ setShowDownloadPrompt, onPreviewResults, results, them
         responseType: 'blob',
         timeout: 300000, // 5 minute timeout
         maxContentLength: Infinity,
-        maxBodyLength: Infinity
+        maxBodyLength: Infinity,
+        onDownloadProgress: (progressEvent) => {
+          console.log('Download progress:', progressEvent);
+        }
       });
-      
-      // Create and trigger download
+  
+      // Handle the downloaded blob
       const blob = new Blob([response.data], {
         type: response.headers['content-type']
       });
+      
+      // Use browser's download capability
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', `clinvar_results_${new Date().toISOString().split('T')[0]}.${downloadFormat}`);
       document.body.appendChild(link);
       link.click();
-      link.parentNode.removeChild(link);
+      document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
+      
     } catch (error) {
       console.error('Download failed:', error);
-      setDownloadError(`Failed to download results: ${error.message}`);
+      setDownloadError(`Download failed: ${error.message}. Please try again.`);
     }
   };
   
