@@ -1,6 +1,6 @@
 import React from 'react';
 import { useThemeConstants } from '../components/Page/ThemeConstants';
-import { Search, Database, Download, Users, Sparkles, Clock } from 'lucide-react';
+import { Search, Database, Download, Users, Sparkles, Clock, School, HeartHandshake } from 'lucide-react';
 
 const AboutPage = () => {
   const themeConstants = useThemeConstants();
@@ -83,6 +83,42 @@ const AboutPage = () => {
               <p>{feature.description}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Credits Section */}
+      <section className="mb-16">
+        <h2 className={`text-2xl font-semibold mb-8 ${themeConstants.headingTextColor}`}>Credits</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className={`p-6 rounded-lg shadow-lg ${themeConstants.unselectedItemBackgroundColor}`}>
+            <div className={`${themeConstants.labelAccentColor} mb-4`}>
+              <School size={24} />
+            </div>
+            <h3 className={`text-xl font-semibold mb-2 ${themeConstants.headingTextColor}`}>
+              Development Team
+            </h3>
+            <p className="mb-4">Charleston Southern University - Systems Analysis and Design (2024 Fall)</p>
+            <ul className="list-disc list-inside space-y-2">
+              <li>Justin Pike</li>
+              <li>Marina Skegro</li>
+              <li>Mackenzie Wessels</li>
+              <li>James Wood</li>
+              
+            </ul>
+          </div>
+
+          <div className={`p-6 rounded-lg shadow-lg ${themeConstants.unselectedItemBackgroundColor}`}>
+            <div className={`${themeConstants.labelAccentColor} mb-4`}>
+              <HeartHandshake size={24} />
+            </div>
+            <h3 className={`text-xl font-semibold mb-2 ${themeConstants.headingTextColor}`}>
+              Domain Expert & Customer
+            </h3>
+            <p className="mb-4">This project was made possible through the expertise and guidance of:</p>
+            <p className="font-semibold">Kevin S. Hughes, MD, FACS</p>
+            <p>Director of Cancer Genetics</p>
+            <p>Medical University of South Carolina</p>
+          </div>
         </div>
       </section>
 
