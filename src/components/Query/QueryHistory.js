@@ -61,7 +61,7 @@ const QueryHistory = ({ queryHistory, onSelectQuery }) => {
           <strong>Search Groups: </strong>
           <div className="ml-4 space-y-1">
             {query.search_groups.map((group, index) => (
-              <div key={index} className="text-sm p-2 bg-gray-50 dark:bg-gray-700 rounded">
+              <div key={index} className="text-sm p-2">
                 {renderSearchGroup(group)}
               </div>
             ))}

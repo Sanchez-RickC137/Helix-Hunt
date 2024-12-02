@@ -1,0 +1,26 @@
+Searching ClinVar with criteria: {
+  geneSymbol: undefined,
+  dnaChange: 'c.449G',
+  proteinChange: undefined
+}
+Encoded DNA change: c.449G
+Search URL: https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=clinvar&term=(c.449G[text])&retmax=500
+Found 1 matching variations
+Processing 1 variation IDs...
+Processing 1 variation archives
+
+Validating variation: NM_020791.4(TAOK1):c.449G>T (p.Arg150Ile)
+Looking for DNA change: c.449G
+Normalized DNA change: c.449g
+Normalized DNA change: c.nm_020791.4(taok1):c.449g>t(p.arg150ile)
+Comparing DNA changes:
+  Normalized input: c.449g
+  Normalized name: c.nm_020791.4(taok1):c.449g>t(p.arg150ile)
+Matched DNA change in: NM_020791.4(TAOK1):c.449G>T (p.Arg150Ile)
+Validated: NM_020791.4(TAOK1):c.449G>T (p.Arg150Ile)
+Validated 1 variations out of 1
+Generated 2 assertion records
+Processed 1/1 IDs (100%)
+Total execution: 418.829ms
+Found 2 matching assertions
+Results written to clinvar_results.json
