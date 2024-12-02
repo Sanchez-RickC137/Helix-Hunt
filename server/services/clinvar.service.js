@@ -329,10 +329,11 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
       }];
     }
 
-    return results.filter(result => {
-      if (!result.assertionList) return false;
+    return results.map(result => {
+      if (!result.assertionList) return result;
       
-      return result.assertionList.some(assertion => {
+      // Filter the assertionList to only include submissions within date range
+      const filteredAssertions = result.assertionList.filter(assertion => {
         const assertionDate = new Date(assertion.Classification.date);
         
         const matchesStartDate = !validStartDate || assertionDate >= validStartDate;
@@ -342,10 +343,15 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
           clinicalSignificance.some(sig => 
             assertion.Classification.value.toLowerCase().trim() === sig.toLowerCase().trim()
           );
-
+    
         return matchesSignificance && matchesStartDate && matchesEndDate;
       });
-    });
+    
+      return {
+        ...result,
+        assertionList: filteredAssertions
+      };
+    }).filter(result => result.assertionList.length > 0);
 
   } catch (error) {
     return [{

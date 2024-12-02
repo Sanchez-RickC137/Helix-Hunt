@@ -269,32 +269,40 @@ const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate,
   }
 
   const query = `
-    WITH filtered_variants AS (
-      SELECT DISTINCT vs.* 
-      FROM "variant_summary" vs
-      WHERE ${conditions.join(' ')}
-    )
-    SELECT DISTINCT
-        vs."VariationID",
-        vs."Name",
-        vs."GeneSymbol",
-        vs."ClinicalSignificance" AS "OverallClinicalSignificance",
-        vs."LastEvaluated" AS "OverallLastEvaluated",
-        vs."ReviewStatus" AS "OverallReviewStatus",
-        vs."RCVaccession" AS "AccessionID",
-        ss.ClinicalSignificance,
-        ss.DateLastEvaluated,
-        ss.ReviewStatus,
-        ss.CollectionMethod AS "Method",
-        ss.ReportedPhenotypeInfo AS "ConditionInfo",
-        ss.Submitter,
-        ss.SCV AS "SubmitterAccession",
-        ss.Description,
-        ss.OriginCounts AS "AlleleOrigin"
+  WITH filtered_variants AS (
+    SELECT DISTINCT vs.* 
+    FROM "variant_summary" vs
+    WHERE ${conditions.join(' ')}
+  ),
+  filtered_submissions AS (
+    SELECT ss.*
     FROM filtered_variants vs
-    LEFT JOIN submission_summary ss ON vs."VariationID" = ss.VariationID
-    ${whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : ''}
-    ORDER BY ss.DateLastEvaluated DESC`;
+    JOIN submission_summary ss ON vs."VariationID" = ss.VariationID
+    WHERE 1=1
+    ${clinicalSignificance?.length ? `AND ss.ClinicalSignificance = ANY($${paramCount++})` : ''}
+    ${startDate && startDate !== '' && startDate !== '-' ? `AND ss.DateLastEvaluated >= $${paramCount++}` : ''}
+    ${endDate && endDate !== '' && endDate !== '-' ? `AND ss.DateLastEvaluated <= $${paramCount++}` : ''}
+  )
+  SELECT DISTINCT
+      vs."VariationID",
+      vs."Name",
+      vs."GeneSymbol",
+      vs."ClinicalSignificance" AS "OverallClinicalSignificance",
+      vs."LastEvaluated" AS "OverallLastEvaluated",
+      vs."ReviewStatus" AS "OverallReviewStatus",
+      vs."RCVaccession" AS "AccessionID",
+      fs.ClinicalSignificance,
+      fs.DateLastEvaluated,
+      fs.ReviewStatus,
+      fs.CollectionMethod AS "Method",
+      fs.ReportedPhenotypeInfo AS "ConditionInfo",
+      fs.Submitter,
+      fs.SCV AS "SubmitterAccession",
+      fs.Description,
+      fs.OriginCounts AS "AlleleOrigin"
+  FROM filtered_variants vs
+  JOIN filtered_submissions fs ON vs."VariationID" = fs.VariationID
+  ORDER BY fs.DateLastEvaluated DESC`;
 
   try {
     const result = await pool.query(query, params);
