@@ -250,7 +250,7 @@ function normalizeSignificanceString(value) {
     .trim();
 }
 
-const processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance, startDate, endDate) => {
+exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance, startDate, endDate) => {
   try {
     const isGeneSymbolOnly = searchGroup.geneSymbol && 
       !searchGroup.dnaChange && 
