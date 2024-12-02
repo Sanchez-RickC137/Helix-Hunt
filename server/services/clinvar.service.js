@@ -86,24 +86,17 @@ const processUrlBatch = async (urls, searchQuery, clinicalSignificance, startDat
         // Apply filters with case-insensitive matching
         if (clinicalSignificance?.length || startDate || endDate) {
           assertionList = assertionList.filter(a => {
-            const matchesSignificance = clinicalSignificance?.length
-              ? clinicalSignificance.some(sig => {
-                  // Log the comparison for debugging
-                  // console.log('Comparing:', {
-                  //   assertion: a.Classification.value.toLowerCase().trim(),
-                  //   filter: sig.toLowerCase().trim()
-                  // });
-                  return a.Classification.value.toLowerCase().trim() === sig.toLowerCase().trim();
-                })
-              : true;
+            const matchesSignificance = !clinicalSignificance?.length || 
+              clinicalSignificance.some(sig => 
+                a.Classification.value.toLowerCase().trim() === sig.toLowerCase().trim()
+              );
 
-            const matchesStartDate = startDate
-              ? new Date(a.Classification.date) >= new Date(startDate)
-              : true;
+            const aDate = new Date(a.Classification.date);
+            const startDateObj = startDate ? new Date(startDate) : null;
+            const endDateObj = endDate ? new Date(endDate) : null;
 
-            const matchesEndDate = endDate
-              ? new Date(a.Classification.date) <= new Date(endDate)
-              : true;
+            const matchesStartDate = !startDate || (aDate >= startDateObj);
+            const matchesEndDate = !endDate || (aDate <= endDateObj);
 
             return matchesSignificance && matchesStartDate && matchesEndDate;
           });
