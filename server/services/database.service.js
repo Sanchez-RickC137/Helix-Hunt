@@ -276,14 +276,15 @@ const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate,
     FROM filtered_variants vs
     LEFT JOIN submission_summary ss 
         ON vs."VariationID" = ss.VariationID
-    ${clinicalSignificance?.length ? `WHERE ss.ClinicalSignificance = ANY($${paramCount++})` : ''}
-    ${startDate ? `AND ss.DateLastEvaluated::date >= $${paramCount++}::date` : ''}
-    ${endDate ? `AND ss.DateLastEvaluated::date <= $${paramCount++}::date` : ''}
+    ${clinicalSignificance?.length || startDate || endDate ? 'WHERE' : ''}
+    ${clinicalSignificance?.length ? `ss.ClinicalSignificance = ANY($${paramCount++})` : ''}
+    ${startDate ? `${clinicalSignificance?.length ? 'AND' : ''} ss.DateLastEvaluated::date >= $${paramCount++}::date` : ''}
+    ${endDate ? `${(clinicalSignificance?.length || startDate) ? 'AND' : ''} ss.DateLastEvaluated::date <= $${paramCount++}::date` : ''}
     ORDER BY ss.DateLastEvaluated DESC`;
 
   if (clinicalSignificance?.length) params.push(clinicalSignificance);
-  if (startDate) params.push(startDate);
-  if (endDate) params.push(endDate);
+  if (startDate && startDate !== '-') params.push(startDate);
+  if (endDate && endDate !== '-') params.push(endDate);
 
   try {
     const result = await pool.query(query, params);
@@ -296,7 +297,7 @@ const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate,
   } catch (error) {
     console.error('Database query error for group:', group, error);
     return [{
-      error: "Query failed",
+      error: "Query failed", 
       details: error.message,
       searchTerms: Object.entries(group)
         .filter(([_, value]) => value)
