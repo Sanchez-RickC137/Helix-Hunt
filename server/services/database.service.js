@@ -250,59 +250,51 @@ const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate,
     conditions.push(')');
   }
 
-  // Add WHERE conditions
-  const whereConditions = [];
-  
+  const baseQuery = `
+    WITH filtered_variants AS (
+      SELECT DISTINCT vs.* 
+      FROM "variant_summary" vs
+      WHERE ${conditions.join(' ')}
+    )`;
+
+  let filterClauses = [];
   if (clinicalSignificance?.length) {
-    whereConditions.push(`ss.ClinicalSignificance = ANY($${paramCount++})`);
+    filterClauses.push(`ss.ClinicalSignificance = ANY($${paramCount++})`);
     params.push(clinicalSignificance);
   }
 
   if (startDate && startDate !== '' && startDate !== '-') {
-    whereConditions.push(`ss.DateLastEvaluated >= $${paramCount++}`);
+    filterClauses.push(`ss.DateLastEvaluated >= $${paramCount++}`);
     params.push(startDate);
   }
 
   if (endDate && endDate !== '' && endDate !== '-') {
-    whereConditions.push(`ss.DateLastEvaluated <= $${paramCount++}`);
+    filterClauses.push(`ss.DateLastEvaluated <= $${paramCount++}`);
     params.push(endDate);
   }
 
-  const query = `
-  WITH filtered_variants AS (
-    SELECT DISTINCT vs.* 
-    FROM "variant_summary" vs
-    WHERE ${conditions.join(' ')}
-  ),
-  filtered_submissions AS (
-    SELECT ss.*
+  const query = `${baseQuery}
+    SELECT DISTINCT
+        vs."VariationID",
+        vs."Name",
+        vs."GeneSymbol",
+        vs."ClinicalSignificance" AS "OverallClinicalSignificance",
+        vs."LastEvaluated" AS "OverallLastEvaluated",
+        vs."ReviewStatus" AS "OverallReviewStatus",
+        vs."RCVaccession" AS "AccessionID",
+        ss.ClinicalSignificance,
+        ss.DateLastEvaluated,
+        ss.ReviewStatus,
+        ss.CollectionMethod AS "Method",
+        ss.ReportedPhenotypeInfo AS "ConditionInfo",
+        ss.Submitter,
+        ss.SCV AS "SubmitterAccession",
+        ss.Description,
+        ss.OriginCounts AS "AlleleOrigin"
     FROM filtered_variants vs
-    JOIN submission_summary ss ON vs."VariationID" = ss.VariationID
-    WHERE 1=1
-    ${clinicalSignificance?.length ? `AND ss.ClinicalSignificance = ANY($${paramCount++})` : ''}
-    ${startDate && startDate !== '' && startDate !== '-' ? `AND ss.DateLastEvaluated >= $${paramCount++}` : ''}
-    ${endDate && endDate !== '' && endDate !== '-' ? `AND ss.DateLastEvaluated <= $${paramCount++}` : ''}
-  )
-  SELECT DISTINCT
-      vs."VariationID",
-      vs."Name",
-      vs."GeneSymbol",
-      vs."ClinicalSignificance" AS "OverallClinicalSignificance",
-      vs."LastEvaluated" AS "OverallLastEvaluated",
-      vs."ReviewStatus" AS "OverallReviewStatus",
-      vs."RCVaccession" AS "AccessionID",
-      fs.ClinicalSignificance,
-      fs.DateLastEvaluated,
-      fs.ReviewStatus,
-      fs.CollectionMethod AS "Method",
-      fs.ReportedPhenotypeInfo AS "ConditionInfo",
-      fs.Submitter,
-      fs.SCV AS "SubmitterAccession",
-      fs.Description,
-      fs.OriginCounts AS "AlleleOrigin"
-  FROM filtered_variants vs
-  JOIN filtered_submissions fs ON vs."VariationID" = fs.VariationID
-  ORDER BY fs.DateLastEvaluated DESC`;
+    LEFT JOIN submission_summary ss ON vs."VariationID" = ss.VariationID
+    ${filterClauses.length ? 'WHERE ' + filterClauses.join(' AND ') : ''}
+    ORDER BY ss.DateLastEvaluated DESC`;
 
   try {
     const result = await pool.query(query, params);
