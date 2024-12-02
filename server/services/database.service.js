@@ -250,6 +250,24 @@ const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate,
     conditions.push(')');
   }
 
+  // Add WHERE conditions
+  const whereConditions = [];
+  
+  if (clinicalSignificance?.length) {
+    whereConditions.push(`ss.ClinicalSignificance = ANY($${paramCount++})`);
+    params.push(clinicalSignificance);
+  }
+
+  if (startDate && startDate !== '' && startDate !== '-') {
+    whereConditions.push(`ss.DateLastEvaluated >= $${paramCount++}`);
+    params.push(startDate);
+  }
+
+  if (endDate && endDate !== '' && endDate !== '-') {
+    whereConditions.push(`ss.DateLastEvaluated <= $${paramCount++}`);
+    params.push(endDate);
+  }
+
   const query = `
     WITH filtered_variants AS (
       SELECT DISTINCT vs.* 
@@ -274,17 +292,9 @@ const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate,
         ss.Description,
         ss.OriginCounts AS "AlleleOrigin"
     FROM filtered_variants vs
-    LEFT JOIN submission_summary ss 
-        ON vs."VariationID" = ss.VariationID
-    ${clinicalSignificance?.length || startDate || endDate ? 'WHERE' : ''}
-    ${clinicalSignificance?.length ? `ss.ClinicalSignificance = ANY($${paramCount++})` : ''}
-    ${startDate ? `${clinicalSignificance?.length ? 'AND' : ''} ss.DateLastEvaluated::date >= $${paramCount++}::date` : ''}
-    ${endDate ? `${(clinicalSignificance?.length || startDate) ? 'AND' : ''} ss.DateLastEvaluated::date <= $${paramCount++}::date` : ''}
+    LEFT JOIN submission_summary ss ON vs."VariationID" = ss.VariationID
+    ${whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : ''}
     ORDER BY ss.DateLastEvaluated DESC`;
-
-  if (clinicalSignificance?.length) params.push(clinicalSignificance);
-  if (startDate && startDate !== '-') params.push(startDate);
-  if (endDate && endDate !== '-') params.push(endDate);
 
   try {
     const result = await pool.query(query, params);
@@ -297,7 +307,7 @@ const processSingleNonGeneGroup = async (group, clinicalSignificance, startDate,
   } catch (error) {
     console.error('Database query error for group:', group, error);
     return [{
-      error: "Query failed", 
+      error: "Query failed",
       details: error.message,
       searchTerms: Object.entries(group)
         .filter(([_, value]) => value)

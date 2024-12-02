@@ -86,17 +86,24 @@ const processUrlBatch = async (urls, searchQuery, clinicalSignificance, startDat
         // Apply filters with case-insensitive matching
         if (clinicalSignificance?.length || startDate || endDate) {
           assertionList = assertionList.filter(a => {
-            const matchesSignificance = !clinicalSignificance?.length || 
-              clinicalSignificance.some(sig => 
-                a.Classification.value.toLowerCase().trim() === sig.toLowerCase().trim()
-              );
+            const matchesSignificance = clinicalSignificance?.length
+              ? clinicalSignificance.some(sig => {
+                  // Log the comparison for debugging
+                  // console.log('Comparing:', {
+                  //   assertion: a.Classification.value.toLowerCase().trim(),
+                  //   filter: sig.toLowerCase().trim()
+                  // });
+                  return a.Classification.value.toLowerCase().trim() === sig.toLowerCase().trim();
+                })
+              : true;
 
-            const aDate = new Date(a.Classification.date);
-            const startDateObj = startDate ? new Date(startDate) : null;
-            const endDateObj = endDate ? new Date(endDate) : null;
+            const matchesStartDate = startDate
+              ? new Date(a.Classification.date) >= new Date(startDate)
+              : true;
 
-            const matchesStartDate = !startDate || (aDate >= startDateObj);
-            const matchesEndDate = !endDate || (aDate <= endDateObj);
+            const matchesEndDate = endDate
+              ? new Date(a.Classification.date) <= new Date(endDate)
+              : true;
 
             return matchesSignificance && matchesStartDate && matchesEndDate;
           });
@@ -243,9 +250,8 @@ function normalizeSignificanceString(value) {
     .trim();
 }
 
-exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance, startDate, endDate) => {
+const processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance, startDate, endDate) => {
   try {
-    // Check for gene-symbol-only search
     const isGeneSymbolOnly = searchGroup.geneSymbol && 
       !searchGroup.dnaChange && 
       !searchGroup.proteinChange;
@@ -259,7 +265,6 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
       );
     }
 
-    // Construct search query string
     let searchTerms = '';
     if (searchGroup.dnaChange)
       searchTerms += searchGroup.dnaChange;
@@ -275,11 +280,6 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
     const response = await axios.get(searchUrl);
     let $ = cheerio.load(response.data);
 
-    if ($('title').text().startsWith('VCV')) {
-      // Handle direct VCV page
-      return processDirectVcvPage($, searchTerms, clinicalSignificance, startDate, endDate);
-    }
-
     if ($('title').text().includes('No items found')) {
       return [{
         error: "No items found",
@@ -288,17 +288,6 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
       }];
     }
 
-    // Check result count
-    const resultCountMeta = $('meta[name="ncbi_resultcount"]');
-    if (resultCountMeta.length > 0) {
-      const count = parseInt(resultCountMeta.attr('content'));
-      if (count > 100) {
-        // Redirect to database query if count is too high
-        return processSingleNonGeneGroup(searchGroup, clinicalSignificance, startDate, endDate);
-      }
-    }
-
-    // Collect all matching URLs
     const matchingUrls = new Set();
     $('.blocklevelaintable').each((_, entry) => {
       const entryText = $(entry).text().trim();
@@ -321,8 +310,16 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
       }];
     }
 
-    // Process URLs using the optimized function
-    const { results } = await processAllUrls(urlArray, searchTerms, clinicalSignificance, startDate, endDate);
+    const validStartDate = startDate && startDate !== '' && startDate !== '-' ? new Date(startDate) : null;
+    const validEndDate = endDate && endDate !== '' && endDate !== '-' ? new Date(endDate) : null;
+
+    const { results } = await processAllUrls(
+      urlArray, 
+      searchTerms,
+      clinicalSignificance,
+      validStartDate,
+      validEndDate
+    );
 
     if (!results.length) {
       return [{
@@ -332,7 +329,23 @@ exports.processGeneralClinVarWebQuery = async (searchGroup, clinicalSignificance
       }];
     }
 
-    return results;
+    return results.filter(result => {
+      if (!result.assertionList) return false;
+      
+      return result.assertionList.some(assertion => {
+        const assertionDate = new Date(assertion.Classification.date);
+        
+        const matchesStartDate = !validStartDate || assertionDate >= validStartDate;
+        const matchesEndDate = !validEndDate || assertionDate <= validEndDate;
+        
+        const matchesSignificance = !clinicalSignificance?.length ||
+          clinicalSignificance.some(sig => 
+            assertion.Classification.value.toLowerCase().trim() === sig.toLowerCase().trim()
+          );
+
+        return matchesSignificance && matchesStartDate && matchesEndDate;
+      });
+    });
 
   } catch (error) {
     return [{
